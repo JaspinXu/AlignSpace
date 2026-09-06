@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alignspace.example/schemas/design-brief.schema.json",
+  "title": "AlignSpace Design Brief",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "goals", "attributes", "constraints", "conflicts", "completeness", "version", "approvals"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "roomType", "budgetBand", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "roomType": { "const": "living_room" },
+        "housingType": { "type": ["string", "null"] },
+        "budgetBand": { "enum": ["under_15k_sgd", "15k_to_30k_sgd", "30k_to_50k_sgd", "over_50k_sgd", "prefer_not_to_say"] },
+        "status": { "enum": ["draft", "analysing", "homeowner_review", "designer_review", "alignment", "awaiting_approval", "approved", "archived"] }
+      }
+    },
+    "goals": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "antiPreferences": { "type": "array", "items": { "type": "string", "minLength": 1 }, "default": [] },
+    "attributes": { "type": "array", "items": { "$ref": "#/$defs/attribute" } },
+    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } },
+    "conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" } },
+    "unresolvedDecisions": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "completeness": { "type": "number", "minimum": 0, "maximum": 1 },
+    "version": { "type": "integer", "minimum": 1 },
+    "contentHash": { "type": "string", "minLength": 1 },
+    "approvals": { "type": "array", "items": { "$ref": "#/$defs/approval" }, "maxItems": 2 }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceType", "sourceId", "description"],
+      "properties": {
+        "sourceType": { "enum": ["image", "homeowner_answer", "designer_note", "system_rule"] },
+        "sourceId": { "type": "string", "minLength": 1 },
+        "region": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 },
+            "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "height": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+          }
+        },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "attribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "dimension", "value", "status", "confidence", "evidence", "actor"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "dimension": { "enum": ["style", "colour", "material", "lighting", "layout", "furniture", "mood", "function", "maintenance", "other"] },
+        "value": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["proposed", "confirmed", "rejected", "conflicted", "unresolved", "not_applicable"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" }, "minItems": 1 },
+        "actor": { "enum": ["vision_agent", "homeowner", "designer", "alignment_agent"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "statement", "severity", "verificationStatus", "owner"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "category": { "enum": ["budget", "space", "function", "maintenance", "timeline", "safety", "regulatory", "availability", "other"] },
+        "statement": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string" },
+        "severity": { "enum": ["advisory", "important", "critical"] },
+        "verificationStatus": { "enum": ["unverified", "designer_asserted", "professional_review_required", "verified"] },
+        "owner": { "enum": ["designer", "qualified_professional", "homeowner"] }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "summary", "impact", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["reference_conflict", "stated_vs_visual", "preference_vs_constraint", "human_vs_human", "evidence_gap"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "impact": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["open", "resolved", "escalated", "accepted_unresolved"] },
+        "resolution": { "type": ["string", "null"] }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "actorId", "briefVersion", "contentHash", "approvedAt"],
+      "properties": {
+        "role": { "enum": ["homeowner", "designer"] },
+        "actorId": { "type": "string", "minLength": 1 },
+        "briefVersion": { "type": "integer", "minimum": 1 },
+        "contentHash": { "type": "string", "minLength": 1 },
+        "approvedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
+

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": {
+    "id": "demo-project-haven",
+    "roomType": "living_room",
+    "housingType": "hdb_4_room",
+    "budgetBand": "15k_to_30k_sgd",
+    "status": "alignment"
+  },
+  "goals": [
+    "Create a calm shared living space",
+    "Keep everyday storage visually unobtrusive",
+    "Use finishes that are practical for a household with a pet"
+  ],
+  "antiPreferences": ["high-gloss surfaces", "cool clinical lighting"],
+  "attributes": [
+    {
+      "id": "attr-pale-oak",
+      "dimension": "material",
+      "value": "pale oak or a visually similar low-maintenance finish",
+      "status": "confirmed",
+      "confidence": 1,
+      "evidence": [{
+        "sourceType": "homeowner_answer",
+        "sourceId": "answer-03",
+        "description": "Homeowner selected pale oak as the element they liked across two references."
+      }],
+      "actor": "homeowner",
+      "updatedAt": "2026-09-06T12:00:00+08:00"
+    },
+    {
+      "id": "attr-warm-light",
+      "dimension": "lighting",
+      "value": "warm ambient lighting with task lighting where needed",
+      "status": "confirmed",
+      "confidence": 1,
+      "evidence": [{
+        "sourceType": "homeowner_answer",
+        "sourceId": "answer-05",
+        "description": "Homeowner preferred the warm-lit comparison and rejected a cool-lit alternative."
+      }],
+      "actor": "homeowner",
+      "updatedAt": "2026-09-06T12:03:00+08:00"
+    },
+    {
+      "id": "attr-light-sofa",
+      "dimension": "furniture",
+      "value": "light neutral sofa upholstery",
+      "status": "conflicted",
+      "confidence": 0.78,
+      "evidence": [{
+        "sourceType": "image",
+        "sourceId": "demo-image-02",
+        "region": { "x": 0.17, "y": 0.43, "width": 0.58, "height": 0.38 },
+        "description": "A large light neutral sofa is prominent in the reference."
+      }],
+      "actor": "vision_agent",
+      "updatedAt": "2026-09-06T11:57:00+08:00"
+    }
+  ],
+  "constraints": [{
+    "id": "constraint-pet-upholstery",
+    "category": "maintenance",
+    "statement": "The selected upholstery should tolerate frequent cleaning and visible pet hair.",
+    "rationale": "The household has a pet and prioritises easy maintenance.",
+    "severity": "important",
+    "verificationStatus": "designer_asserted",
+    "owner": "designer"
+  }],
+  "conflicts": [{
+    "id": "conflict-sofa-maintenance",
+    "type": "preference_vs_constraint",
+    "summary": "The preferred light sofa appearance may increase visible staining or cleaning effort.",
+    "impact": "Material choice and maintenance routine must be agreed before furniture selection.",
+    "status": "open",
+    "resolution": null
+  }],
+  "unresolvedDecisions": ["Choose a light performance fabric or a slightly darker neutral upholstery."],
+  "completeness": 0.82,
+  "version": 3,
+  "contentHash": "demo-sha256-placeholder-v3",
+  "approvals": []
+}
+
