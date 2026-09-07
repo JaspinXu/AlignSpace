@@ -69,6 +69,42 @@ All announcements, support, and submission changes are communicated through Slac
 6. The Review Agent checks provenance, confidence, safety, and brief completeness.
 7. Both people edit and explicitly approve a versioned design brief.
 
+## Simplified system architecture
+
+```mermaid
+flowchart TB
+    H["Homeowner<br/>Preferences and inspiration images"]
+    D["Designer<br/>Budget, constraints, and professional judgement"]
+
+    H <-->|"Answer and confirm"| HA["Homeowner-side Agent<br/>Extracts and validates preferences"]
+    D <-->|"Answer and confirm"| DA["Designer-side Agent<br/>Structures constraints and feasibility"]
+
+    HA <-->|"AQ-Agent-QA<br/>Ask · answer · translate · cross-check"| DA
+
+    HA --> S[("Shared Project Design State")]
+    DA --> S
+    L[("Design reference library")] --> K
+
+    S --> K["Akinator-inspired Question Selector<br/>Chooses the highest-information question"]
+    K -->|"Ask the homeowner"| HA
+    K -->|"Ask the designer"| DA
+    K -->|"Eliminate mismatched directions<br/>and narrow the candidate space"| S
+
+    S --> C{"Are preferences, constraints,<br/>and candidate directions aligned?"}
+    C -->|"Not yet"| K
+    C -->|"Yes"| B["Generate shared Design Brief"]
+
+    B --> A["Homeowner and designer review"]
+    A -->|"Revise"| S
+    A -->|"Both approve"| O["Final versioned Design Brief"]
+```
+
+The architecture combines two complementary ideas:
+
+- **AQ-Agent-QA:** the homeowner-side and designer-side agents question, answer, translate, and cross-check each other's structured understanding. They may reason from confirmed state, but any unresolved or consequential assumption is returned to the relevant human for confirmation.
+- **Akinator-inspired questioning:** instead of following a fixed questionnaire, the system selects the next question by expected information gain. Each answer should eliminate incompatible design directions, resolve an important conflict, or narrow the reference set.
+- **Controlled convergence:** the loop continues until preferences, professional constraints, and retrieved design directions are sufficiently aligned. The output is released only after both people approve the same versioned brief.
+
 ## Repository guide
 
 | File | Purpose |
