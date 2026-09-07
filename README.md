@@ -18,6 +18,47 @@ AlignSpace does not replace a designer and does not produce construction advice.
 
 > From 3–10 inspiration images to a mutually approved living-room design brief in one guided session, with every AI inference labelled, editable, and linked to evidence.
 
+## Hackathon operating brief
+
+This section captures organiser guidance from the **ShowMeYourAgent - NUS ISS** Slack workspace and the briefing deck shared there. It was last reconciled on **7 September 2026 (Singapore time)**. Treat newer organiser announcements in Slack as authoritative if they conflict with this summary.
+
+### What must be delivered
+
+- **Shortlisting deadline:** 28 September 2026 at **9:00am SGT**.
+- **Finale:** shortlisted teams must be ready for a face-to-face demo on 10 October 2026 at **8:30am SGT**.
+- Post the shortlisting entry in `#submission`. Ignore `#round1-submission`, which organisers identified as an internal test channel. `#final-submission` is only for finalist updates.
+- The Slack post itself should be text and include the team code, project name, a judge-accessible GitHub repository URL, and a YouTube or other view/download URL for the MP4 demo. Do **not** upload the video directly to the submission channel.
+- Also prepare the PDF write-up and deployment evidence or URL. The briefing deck describes a 30-minute video; verify this unusually long duration against the latest Slack announcement before recording.
+- Incomplete or inaccessible submissions may be rejected. Test repository, video, and deployment links from a signed-out browser before posting.
+
+### Build and deployment constraints
+
+- Any programming language, agent framework, and local development tool may be used. The organiser explicitly allows teams to code a custom agent.
+- Development may use the team's own services and AI tools, but the version assessed for the competition must deploy on the organiser-provided **AWS Lightsail** environment.
+- The organiser plans to expose LLM prompting through a team API in JSON format rather than provide direct Bedrock access. The briefing names **Claude Sonnet 4.5** behind that API; connection details and the team API key are distributed separately.
+- Shortlisting support is stated as **USD 100 of AWS credit per team** and **USD 20 of Kiro credit per participant**. Usage beyond the provided AWS limit may pause the account and affect the entry.
+- Teams may use their own datasets or RAG documents. When real SME data, business rules, or third-party integrations are unavailable, the organiser allows clearly stated assumptions, mock data, mock company APIs, and public APIs.
+
+### What the proposal and judging should demonstrate
+
+- Public-category teams choose one business problem from the proposal form and may narrow a vague statement to a specific industry and target group. SME-category teams propose their own business problem; organisers can help assign one when needed.
+- Work can begin once the problem is selected. The implementation may differ from the initial proposal, but the final agent must still address the business goal.
+- Explain the chosen scope and assumptions, justify the method, and make the business value explicit.
+- The published rubric covers: goal and scope; architecture and reasoning loop; tool use and integration; autonomy and human-in-the-loop controls; safety, security and guardrails; observability and evaluation; and platform/tooling usage.
+- For AlignSpace, the strongest evidence is a complete trace from ambiguous references to an approved brief, including explicit state and memory, typed tool boundaries, human approval gates, prompt-injection resistance, least privilege, logs, and both golden-path and adversarial evaluations.
+
+### Slack channel map
+
+| Channel | Use |
+|---|---|
+| `#tech-support` | AWS and other technical issues |
+| `#solutioning` | Approach, architecture, and solution brainstorming |
+| `#admin-related` | Organiser or mentor questions |
+| `#submission` | Shortlisting deliverables due 28 September |
+| `#final-submission` | Finalist-only updated artifacts |
+
+All announcements, support, and submission changes are communicated through Slack, so this repository summary should be rechecked before packaging.
+
 ## Core workflow
 
 1. Homeowner creates a project, gives consent, uploads references, and supplies room/budget context.
@@ -32,6 +73,7 @@ AlignSpace does not replace a designer and does not produce construction advice.
 
 | File | Purpose |
 |---|---|
+| [Official hackathon briefing](docs/references/showmeyouragent-hackathon-briefing-2026-09-06.pdf) | Organiser-provided rules, rubric, dates, submission format, and AWS/Kiro support |
 | [Official context](docs/00-official-context.md) | Verified event facts vs team assumptions |
 | [Product requirements](docs/01-product-requirements.md) | PRD, scope, users, stories, acceptance criteria |
 | [Research plan](docs/02-user-research-plan.md) | Interviews, tests, consent, synthesis |
@@ -60,10 +102,10 @@ These tools operate at different layers and are alternatives where noted:
 | [OpenClaw](https://github.com/openclaw/openclaw) | Optional self-hosted gateway for a fast WhatsApp, Telegram, or WebChat demo. AWS provides a preconfigured [Lightsail deployment](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-quick-start-guide-openclaw.html) that can call Amazon Bedrock. It should remain a channel adapter rather than own multi-user project state. |
 | [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) | Alternative general-purpose agent runtime with persistent memory, skills, specialist bots, MCP, and delegation. Useful for experimenting with interview and alignment strategies. |
 | [NanoClaw](https://github.com/nanocoai/nanoclaw) | Alternative lightweight runtime that isolates agent groups in containers. Useful when prototype security, limited filesystem access, and code auditability are the priority. |
-| AWS cloud resources | Production foundation: Bedrock for multimodal reasoning, S3 for images and briefs, DynamoDB for structured alignment state, Cognito/API Gateway for access, and Lambda plus Step Functions or AgentCore for orchestration. |
+| AWS competition resources | Required assessment target: the organiser-provided Lightsail environment and JSON LLM API. Keep the integration behind an adapter so local development can use other services without changing the agent contracts. Broader AWS services remain a post-hackathon production option, not an assumed competition entitlement. |
 | [Kiro](https://kiro.dev/docs/) | Development environment for specs, repository guidance, hooks, tests, and implementation; it is not part of the end-user runtime. |
 
-Recommended MVP: use **Kiro for development and AWS-native services for the core product**, adding OpenClaw only if a messaging-channel demo is valuable. OpenClaw, Hermes Agent, and NanoClaw are competing runtime choices and should not all be introduced into the first version.
+Recommended hackathon MVP: use **Kiro or the team's preferred local tools for development**, keep the LLM behind a provider adapter, and deploy the assessed build to the organiser's Lightsail environment. Add OpenClaw only if a messaging-channel demo materially improves the business case. OpenClaw, Hermes Agent, and NanoClaw are competing runtime choices and should not all be introduced into the first version.
 
 ## Prototype definition of done
 
@@ -76,10 +118,11 @@ Recommended MVP: use **Kiro for development and AWS-native services for the core
 - Unsupported structural, electrical, regulatory, quotation, or availability claims are blocked or escalated.
 - Evaluation reports task completion, agreement, correction rate, latency, cost, and safety results.
 
-## Working assumptions
+## Evidence status and open checks
 
-This package is implementation-ready but not evidence-complete. Numeric goals are hypotheses until user tests establish baselines. Exact hackathon upload formats and judging weights are not public on the event page as of 6 September 2026 and must be confirmed with the organiser.
+This package is implementation-ready but not evidence-complete. Product metrics remain hypotheses until user tests establish baselines. The organiser has now published the submission fields and rubric categories, but exact scoring weights, the final video-duration interpretation, proposal-edit mechanics, and any later packaging changes still require confirmation in Slack.
 
 ## Source
 
 - [NUS-ISS Show Me Your Agents Hackathon](https://www.iss.nus.edu.sg/show-me-your-agents)
+- [`#all-showmeyouragent` organiser channel](https://app.slack.com/client/T0BS91620SK/C0BSLD28J85)
