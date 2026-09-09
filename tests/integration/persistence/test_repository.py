@@ -162,11 +162,14 @@ def test_schema_uses_canonical_entity_tables_without_a_state_snapshot(tmp_path) 
     } <= set(inspector.get_table_names())
     project_columns = {column["name"] for column in inspector.get_columns("projects")}
     assert project_columns == {
+        "budget_band",
+        "consent",
         "id",
         "state_version",
         "status",
         "completeness",
         "current_node",
+        "room_type",
         "wait_reason",
     }
     engine.dispose()

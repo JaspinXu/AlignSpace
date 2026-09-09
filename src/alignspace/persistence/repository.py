@@ -90,7 +90,14 @@ class ProjectRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def create(self, state: ProjectState) -> None:
+    def create(
+        self,
+        state: ProjectState,
+        *,
+        room_type: str | None = None,
+        budget_band: str | None = None,
+        consent: bool = False,
+    ) -> None:
         if state.state_version != 0:
             raise ValueError("new projects must start at state_version 0")
         self._session.add(
@@ -101,6 +108,9 @@ class ProjectRepository:
                 completeness=state.completeness,
                 current_node=state.current_node,
                 wait_reason=state.wait_reason,
+                room_type=room_type,
+                budget_band=budget_band,
+                consent=consent,
             )
         )
         self._replace_entities(state)

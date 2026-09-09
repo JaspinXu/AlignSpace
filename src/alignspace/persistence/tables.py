@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -17,6 +17,9 @@ class ProjectRow(Base):
     completeness: Mapped[float] = mapped_column(Float, nullable=False)
     current_node: Mapped[str | None] = mapped_column(String)
     wait_reason: Mapped[str | None] = mapped_column(String)
+    room_type: Mapped[str | None] = mapped_column(String)
+    budget_band: Mapped[str | None] = mapped_column(String)
+    consent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class ProjectMemberRow(Base):
