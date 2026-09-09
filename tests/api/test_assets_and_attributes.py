@@ -142,3 +142,18 @@ def test_homeowner_can_correct_an_observed_attribute(client, project_with_attrib
     )
     assert attribute["status"] == "confirmed"
     assert attribute["value"] == "soft warm beige"
+
+
+def test_attribute_correction_requires_a_status(client, project_with_attribute) -> None:
+    response = client.patch(
+        f"/v1/projects/{project_with_attribute}/attributes/wall-colour",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "missing-status",
+            "expectedStateVersion": 0,
+            "data": {"value": "soft warm beige"},
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"

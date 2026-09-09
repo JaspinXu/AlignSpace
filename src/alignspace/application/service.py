@@ -1,6 +1,9 @@
+import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
+from jsonschema import Draft202012Validator
 from langgraph.types import Command
 from pydantic import Field
 from sqlalchemy.orm import Session, sessionmaker
@@ -9,19 +12,57 @@ from alignspace.application.commands import ActorContext, WriteEnvelope
 from alignspace.domain.enums import (
     ActorKind,
     AttributeStatus,
+    ConflictStatus,
     EvidenceSource,
     ProjectStatus,
     Role,
 )
-from alignspace.domain.models import DomainModel, Evidence, ProjectState
-from alignspace.domain.patches import StatePatch, UpsertAttribute, apply_patch
-from alignspace.domain.policies import StaleStateError
+from alignspace.domain.models import (
+    Approval,
+    BriefVersion,
+    DomainModel,
+    Evidence,
+    ProjectState,
+    Question,
+    calculate_brief_content_hash,
+)
+from alignspace.domain.patches import (
+    StatePatch,
+    UpsertApproval,
+    UpsertAttribute,
+    UpsertBriefVersion,
+    UpsertConflict,
+    apply_patch,
+)
+from alignspace.domain.policies import (
+    DomainRuleError,
+    StaleStateError,
+    can_approve,
+    can_draft_brief,
+    record_conflict_attempt,
+)
 from alignspace.persistence.repository import canonical_request_hash
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
 
 
 class AuthorizationError(PermissionError):
     """Raised when an actor is not permitted to perform a project action."""
+
+
+class BriefHashMismatchError(ValueError):
+    """Raised when approval targets content other than the stored brief."""
+
+
+class BriefSchemaError(ValueError):
+    """Raised when an edited brief does not match the public schema."""
+
+
+class ApprovalNotAllowedError(ValueError):
+    """Raised when completeness or conflicts prevent approval."""
+
+
+class BriefReviewError(ValueError):
+    """Raised when a valid brief still fails approval-readiness review."""
 
 
 class WorkflowResponse(DomainModel):
@@ -31,6 +72,15 @@ class WorkflowResponse(DomainModel):
     wait_reason: str | None = None
     pending_question: dict[str, object] | None = None
     project_state: dict[str, object]
+
+
+class BriefView(DomainModel):
+    version: int
+    content_hash: str
+    payload: dict[str, object]
+    completeness: float
+    approvals: list[Approval]
+    state_version: int
 
 
 MembershipCheck = Callable[[str, ActorContext], bool]
@@ -47,6 +97,8 @@ class WorkflowService:
         self._session_factory = session_factory
         self._graph = graph
         self._membership_check = membership_check
+        schema_path = Path(__file__).resolve().parents[3] / "schemas/design-brief.schema.json"
+        self._brief_validator = Draft202012Validator(json.loads(schema_path.read_text()))
 
     def start_analysis(
         self,
@@ -63,6 +115,8 @@ class WorkflowService:
         actor: ActorContext,
         wait_reason: str,
         envelope: WriteEnvelope[dict[str, object]],
+        *,
+        action: str | None = None,
     ) -> WorkflowResponse:
         self._authorize(project_id, actor)
         required_role = {
@@ -76,7 +130,7 @@ class WorkflowService:
             project_id,
             actor,
             envelope,
-            action=f"resume_{wait_reason}",
+            action=action or f"resume_{wait_reason}",
             resume=True,
         )
 
@@ -88,6 +142,9 @@ class WorkflowService:
         envelope: WriteEnvelope[dict[str, object]],
     ) -> WorkflowResponse:
         self._authorize(project_id, actor)
+        raw_status = envelope.data.get("status")
+        if not isinstance(raw_status, str):
+            raise DomainRuleError("attribute correction requires a status")
         request_hash = self._hash_request(
             "edit_attribute",
             project_id,
@@ -107,7 +164,7 @@ class WorkflowService:
             )
             if attribute is None:
                 raise KeyError(f"attribute {attribute_id} not found")
-            status = AttributeStatus(envelope.data["status"])
+            status = AttributeStatus(raw_status)
             if status not in {
                 AttributeStatus.CONFIRMED,
                 AttributeStatus.REJECTED,
@@ -145,6 +202,237 @@ class WorkflowService:
                     operations=[UpsertAttribute(attribute=changed)],
                 ),
             )
+            response = self._response(updated)
+            uow.projects.save(updated, expected_version=state.state_version)
+            self._record_replay(uow, project_id, envelope, request_hash, response)
+            uow.commit()
+            return response
+
+    def get_state(self, project_id: str, actor: ActorContext) -> ProjectState:
+        self._authorize(project_id, actor)
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            return uow.projects.load(project_id)
+
+    def next_question(self, project_id: str, actor: ActorContext) -> Question:
+        state = self.get_state(project_id, actor)
+        question = next((item for item in state.questions if item.answer is None), None)
+        if question is None:
+            raise KeyError("pending question not found")
+        return question
+
+    def answer_question(
+        self,
+        project_id: str,
+        question_id: str,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> WorkflowResponse:
+        self._authorize(project_id, actor)
+        if actor.role != Role.HOMEOWNER:
+            raise AuthorizationError("actor cannot answer homeowner task")
+        answer = envelope.data.get("answer")
+        if not isinstance(answer, str) or not answer.strip():
+            raise ValueError("homeowner answer must be a non-blank string")
+        action = f"answer_question:{question_id}"
+        request_hash = self._hash_request(
+            action,
+            project_id,
+            actor,
+            envelope,
+        )
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return WorkflowResponse.model_validate(replay.response_payload)
+        pending = self.next_question(project_id, actor)
+        if pending.id != question_id:
+            raise KeyError(f"question {question_id} is not the pending question")
+        return self.resume(
+            project_id,
+            actor,
+            "homeowner",
+            envelope,
+            action=action,
+        )
+
+    def resolve_conflict(
+        self,
+        project_id: str,
+        conflict_id: str,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> WorkflowResponse:
+        self._authorize(project_id, actor)
+        request_hash = self._hash_request(
+            "resolve_conflict",
+            project_id,
+            actor,
+            envelope,
+            extra={"conflictId": conflict_id},
+        )
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return WorkflowResponse.model_validate(replay.response_payload)
+            state = uow.projects.load(project_id)
+            self._check_version(state, envelope.expected_state_version)
+            conflict = next((item for item in state.conflicts if item.id == conflict_id), None)
+            if conflict is None:
+                raise KeyError(f"conflict {conflict_id} not found")
+            attempted = record_conflict_attempt(conflict)
+            status = ConflictStatus(envelope.data.get("status", "resolved"))
+            if status not in {ConflictStatus.RESOLVED, ConflictStatus.ACCEPTED_UNRESOLVED}:
+                raise DomainRuleError("a human conflict resolution must close the conflict")
+            resolution = envelope.data.get("resolution")
+            if not isinstance(resolution, str) or not resolution.strip():
+                raise DomainRuleError("conflict resolution text is required")
+            changed = attempted.model_copy(
+                update={"status": status, "resolution": resolution.strip()}
+            )
+            updated = apply_patch(
+                state,
+                StatePatch(
+                    expected_state_version=state.state_version,
+                    operations=[UpsertConflict(conflict=changed)],
+                ),
+            )
+            response = self._response(updated)
+            uow.projects.save(updated, expected_version=state.state_version)
+            self._record_replay(uow, project_id, envelope, request_hash, response)
+            uow.commit()
+            return response
+
+    def latest_brief(self, project_id: str, actor: ActorContext) -> BriefView:
+        state = self.get_state(project_id, actor)
+        if not state.brief_versions:
+            raise KeyError("latest brief not found")
+        latest = max(state.brief_versions, key=lambda item: item.version)
+        return self._brief_view(state, latest)
+
+    def edit_brief(
+        self,
+        project_id: str,
+        version: int,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> BriefView:
+        self._authorize(project_id, actor)
+        request_hash = self._hash_request(
+            "edit_brief",
+            project_id,
+            actor,
+            envelope,
+            extra={"version": version},
+        )
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return BriefView.model_validate(replay.response_payload)
+            state = uow.projects.load(project_id)
+            self._check_version(state, envelope.expected_state_version)
+            latest = self._find_latest_brief(state)
+            if latest.version != version:
+                raise StaleStateError(
+                    f"brief version {version} is stale; latest version is {latest.version}"
+                )
+            raw_payload = envelope.data.get("payload")
+            if not isinstance(raw_payload, dict):
+                raise BriefSchemaError("brief edit requires a payload object")
+            payload = dict(raw_payload)
+            project = payload.get("project")
+            if not isinstance(project, dict) or project.get("id") != project_id:
+                raise BriefSchemaError("brief project id must match the route project")
+            next_version = latest.version + 1
+            payload["version"] = next_version
+            payload["approvals"] = []
+            payload.pop("contentHash", None)
+            payload["project"] = {**project, "status": ProjectStatus.AWAITING_APPROVAL.value}
+            self._validate_brief(payload)
+            completeness = payload.get("completeness")
+            if not isinstance(completeness, (int, float)):
+                raise BriefSchemaError("brief completeness must be numeric")
+            brief = BriefVersion(
+                version=next_version,
+                content_hash=calculate_brief_content_hash(payload),
+                payload=payload,
+                completeness=float(completeness),
+            )
+            if not can_draft_brief(state) or brief.completeness < 0.85:
+                raise BriefReviewError(
+                    "brief review requires at least 0.85 completeness and no critical conflict"
+                )
+            updated = apply_patch(
+                state,
+                StatePatch(
+                    expected_state_version=state.state_version,
+                    operations=[UpsertBriefVersion(brief_version=brief)],
+                ),
+            ).model_copy(
+                update={"approvals": [], "status": ProjectStatus.AWAITING_APPROVAL}
+            )
+            response = self._brief_view(updated, brief)
+            uow.projects.save(updated, expected_version=state.state_version)
+            self._record_replay(uow, project_id, envelope, request_hash, response)
+            uow.commit()
+            return response
+
+    def approve_brief(
+        self,
+        project_id: str,
+        version: int,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> WorkflowResponse:
+        self._authorize(project_id, actor)
+        request_hash = self._hash_request(
+            "approve_brief",
+            project_id,
+            actor,
+            envelope,
+            extra={"version": version},
+        )
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return WorkflowResponse.model_validate(replay.response_payload)
+            state = uow.projects.load(project_id)
+            self._check_version(state, envelope.expected_state_version)
+            brief = self._find_latest_brief(state)
+            if brief.version != version:
+                raise StaleStateError(
+                    f"brief version {version} is stale; latest version is {brief.version}"
+                )
+            submitted_hash = envelope.data.get("contentHash")
+            if submitted_hash != brief.content_hash:
+                raise BriefHashMismatchError("submitted hash does not match the stored brief")
+            if not can_draft_brief(state) or brief.completeness < 0.85:
+                raise ApprovalNotAllowedError(
+                    "brief approval requires complete state and no open critical conflict"
+                )
+            approval = Approval(
+                role=actor.role,
+                actor_id=actor.actor_id,
+                brief_version=brief.version,
+                content_hash=brief.content_hash,
+            )
+            state_without_actor_approval = state.model_copy(
+                update={
+                    "approvals": [item for item in state.approvals if item.role != actor.role]
+                }
+            )
+            updated = apply_patch(
+                state_without_actor_approval,
+                StatePatch(
+                    expected_state_version=state.state_version,
+                    operations=[UpsertApproval(approval=approval)],
+                ),
+            )
+            status = (
+                ProjectStatus.APPROVED
+                if can_approve(updated, brief)
+                else ProjectStatus.AWAITING_APPROVAL
+            )
+            updated = updated.model_copy(update={"status": status})
             response = self._response(updated)
             uow.projects.save(updated, expected_version=state.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)
@@ -270,17 +558,46 @@ class WorkflowService:
         )
 
     @staticmethod
+    def _find_latest_brief(state: ProjectState) -> BriefVersion:
+        if not state.brief_versions:
+            raise KeyError("latest brief not found")
+        return max(state.brief_versions, key=lambda item: item.version)
+
+    @staticmethod
+    def _brief_view(state: ProjectState, brief: BriefVersion) -> BriefView:
+        approvals = [
+            item
+            for item in state.approvals
+            if item.brief_version == brief.version and item.content_hash == brief.content_hash
+        ]
+        return BriefView(
+            version=brief.version,
+            content_hash=brief.content_hash,
+            payload=brief.payload,
+            completeness=brief.completeness,
+            approvals=approvals,
+            state_version=state.state_version,
+        )
+
+    def _validate_brief(self, payload: dict[str, object]) -> None:
+        errors = sorted(self._brief_validator.iter_errors(payload), key=lambda item: list(item.path))
+        if errors:
+            first = errors[0]
+            path = ".".join(str(item) for item in first.path) or "$"
+            raise BriefSchemaError(f"brief schema error at {path}: {first.message}")
+
+    @staticmethod
     def _record_replay(
         uow: SqlAlchemyUnitOfWork,
         project_id: str,
         envelope: WriteEnvelope[dict[str, object]],
         request_hash: str,
-        response: WorkflowResponse,
+        response: DomainModel,
     ) -> None:
         uow.idempotency.record(
             project_id=project_id,
             key=envelope.idempotency_key,
             request_hash=request_hash,
             response_payload=response.model_dump(mode="json", by_alias=True),
-            resulting_version=response.state_version,
+            resulting_version=getattr(response, "state_version", envelope.expected_state_version + 1),
         )

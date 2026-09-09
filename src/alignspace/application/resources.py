@@ -24,6 +24,10 @@ class AssetLimitError(ValueError):
     """Raised when a project already has the maximum reference assets."""
 
 
+class AssetCountError(ValueError):
+    """Raised when analysis does not have three to ten reference assets."""
+
+
 class CreateProjectCommand(DomainModel):
     room_type: NonBlankString
     budget_band: NonBlankString
@@ -209,6 +213,20 @@ class ProjectResourceService:
     def is_member(self, project_id: str, actor: ActorContext) -> bool:
         with self._session_factory() as session:
             return self._membership(session, project_id, actor) is not None
+
+    def require_analysis_ready(self, project_id: str, actor: ActorContext) -> None:
+        with self._session_factory() as session:
+            project = self._project(session, project_id)
+            self._authorize_in_session(session, project_id, actor)
+            if not project.consent:
+                raise ConsentRequiredError("image consent is required before analysis")
+            asset_count = session.scalar(
+                select(func.count()).select_from(ImageAssetRow).where(
+                    ImageAssetRow.project_id == project_id
+                )
+            )
+            if not 3 <= asset_count <= 10:
+                raise AssetCountError("analysis requires between three and ten reference assets")
 
     @staticmethod
     def _project(session: Session, project_id: str) -> ProjectRow:

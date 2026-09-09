@@ -8,7 +8,9 @@ from fastapi import FastAPI, Request
 
 from alignspace.agents.contracts import AgentBundle
 from alignspace.api.errors import install_error_handlers
+from alignspace.api.routes.briefs import router as briefs_router
 from alignspace.api.routes.projects import router as projects_router
+from alignspace.api.routes.workflow import router as workflow_router
 from alignspace.application.resources import ProjectResourceService
 from alignspace.application.service import WorkflowService
 from alignspace.persistence.database import create_engine_and_session
@@ -68,4 +70,6 @@ def create_app(
 
     install_error_handlers(app)
     app.include_router(projects_router)
+    app.include_router(workflow_router)
+    app.include_router(briefs_router)
     return app

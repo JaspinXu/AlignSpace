@@ -4,8 +4,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from alignspace.application.resources import AssetLimitError, ConsentRequiredError
-from alignspace.application.service import AuthorizationError
+from alignspace.application.resources import AssetCountError, AssetLimitError, ConsentRequiredError
+from alignspace.application.service import (
+    ApprovalNotAllowedError,
+    AuthorizationError,
+    BriefHashMismatchError,
+    BriefReviewError,
+    BriefSchemaError,
+)
 from alignspace.domain.policies import StaleStateError
 from alignspace.persistence.repository import IdempotencyConflictError
 
@@ -62,6 +68,62 @@ def install_error_handlers(app: FastAPI) -> None:
             request,
             status_code=409,
             code="ASSET_LIMIT_REACHED",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(AssetCountError)
+    async def asset_count_handler(request: Request, exc: AssetCountError) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="ASSET_COUNT_INVALID",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(BriefHashMismatchError)
+    async def brief_hash_handler(
+        request: Request,
+        exc: BriefHashMismatchError,
+    ) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="BRIEF_HASH_MISMATCH",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(BriefSchemaError)
+    async def brief_schema_handler(request: Request, exc: BriefSchemaError) -> JSONResponse:
+        return _response(
+            request,
+            status_code=400,
+            code="BRIEF_SCHEMA_INVALID",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(ApprovalNotAllowedError)
+    async def approval_handler(
+        request: Request,
+        exc: ApprovalNotAllowedError,
+    ) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="APPROVAL_NOT_ALLOWED",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(BriefReviewError)
+    async def brief_review_handler(request: Request, exc: BriefReviewError) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="BRIEF_REVIEW_FAILED",
             message=str(exc),
             recoverable=True,
         )
