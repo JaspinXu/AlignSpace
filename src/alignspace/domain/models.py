@@ -1,8 +1,9 @@
 import hashlib
 import json
 from datetime import UTC, datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from alignspace.domain.enums import (
     ActorKind,
@@ -28,6 +29,9 @@ class DomainModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+NonBlankString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
 def calculate_brief_content_hash(payload: dict[str, object]) -> str:
     canonical_payload = {key: value for key, value in payload.items() if key != "approvals"}
     canonical_json = json.dumps(
@@ -41,8 +45,8 @@ def calculate_brief_content_hash(payload: dict[str, object]) -> str:
 
 class Evidence(DomainModel):
     source_type: EvidenceSource
-    source_id: str
-    description: str
+    source_id: NonBlankString
+    description: NonBlankString
 
 
 class Attribute(DomainModel):
@@ -105,7 +109,7 @@ class Conflict(DomainModel):
 
 
 class BriefVersion(DomainModel):
-    version: int
+    version: int = Field(ge=1)
     content_hash: str
     payload: dict[str, object]
     completeness: float = Field(ge=0, le=1)
@@ -119,8 +123,8 @@ class BriefVersion(DomainModel):
 
 class Approval(DomainModel):
     role: Role
-    actor_id: str
-    brief_version: int
+    actor_id: NonBlankString
+    brief_version: int = Field(ge=1)
     content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     approved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

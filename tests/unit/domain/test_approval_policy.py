@@ -147,3 +147,36 @@ def test_approval_for_a_different_valid_hash_blocks_approval() -> None:
     )
 
     assert can_approve(state, brief) is False
+
+
+def test_brief_rejects_version_zero() -> None:
+    payload = brief_payload()
+
+    with pytest.raises(ValidationError, match="version"):
+        BriefVersion(
+            version=0,
+            content_hash=calculate_brief_content_hash(payload),
+            payload=payload,
+            completeness=0.9,
+        )
+
+
+def test_approval_rejects_version_zero() -> None:
+    with pytest.raises(ValidationError, match="brief_version"):
+        Approval(
+            role=Role.HOMEOWNER,
+            actor_id="h-1",
+            brief_version=0,
+            content_hash=calculate_brief_content_hash(brief_payload()),
+        )
+
+
+@pytest.mark.parametrize("actor_id", ["", "  \t "])
+def test_approval_rejects_blank_actor_id(actor_id: str) -> None:
+    with pytest.raises(ValidationError, match="actor_id"):
+        Approval(
+            role=Role.HOMEOWNER,
+            actor_id=actor_id,
+            brief_version=2,
+            content_hash=calculate_brief_content_hash(brief_payload()),
+        )

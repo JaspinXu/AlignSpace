@@ -87,3 +87,45 @@ def test_qualified_professional_can_verify_constraint_with_review_evidence() -> 
     constraint = Constraint(**fields)
 
     assert constraint.verified_by == "professional-1"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source_id", ""),
+        ("source_id", "   "),
+        ("description", ""),
+        ("description", " \t "),
+    ],
+)
+def test_evidence_rejects_blank_provenance_text(field: str, value: str) -> None:
+    fields = {
+        "source_type": EvidenceSource.DESIGNER_NOTE,
+        "source_id": "note-1",
+        "description": "Designer feasibility review",
+    }
+    fields[field] = value
+
+    with pytest.raises(ValidationError, match=field):
+        Evidence(**fields)
+
+
+def test_verified_constraint_rejects_blank_professional_review_source_id() -> None:
+    fields = constraint_fields()
+    fields.update(
+        {
+            "verification_status": ConstraintVerificationStatus.VERIFIED,
+            "owner": ConstraintOwner.QUALIFIED_PROFESSIONAL,
+            "verified_by": "professional-1",
+            "evidence": [
+                {
+                    "source_type": EvidenceSource.PROFESSIONAL_REVIEW,
+                    "source_id": "  ",
+                    "description": "Qualified professional review",
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(ValidationError, match="source_id"):
+        Constraint(**fields)

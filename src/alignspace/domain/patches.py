@@ -97,6 +97,15 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
             questions.append(question)
         elif isinstance(operation, UpsertConflict):
             conflict = operation.conflict
+            existing_conflict = next(
+                (item for item in conflicts if item.id == conflict.id),
+                None,
+            )
+            if (
+                existing_conflict is not None
+                and conflict.resolution_attempts < existing_conflict.resolution_attempts
+            ):
+                raise DomainRuleError("conflict resolution attempts cannot decrease")
             conflicts = [item for item in conflicts if item.id != conflict.id]
             conflicts.append(conflict)
         elif isinstance(operation, UpsertBriefVersion):

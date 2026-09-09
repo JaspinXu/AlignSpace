@@ -93,6 +93,33 @@ def test_patch_rejects_conflict_with_more_than_two_resolution_attempts() -> None
         )
 
 
+def test_conflict_patch_cannot_reset_exhausted_resolution_attempts() -> None:
+    exhausted_conflict = Conflict(
+        id="c-1",
+        type=ConflictType.PREFERENCE_VS_CONSTRAINT,
+        summary="Material exceeds budget",
+        impact="A lower-cost alternative is required",
+        status=ConflictStatus.ESCALATED,
+        severity=ConstraintSeverity.IMPORTANT,
+        resolution_attempts=2,
+    )
+    state = ProjectState(project_id="project-1", conflicts=[exhausted_conflict])
+    reset_attempt = exhausted_conflict.model_copy(update={"resolution_attempts": 0})
+    patch = StatePatch(
+        expected_state_version=0,
+        operations=[UpsertConflict(conflict=reset_attempt)],
+    )
+
+    with pytest.raises(
+        DomainRuleError,
+        match="conflict resolution attempts cannot decrease",
+    ):
+        apply_patch(state, patch)
+
+    assert state.conflicts == [exhausted_conflict]
+    assert state.state_version == 0
+
+
 def test_patch_rejects_an_impossible_future_operation_explicitly() -> None:
     class FutureOperation:
         approval = Approval(
