@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AlignSpace turns homeowner inspiration and designer constraints into an approved design brief.">
+  <title>AlignSpace · Design alignment workspace</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="AlignSpace home">
+      <span class="brand-mark">A</span>
+      <span>AlignSpace</span>
+    </a>
+    <div class="header-meta">
+      <span class="live-dot"></span>
+      <span>Shared design alignment</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="welcome" class="welcome-shell">
+      <div class="welcome-copy">
+        <p class="eyebrow">From inspiration to shared intent</p>
+        <h1>Make “I like this” <em>clear enough to design.</em></h1>
+        <p class="lead">Two specialised agents help homeowners and designers ask better questions, narrow the design space, and approve the same evidence-backed brief.</p>
+        <div class="idea-strip" aria-label="How AlignSpace works">
+          <div><strong>01</strong><span>Share references</span></div>
+          <div><strong>02</strong><span>Clarify both sides</span></div>
+          <div><strong>03</strong><span>Approve one brief</span></div>
+        </div>
+      </div>
+
+      <div class="start-card">
+        <div>
+          <p class="eyebrow">Start a living-room project</p>
+          <h2>Set the practical frame</h2>
+        </div>
+        <form id="project-form">
+          <label>Project name<input name="name" value="My living room" required minlength="2" maxlength="80"></label>
+          <label>Housing type<input name="housingType" placeholder="e.g. HDB 4-room"></label>
+          <label>Renovation budget
+            <select name="budgetBand" required>
+              <option value="under_15k_sgd">Under S$15k</option>
+              <option value="15k_to_30k_sgd" selected>S$15k–30k</option>
+              <option value="30k_to_50k_sgd">S$30k–50k</option>
+              <option value="over_50k_sgd">Over S$50k</option>
+              <option value="prefer_not_to_say">Prefer not to say</option>
+            </select>
+          </label>
+          <label class="consent"><input type="checkbox" required> I have the right to use uploaded references and consent to AI-assisted analysis for this project.</label>
+          <button class="button primary" type="submit">Create alignment workspace <span>→</span></button>
+          <button class="button ghost" id="demo-button" type="button">Open completed demo</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="workspace" class="workspace" hidden>
+      <div class="workspace-topline">
+        <div>
+          <button id="back-button" class="text-button" type="button">← All projects</button>
+          <h1 id="project-name">Project</h1>
+          <p id="project-meta" class="muted"></p>
+        </div>
+        <div class="stage-block">
+          <span id="stage-label" class="stage-label">Explore</span>
+          <span id="readiness-label">0% ready</span>
+          <div class="progress-track" aria-label="Brief readiness"><span id="progress-bar"></span></div>
+        </div>
+      </div>
+
+      <nav class="tabs" aria-label="Workspace views">
+        <button class="tab active" data-tab="alignment" type="button">Alignment room</button>
+        <button class="tab" data-tab="brief" type="button">Shared brief</button>
+        <button class="tab" data-tab="activity" type="button">Activity</button>
+      </nav>
+
+      <div id="notice" class="notice" role="status" hidden></div>
+
+      <section id="alignment-panel" class="tab-panel">
+        <div class="workspace-grid">
+          <div class="main-column">
+            <article id="question-card" class="question-card"></article>
+
+            <article class="panel">
+              <div class="panel-heading">
+                <div><p class="eyebrow">AQ-Agent-QA bridge</p><h2>What both sides understand</h2></div>
+                <span class="muted">Latest exchanges</span>
+              </div>
+              <div id="agent-messages" class="message-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-heading">
+                <div><p class="eyebrow">Human input</p><h2>Designer constraint</h2></div>
+              </div>
+              <form id="constraint-form" class="constraint-form">
+                <label>Constraint category
+                  <select name="category"><option value="space">Space</option><option value="budget">Budget</option><option value="function">Function</option><option value="maintenance">Maintenance</option><option value="timeline">Timeline</option><option value="safety">Safety</option></select>
+                </label>
+                <label>Severity
+                  <select name="severity"><option value="advisory">Advisory</option><option value="important" selected>Important</option><option value="critical">Critical — needs professional review</option></select>
+                </label>
+                <label class="wide">What must the design account for?<textarea name="statement" required placeholder="e.g. Keep a 900 mm clear route to the balcony"></textarea></label>
+                <label>Affected preference
+                  <select name="affectedDimension"><option value="">None</option><option value="style">Style</option><option value="colour">Colour</option><option value="material">Material</option><option value="lighting">Lighting</option><option value="layout">Layout</option><option value="mood">Mood</option><option value="function">Function</option><option value="maintenance">Maintenance</option></select>
+                </label>
+                <label>Incompatible value<input name="incompatibleValue" placeholder="e.g. open_flow"></label>
+                <label class="wide">Why does it matter?<input name="rationale" placeholder="Describe the impact or trade-off"></label>
+                <button class="button secondary wide" type="submit">Add designer constraint</button>
+              </form>
+            </article>
+          </div>
+
+          <aside class="side-column">
+            <article class="panel compact">
+              <div class="panel-heading"><div><p class="eyebrow">Candidate space</p><h2>Closest directions</h2></div><span id="candidate-count" class="count-badge"></span></div>
+              <div id="shortlist" class="shortlist"></div>
+            </article>
+
+            <article class="panel compact">
+              <div class="panel-heading"><div><p class="eyebrow">Evidence</p><h2>Goals & references</h2></div></div>
+              <form id="preferences-form" class="stack-form">
+                <label>Project goals<textarea name="goals" placeholder="One goal per line"></textarea></label>
+                <label>Must avoid<textarea name="antiPreferences" placeholder="One item per line"></textarea></label>
+                <button class="button ghost" type="submit">Save goals</button>
+              </form>
+              <hr>
+              <form id="reference-form" class="stack-form">
+                <label>Inspiration image<input name="file" type="file" accept="image/jpeg,image/png,image/webp" required></label>
+                <label>What caught your eye?<input name="note" placeholder="e.g. the soft layered lighting"></label>
+                <button class="button ghost" type="submit">Add reference</button>
+              </form>
+              <div id="reference-list" class="reference-list"></div>
+              <button id="analyse-button" class="button secondary analyse-button" type="button">Analyse reference notes</button>
+              <div id="proposal-list" class="proposal-list"></div>
+            </article>
+
+            <article id="conflicts-card" class="panel compact"></article>
+          </aside>
+        </div>
+      </section>
+
+      <section id="brief-panel" class="tab-panel" hidden>
+        <div class="brief-layout">
+          <article class="panel brief-paper">
+            <div class="panel-heading">
+              <div><p class="eyebrow">Versioned deliverable</p><h2>Shared Design Brief</h2></div>
+              <button id="export-button" class="button ghost" type="button">Export JSON</button>
+            </div>
+            <div id="brief-content"></div>
+          </article>
+          <aside class="panel approval-panel">
+            <p class="eyebrow">Human approval gate</p>
+            <h2>Confirm the same brief</h2>
+            <p class="muted">Any later edit clears both approvals.</p>
+            <div id="approval-status"></div>
+            <button class="button secondary" data-approve="homeowner" type="button">Approve as homeowner</button>
+            <button class="button secondary" data-approve="designer" type="button">Approve as designer</button>
+          </aside>
+        </div>
+      </section>
+
+      <section id="activity-panel" class="tab-panel" hidden>
+        <article class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">Append-only record</p><h2>Project activity</h2></div></div>
+          <div id="audit-list" class="audit-list"></div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <footer>AlignSpace is a requirements-alignment aid, not construction, structural, electrical, regulatory, pricing, or availability advice.</footer>
+</body>
+</html>

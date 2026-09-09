@@ -1,0 +1,2 @@
+"""AlignSpace application package."""
+

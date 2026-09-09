@@ -105,10 +105,58 @@ The architecture combines two complementary ideas:
 - **Akinator-inspired questioning:** instead of following a fixed questionnaire, the system selects the next question by expected information gain. Each answer should eliminate incompatible design directions, resolve an important conflict, or narrow the reference set.
 - **Controlled convergence:** the loop continues until preferences, professional constraints, and retrieved design directions are sufficiently aligned. The output is released only after both people approve the same versioned brief.
 
+## Running MVP
+
+The `jaspin` branch contains a runnable end-to-end prototype with:
+
+- a responsive homeowner/designer workspace;
+- AQ-Agent-QA cross-questioning and plain-language translation;
+- an entropy-based, Akinator-inspired next-question selector;
+- a versioned Project Design State persisted in SQLite;
+- controlled reference-note analysis whose proposals require homeowner confirmation;
+- designer constraints, automatic conflict detection, and human resolution;
+- deterministic readiness scoring across Explore, Clarify, Focus, and Commit;
+- schema-validated JSON brief export, independent approvals, and append-only audit events;
+- optimistic state-version checks to prevent silent concurrent overwrites;
+- a Docker deployment path suitable for the hackathon Lightsail host.
+
+The bundled reference analysis is deliberately conservative and rule-based so the repository runs without a model key. It treats extracted attributes as tentative evidence, never as confirmed preference. A competition-provided multimodal model can later replace this adapter without changing the state and approval contracts.
+
+### Run locally
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload
+```
+
+Open [http://localhost:8000](http://localhost:8000). Choose **Open completed demo** for a populated happy path, or create a project and follow the adaptive interview. Interactive API documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+### Run with Docker
+
+```bash
+docker compose up --build
+```
+
+SQLite state and uploaded demo references are kept in the `alignspace-data` volume.
+
+### Verify
+
+```bash
+pytest -q
+```
+
 ## Repository guide
 
 | File | Purpose |
 |---|---|
+| [`app/main.py`](app/main.py) | FastAPI routes, upload validation, schema validation, and static UI hosting |
+| [`app/engine.py`](app/engine.py) | AQ-Agent-QA state transitions, information-gain questioning, retrieval, conflicts, readiness, and approvals |
+| [`app/store.py`](app/store.py) | Transactional SQLite state and audit persistence |
+| [`app/static`](app/static) | Responsive two-role web workspace |
+| [`tests`](tests) | Engine, safety invariant, schema, API, and concurrency tests |
 | [Official hackathon briefing](docs/references/showmeyouragent-hackathon-briefing-2026-09-06.pdf) | Organiser-provided rules, rubric, dates, submission format, and AWS/Kiro support |
 | [Official context](docs/00-official-context.md) | Verified event facts vs team assumptions |
 | [Product requirements](docs/01-product-requirements.md) | PRD, scope, users, stories, acceptance criteria |

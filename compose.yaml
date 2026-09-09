@@ -1,0 +1,11 @@
+services:
+  alignspace:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - alignspace-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  alignspace-data:
