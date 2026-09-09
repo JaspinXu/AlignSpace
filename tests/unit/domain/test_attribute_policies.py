@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from alignspace.domain.enums import ActorKind, AttributeStatus, EvidenceSource
 from alignspace.domain.models import Attribute, Evidence, ProjectState
@@ -56,3 +57,38 @@ def test_vision_agent_cannot_confirm_preference() -> None:
     )
     with pytest.raises(DomainRuleError, match="vision observations must remain proposed"):
         apply_patch(state, patch)
+
+
+def test_actor_kind_includes_five_agents_and_distinct_humans() -> None:
+    agent_values = {
+        "vision_agent",
+        "homeowner_interview_agent",
+        "designer_agent",
+        "alignment_agent",
+        "review_agent",
+    }
+    assert agent_values.issubset({actor.value for actor in ActorKind})
+    assert ActorKind.HOMEOWNER.value == "homeowner"
+    assert ActorKind.DESIGNER.value == "designer"
+
+
+@pytest.mark.parametrize("confidence", [0, 1])
+def test_attribute_confidence_accepts_inclusive_bounds(confidence: float) -> None:
+    payload = make_attribute(ActorKind.HOMEOWNER, AttributeStatus.CONFIRMED).model_dump()
+    payload["confidence"] = confidence
+    assert Attribute(**payload).confidence == confidence
+
+
+@pytest.mark.parametrize("confidence", [-0.01, 1.01])
+def test_attribute_confidence_rejects_outside_inclusive_bounds(confidence: float) -> None:
+    with pytest.raises(ValidationError):
+        Attribute(
+            id="attribute-1",
+            target_element="wall",
+            dimension="colour",
+            value="warm beige",
+            status=AttributeStatus.CONFIRMED,
+            confidence=confidence,
+            evidence=[],
+            actor=ActorKind.HOMEOWNER,
+        )

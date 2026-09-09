@@ -14,9 +14,12 @@ class ProjectStatus(str, Enum):
 
 class ActorKind(str, Enum):
     VISION_AGENT = "vision_agent"
+    HOMEOWNER_INTERVIEW_AGENT = "homeowner_interview_agent"
+    DESIGNER_AGENT = "designer_agent"
     HOMEOWNER = "homeowner"
     DESIGNER = "designer"
     ALIGNMENT_AGENT = "alignment_agent"
+    REVIEW_AGENT = "review_agent"
 
 
 class AttributeStatus(str, Enum):
