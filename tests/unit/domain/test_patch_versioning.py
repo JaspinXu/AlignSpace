@@ -1,10 +1,22 @@
 import pytest
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
-from alignspace.domain.enums import ConflictStatus, ConstraintSeverity
-from alignspace.domain.models import Conflict, ProjectState
-from alignspace.domain.patches import PatchOperation, StatePatch, UpsertConflict, apply_patch
-from alignspace.domain.policies import StaleStateError
+from alignspace.domain.enums import ConflictStatus, ConflictType, ConstraintSeverity, Role
+from alignspace.domain.models import (
+    Approval,
+    Conflict,
+    ProjectState,
+    Question,
+    calculate_brief_content_hash,
+)
+from alignspace.domain.patches import (
+    PatchOperation,
+    StatePatch,
+    UpsertConflict,
+    UpsertQuestion,
+    apply_patch,
+)
+from alignspace.domain.policies import DomainRuleError, StaleStateError
 
 
 def test_stale_patch_is_rejected() -> None:
@@ -17,7 +29,7 @@ def test_stale_patch_is_rejected() -> None:
 def test_discriminated_conflict_operation_updates_state_immutably() -> None:
     conflict = Conflict(
         id="c-1",
-        type="preference_vs_constraint",
+        type=ConflictType.PREFERENCE_VS_CONSTRAINT,
         summary="Material exceeds budget",
         impact="A lower-cost alternative is required",
         status=ConflictStatus.OPEN,
@@ -37,3 +49,60 @@ def test_discriminated_conflict_operation_updates_state_immutably() -> None:
     assert state.conflicts == []
     assert updated.conflicts == [conflict]
     assert updated.state_version == 1
+
+
+def test_question_patch_rejects_eleventh_distinct_homeowner_question() -> None:
+    state = ProjectState(
+        project_id="project-1",
+        questions=[
+            Question(id=f"q-{index}", target_role=Role.HOMEOWNER, text=f"Question {index}")
+            for index in range(10)
+        ],
+    )
+    patch = StatePatch(
+        expected_state_version=0,
+        operations=[
+            UpsertQuestion(
+                question=Question(id="q-10", target_role=Role.HOMEOWNER, text="Question 10")
+            )
+        ],
+    )
+
+    with pytest.raises(DomainRuleError, match="homeowner question budget exhausted"):
+        apply_patch(state, patch)
+
+
+def test_patch_rejects_conflict_with_more_than_two_resolution_attempts() -> None:
+    with pytest.raises(ValidationError, match="less than or equal to 2"):
+        StatePatch(
+            expected_state_version=0,
+            operations=[
+                {
+                    "op": "upsert_conflict",
+                    "conflict": {
+                        "id": "c-1",
+                        "type": "preference_vs_constraint",
+                        "summary": "Material exceeds budget",
+                        "impact": "A lower-cost alternative is required",
+                        "status": "open",
+                        "severity": "important",
+                        "resolution_attempts": 3,
+                    },
+                }
+            ],
+        )
+
+
+def test_patch_rejects_an_impossible_future_operation_explicitly() -> None:
+    class FutureOperation:
+        approval = Approval(
+            role=Role.HOMEOWNER,
+            actor_id="h-1",
+            brief_version=2,
+            content_hash=calculate_brief_content_hash({"style": "warm modern"}),
+        )
+
+    patch = StatePatch.model_construct(expected_state_version=0, operations=[FutureOperation()])
+
+    with pytest.raises(TypeError, match="unsupported patch operation"):
+        apply_patch(ProjectState(project_id="project-1"), patch)

@@ -35,6 +35,7 @@ class EvidenceSource(str, Enum):
     IMAGE = "image"
     HOMEOWNER_ANSWER = "homeowner_answer"
     DESIGNER_NOTE = "designer_note"
+    PROFESSIONAL_REVIEW = "professional_review"
     SYSTEM_RULE = "system_rule"
 
 
@@ -79,6 +80,14 @@ class ConflictStatus(str, Enum):
     RESOLVED = "resolved"
     ESCALATED = "escalated"
     ACCEPTED_UNRESOLVED = "accepted_unresolved"
+
+
+class ConflictType(str, Enum):
+    REFERENCE_CONFLICT = "reference_conflict"
+    STATED_VS_VISUAL = "stated_vs_visual"
+    PREFERENCE_VS_CONSTRAINT = "preference_vs_constraint"
+    HUMAN_VS_HUMAN = "human_vs_human"
+    EVIDENCE_GAP = "evidence_gap"
 
 
 class NextAction(str, Enum):

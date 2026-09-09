@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from alignspace.domain.enums import ActorKind, AttributeStatus
+from alignspace.domain.enums import ActorKind, AttributeStatus, Role
 from alignspace.domain.models import (
     Approval,
     Attribute,
@@ -89,6 +89,11 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
         elif isinstance(operation, UpsertQuestion):
             question = operation.question
             questions = [item for item in questions if item.id != question.id]
+            homeowner_question_count = sum(
+                item.target_role == Role.HOMEOWNER for item in questions
+            )
+            if question.target_role == Role.HOMEOWNER and homeowner_question_count >= 10:
+                raise DomainRuleError("homeowner question budget exhausted")
             questions.append(question)
         elif isinstance(operation, UpsertConflict):
             conflict = operation.conflict
@@ -100,7 +105,7 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
                 item for item in brief_versions if item.version != brief_version.version
             ]
             brief_versions.append(brief_version)
-        else:
+        elif isinstance(operation, UpsertApproval):
             approval = operation.approval
             approvals = [
                 item
@@ -109,6 +114,8 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
                 != (approval.role, approval.brief_version, approval.content_hash)
             ]
             approvals.append(approval)
+        else:
+            raise TypeError(f"unsupported patch operation: {operation!r}")
     return state.model_copy(
         update={
             "attributes": attributes,

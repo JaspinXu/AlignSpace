@@ -1,11 +1,13 @@
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from alignspace.domain.enums import (
     ActorKind,
     AttributeStatus,
     ConflictStatus,
+    ConflictType,
     ConstraintSeverity,
     EvidenceSource,
     Role,
@@ -71,7 +73,7 @@ def test_completeness_uses_required_dimensions_without_materialising_missing_row
 def test_second_unsuccessful_conflict_attempt_escalates_immutably() -> None:
     conflict = Conflict(
         id="c-1",
-        type="preference_vs_constraint",
+        type=ConflictType.PREFERENCE_VS_CONSTRAINT,
         summary="Material exceeds budget",
         impact="A lower-cost alternative is required",
         status=ConflictStatus.OPEN,
@@ -84,3 +86,43 @@ def test_second_unsuccessful_conflict_attempt_escalates_immutably() -> None:
     assert conflict.resolution_attempts == 1
     assert updated.resolution_attempts == 2
     assert updated.status == ConflictStatus.ESCALATED
+
+
+def test_third_conflict_resolution_attempt_is_rejected() -> None:
+    conflict = Conflict(
+        id="c-1",
+        type=ConflictType.PREFERENCE_VS_CONSTRAINT,
+        summary="Material exceeds budget",
+        impact="A lower-cost alternative is required",
+        status=ConflictStatus.ESCALATED,
+        severity=ConstraintSeverity.IMPORTANT,
+        resolution_attempts=2,
+    )
+
+    with pytest.raises(DomainRuleError, match="conflict resolution budget exhausted"):
+        record_conflict_attempt(conflict)
+
+
+def test_conflict_model_rejects_more_than_two_resolution_attempts() -> None:
+    with pytest.raises(ValidationError, match="less than or equal to 2"):
+        Conflict(
+            id="c-1",
+            type=ConflictType.PREFERENCE_VS_CONSTRAINT,
+            summary="Material exceeds budget",
+            impact="A lower-cost alternative is required",
+            status=ConflictStatus.OPEN,
+            severity=ConstraintSeverity.IMPORTANT,
+            resolution_attempts=3,
+        )
+
+
+def test_conflict_rejects_unknown_type() -> None:
+    with pytest.raises(ValidationError):
+        Conflict(
+            id="c-1",
+            type="unknown_conflict",
+            summary="Unrecognised conflict",
+            impact="Cannot route resolution",
+            status=ConflictStatus.OPEN,
+            severity=ConstraintSeverity.IMPORTANT,
+        )

@@ -1,11 +1,14 @@
+import hashlib
+import json
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from alignspace.domain.enums import (
     ActorKind,
     AttributeStatus,
     ConflictStatus,
+    ConflictType,
     ConstraintCategory,
     ConstraintOwner,
     ConstraintSeverity,
@@ -23,6 +26,17 @@ def to_camel(value: str) -> str:
 
 class DomainModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+def calculate_brief_content_hash(payload: dict[str, object]) -> str:
+    canonical_payload = {key: value for key, value in payload.items() if key != "approvals"}
+    canonical_json = json.dumps(
+        canonical_payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
 class Evidence(DomainModel):
@@ -51,6 +65,22 @@ class Constraint(DomainModel):
     severity: ConstraintSeverity
     verification_status: ConstraintVerificationStatus
     owner: ConstraintOwner
+    evidence: list[Evidence] = Field(min_length=1)
+    verified_by: str | None = None
+
+    @model_validator(mode="after")
+    def validate_verified_provenance(self) -> "Constraint":
+        if self.verification_status != ConstraintVerificationStatus.VERIFIED:
+            return self
+        if self.owner != ConstraintOwner.QUALIFIED_PROFESSIONAL:
+            raise ValueError("verified constraints must be owned by a qualified professional")
+        if not self.verified_by or not self.verified_by.strip():
+            raise ValueError("verified constraints require verified_by")
+        if not any(
+            item.source_type == EvidenceSource.PROFESSIONAL_REVIEW for item in self.evidence
+        ):
+            raise ValueError("verified constraints require professional review evidence")
+        return self
 
 
 class Question(DomainModel):
@@ -65,13 +95,13 @@ class Question(DomainModel):
 
 class Conflict(DomainModel):
     id: str
-    type: str
+    type: ConflictType
     summary: str
     impact: str
     status: ConflictStatus
     resolution: str | None = None
     severity: ConstraintSeverity
-    resolution_attempts: int = Field(default=0, ge=0)
+    resolution_attempts: int = Field(default=0, ge=0, le=2)
 
 
 class BriefVersion(DomainModel):
@@ -80,12 +110,18 @@ class BriefVersion(DomainModel):
     payload: dict[str, object]
     completeness: float = Field(ge=0, le=1)
 
+    @model_validator(mode="after")
+    def validate_content_hash(self) -> "BriefVersion":
+        if self.content_hash != calculate_brief_content_hash(self.payload):
+            raise ValueError("content_hash must match canonical payload SHA-256")
+        return self
+
 
 class Approval(DomainModel):
     role: Role
     actor_id: str
     brief_version: int
-    content_hash: str
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     approved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

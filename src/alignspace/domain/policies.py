@@ -48,6 +48,8 @@ def can_draft_brief(state: ProjectState) -> bool:
 
 
 def record_conflict_attempt(conflict: Conflict) -> Conflict:
+    if conflict.resolution_attempts >= 2:
+        raise DomainRuleError("conflict resolution budget exhausted")
     attempts = conflict.resolution_attempts + 1
     status = ConflictStatus.ESCALATED if attempts >= 2 else ConflictStatus.OPEN
     return conflict.model_copy(update={"resolution_attempts": attempts, "status": status})
