@@ -7,6 +7,7 @@ dependencies = [
   "fastapi>=0.116,<1",
   "langgraph>=1.1,<2",
   "langgraph-checkpoint-sqlite>=3.1,<4",
+  "jsonschema>=4.25,<5",
   "pydantic>=2.11,<3",
   "sqlalchemy>=2.0,<3",
   "uvicorn>=0.35,<1",
@@ -15,7 +16,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28,<1",
-  "jsonschema>=4.25,<5",
   "pytest>=8.4,<9",
   "pytest-cov>=7,<8",
   "ruff>=0.12,<1",
