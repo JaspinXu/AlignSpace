@@ -55,9 +55,10 @@
     "attribute": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "dimension", "value", "status", "confidence", "evidence", "actor"],
+      "required": ["id", "targetElement", "dimension", "value", "status", "confidence", "evidence", "actor"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
+        "targetElement": { "type": "string", "minLength": 1 },
         "dimension": { "enum": ["style", "colour", "material", "lighting", "layout", "furniture", "mood", "function", "maintenance", "other"] },
         "value": { "type": "string", "minLength": 1 },
         "status": { "enum": ["proposed", "confirmed", "rejected", "conflicted", "unresolved", "not_applicable"] },
@@ -84,14 +85,16 @@
     "conflict": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "type", "summary", "impact", "status"],
+      "required": ["id", "type", "summary", "impact", "status", "severity", "resolutionAttempts"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "type": { "enum": ["reference_conflict", "stated_vs_visual", "preference_vs_constraint", "human_vs_human", "evidence_gap"] },
         "summary": { "type": "string", "minLength": 1 },
         "impact": { "type": "string", "minLength": 1 },
         "status": { "enum": ["open", "resolved", "escalated", "accepted_unresolved"] },
-        "resolution": { "type": ["string", "null"] }
+        "resolution": { "type": ["string", "null"] },
+        "severity": { "enum": ["advisory", "important", "critical"] },
+        "resolutionAttempts": { "type": "integer", "minimum": 0 }
       }
     },
     "approval": {
@@ -108,4 +111,3 @@
     }
   }
 }
-

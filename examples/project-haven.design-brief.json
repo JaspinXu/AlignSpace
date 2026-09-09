@@ -16,6 +16,7 @@
   "attributes": [
     {
       "id": "attr-pale-oak",
+      "targetElement": "general_finish",
       "dimension": "material",
       "value": "pale oak or a visually similar low-maintenance finish",
       "status": "confirmed",
@@ -30,6 +31,7 @@
     },
     {
       "id": "attr-warm-light",
+      "targetElement": "lighting",
       "dimension": "lighting",
       "value": "warm ambient lighting with task lighting where needed",
       "status": "confirmed",
@@ -44,6 +46,7 @@
     },
     {
       "id": "attr-light-sofa",
+      "targetElement": "sofa",
       "dimension": "furniture",
       "value": "light neutral sofa upholstery",
       "status": "conflicted",
@@ -73,7 +76,9 @@
     "summary": "The preferred light sofa appearance may increase visible staining or cleaning effort.",
     "impact": "Material choice and maintenance routine must be agreed before furniture selection.",
     "status": "open",
-    "resolution": null
+    "resolution": null,
+    "severity": "important",
+    "resolutionAttempts": 0
   }],
   "unresolvedDecisions": ["Choose a light performance fabric or a slightly darker neutral upholstery."],
   "completeness": 0.82,
@@ -81,4 +86,3 @@
   "contentHash": "demo-sha256-placeholder-v3",
   "approvals": []
 }
-
