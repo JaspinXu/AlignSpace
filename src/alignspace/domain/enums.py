@@ -43,6 +43,37 @@ class Role(str, Enum):
     DESIGNER = "designer"
 
 
+class ConstraintCategory(str, Enum):
+    BUDGET = "budget"
+    SPACE = "space"
+    FUNCTION = "function"
+    MAINTENANCE = "maintenance"
+    TIMELINE = "timeline"
+    SAFETY = "safety"
+    REGULATORY = "regulatory"
+    AVAILABILITY = "availability"
+    OTHER = "other"
+
+
+class ConstraintSeverity(str, Enum):
+    ADVISORY = "advisory"
+    IMPORTANT = "important"
+    CRITICAL = "critical"
+
+
+class ConstraintVerificationStatus(str, Enum):
+    UNVERIFIED = "unverified"
+    DESIGNER_ASSERTED = "designer_asserted"
+    PROFESSIONAL_REVIEW_REQUIRED = "professional_review_required"
+    VERIFIED = "verified"
+
+
+class ConstraintOwner(str, Enum):
+    DESIGNER = "designer"
+    QUALIFIED_PROFESSIONAL = "qualified_professional"
+    HOMEOWNER = "homeowner"
+
+
 class ConflictStatus(str, Enum):
     OPEN = "open"
     RESOLVED = "resolved"
