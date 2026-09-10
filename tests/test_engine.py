@@ -54,7 +54,25 @@ def test_conflict_requires_human_resolution_before_approval():
     assert state["readiness"]["readyForApproval"] is False
 
     state = engine.resolve_conflict(state, state["conflicts"][0]["id"], "accept_designer_constraint")
-    assert state["readiness"]["readyForApproval"] is True
+    assert state["readiness"]["readyForApproval"] is False
+    assert 'layout' in state['readiness']['missingDimensions']
+    assert not any(a['dimension'] == 'layout' and a['status'] == 'confirmed' for a in state['attributes'])
+
+
+def test_edit_after_approval_clears_status_and_approvals():
+    state = completed_state()
+    engine.approve(state, 'homeowner', 'h1')
+    engine.approve(state, 'designer', 'd1')
+    engine.add_preferences(state, ['Changed goal'], [])
+    assert state['status'] != 'approved'
+    assert state['approvals'] == []
+
+
+def test_no_matches_does_not_report_perfect_concentration():
+    state = completed_state()
+    state['attributes'][0]['value'] = 'unknown'
+    engine.recompute(state)
+    assert state['readiness']['candidateConcentration'] == 0
 
 
 def test_two_approvals_use_the_same_content_hash():

@@ -107,6 +107,20 @@ The architecture combines two complementary ideas:
 
 ## Running MVP
 
+### Guided demonstration (5–8 minutes)
+
+Run `python -m uvicorn app.main:app --host 127.0.0.1 --port 8000`, then open http://localhost:8000.
+
+1. Click **Start guided demo from scratch**. This creates a new project with goals and a labelled sample inspiration note.
+2. Click **Analyse reference notes**, then confirm the warm-modern and soft-textiles proposals. Note analysis uses offline keyword rules; it does not inspect image pixels or call an LLM.
+3. Answer the remaining questions: family relaxing, zoned layout, cosy, warm neutrals, soft layered light, balanced care. The order adapts to candidate information gain.
+4. Add a designer constraint: affected preference **Layout**, incompatible value `zoned`, statement “Zoned furniture obstructs the balcony route”. Show the conflict, then select **Accept constraint**.
+5. Open **Shared brief**. Under **Revise a decision**, choose **Layout** and **Open flow**. This replaces the rejected choice. The catalogue may have no exact match; closest directions remain suggestions.
+6. Approve as homeowner, then designer. These are simulated roles on one device, not authenticated separate accounts. Export JSON or use **Print / Save PDF**.
+7. Revise any decision to demonstrate that both approvals are invalidated. Refresh to show persistence, and inspect **Activity** for the audit trail.
+
+If a question was answered “Not sure”, fill it using **Revise a decision**. All eight dimensions must be confirmed before approval. Unresolved escalations and critical constraints block final approval. The service is a local workflow demo; production authentication and the competition model integration are not implemented.
+
 The `jaspin` branch contains a runnable end-to-end prototype with:
 
 - a responsive homeowner/designer workspace;

@@ -12,6 +12,14 @@
   --shadow: 0 18px 50px rgba(32, 39, 35, .08);
 }
 
+@media print {
+  .site-header, .tabs, .approval-panel, #export-button, #notice, footer, #back-button { display:none !important; }
+  .brief-layout {display:block !important;}
+  .panel {box-shadow:none !important; border:0 !important;}
+  .workspace {padding:0 !important;}
+  .brief-section {break-inside:avoid;}
+}
+
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); font-family: "DM Sans", system-ui, sans-serif; }
 button, input, select, textarea { font: inherit; }

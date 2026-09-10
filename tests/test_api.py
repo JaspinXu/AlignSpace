@@ -82,3 +82,23 @@ def test_upload_rejects_mismatched_image_content(tmp_path):
         files={"file": ("fake.png", b"not an image", "image/png")},
     )
     assert response.status_code == 422
+
+
+def test_guided_demo_manual_recovery_and_approval_revision(tmp_path):
+    client = make_client(tmp_path)
+    p = client.post('/api/demo/start').json()
+    base = f"/api/projects/{p['id']}"
+    p = client.post(base + '/analysis-runs').json()
+    for proposal in list(p['attributes']):
+        p = client.post(base + f"/attributes/{proposal['id']}/review", json={'decision':'confirm'}).json()
+    assert all(a['status'] == 'confirmed' for a in p['attributes'])
+    for q in client.get('/api/decision-options').json():
+        p = client.put(base + f"/decisions/{q['id']}", json={'role':q['target'], 'value':q['options'][0], 'expectedStateVersion':p['stateVersion']}).json()
+    assert p['readiness']['readyForApproval']
+    for role in ['homeowner', 'designer']:
+        p = client.post(base + '/approvals', json={'role':role,'actorId':role,'expectedStateVersion':p['stateVersion']}).json()
+    assert p['status'] == 'approved'
+    brief = client.get(base + '/brief').json()
+    assert all(a['contentHash'] == brief['contentHash'] for a in brief['approvals'])
+    p = client.put(base + '/decisions/style_direction', json={'role':'homeowner','value':'japandi','expectedStateVersion':p['stateVersion']}).json()
+    assert p['approvals'] == [] and p['status'] != 'approved'

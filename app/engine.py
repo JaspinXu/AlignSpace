@@ -183,6 +183,8 @@ def _compatible_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
     confirmed = _confirmed_map(state)
     excluded: dict[str, set[str]] = {}
     for constraint in state["constraints"]:
+        if constraint.get('waived'):
+            continue
         dimension = constraint.get("affectedDimension")
         value = constraint.get("incompatibleValue")
         if dimension and value:
@@ -201,7 +203,10 @@ def _compatible_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
 def _ranked_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
     confirmed = _confirmed_map(state)
     compatible = _compatible_candidates(state)
-    pool = compatible or CATALOG
+    pool = compatible or [candidate for candidate in CATALOG if not any(
+        c.get('affectedDimension') and c.get('incompatibleValue') == candidate.get(c['affectedDimension'])
+        for c in state['constraints'] if not c.get('waived')
+    )]
     ranked = []
     for candidate in pool:
         matches = sum(candidate.get(key) == value for key, value in confirmed.items())
@@ -230,7 +235,7 @@ def next_question(state: dict[str, Any]) -> dict[str, Any] | None:
         if conflict["status"] == "open" and conflict.get("dimension")
     }
     for question in QUESTION_BANK:
-        if question["id"] in answered:
+        if question["id"] in answered or question['dimension'] in _confirmed_map(state):
             continue
         values = [candidate[question["dimension"]] for candidate in candidates]
         information_gain = _entropy(values)
@@ -250,11 +255,13 @@ def next_question(state: dict[str, Any]) -> dict[str, Any] | None:
         "options": options + ["not_sure"],
         "informationGain": round(score, 3),
         "sequence": state["questionCount"] + 1,
-        "remainingCandidateCount": len(candidates),
+        "remainingCandidateCount": len(_compatible_candidates(state)),
     }
 
 
 def answer_question(state: dict[str, Any], question_id: str, role: str, value: str) -> dict[str, Any]:
+    if state['questionCount'] >= state['maxQuestions']:
+        raise ValueError('Question budget reached; edit the brief to complete remaining decisions')
     question = next((item for item in QUESTION_BANK if item["id"] == question_id), None)
     if not question:
         raise ValueError("Unknown question")
@@ -264,6 +271,8 @@ def answer_question(state: dict[str, Any], question_id: str, role: str, value: s
         raise ValueError("Question has already been answered")
     if value not in [*question["options"], "not_sure"]:
         raise ValueError("Answer is not one of the allowed options")
+    if any(c.get('affectedDimension') == question['dimension'] and c.get('incompatibleValue') == value and not c.get('waived') for c in state['constraints']):
+        raise ValueError('This value conflicts with an active designer constraint. Choose a compatible value.')
 
     answer_id = new_id("answer")
     state["answers"].append(
@@ -457,7 +466,7 @@ def add_constraint(state: dict[str, Any], data: dict[str, Any]) -> dict[str, Any
         "statement": data["statement"].strip(),
         "rationale": data.get("rationale", "").strip(),
         "severity": data["severity"],
-        "verificationStatus": "professional_review_requested" if data["severity"] == "critical" else "designer_asserted",
+        "verificationStatus": "professional_review_required" if data["severity"] == "critical" else "designer_asserted",
         "owner": "designer",
         "affectedDimension": data.get("affectedDimension"),
         "incompatibleValue": data.get("incompatibleValue"),
@@ -473,6 +482,7 @@ def add_constraint(state: dict[str, Any], data: dict[str, Any]) -> dict[str, Any
                 "id": new_id("conflict"),
                 "type": "preference_vs_constraint",
                 "dimension": dimension,
+                "constraintId": constraint['id'],
                 "summary": f"The confirmed {dimension} preference conflicts with a designer constraint.",
                 "homeownerPosition": incompatible,
                 "designerPosition": constraint["statement"],
@@ -496,7 +506,20 @@ def resolve_conflict(state: dict[str, Any], conflict_id: str, resolution: str) -
     conflict = next((item for item in state["conflicts"] if item["id"] == conflict_id), None)
     if not conflict:
         raise ValueError("Conflict not found")
-    conflict["status"] = "resolved" if resolution != "discuss_offline" else "accepted_unresolved"
+    if resolution not in {'accept_designer_constraint', 'retain_preference_after_discussion', 'discuss_offline'}:
+        raise ValueError('Unknown resolution')
+    if resolution == 'accept_designer_constraint':
+        for attribute in state['attributes']:
+            if attribute['dimension'] == conflict.get('dimension') and attribute['value'] == conflict.get('homeownerPosition'):
+                attribute['status'] = 'rejected'
+    elif resolution == 'retain_preference_after_discussion':
+        for constraint in state['constraints']:
+            if constraint['id'] == conflict.get('constraintId'):
+                if constraint['severity'] == 'critical':
+                    raise ValueError('Critical constraints require professional review')
+                constraint['waived'] = True
+                constraint['rationale'] += ' | Withdrawn by agreement; preference retained.'
+    conflict["status"] = "resolved" if resolution != "discuss_offline" else "escalated"
     conflict["resolution"] = resolution.strip()
     add_agent_message(
         state,
@@ -512,8 +535,8 @@ def _readiness(state: dict[str, Any]) -> dict[str, Any]:
     confirmed = _confirmed_map(state)
     coverage = len(set(confirmed) & set(DIMENSIONS)) / len(DIMENSIONS)
     candidates = _compatible_candidates(state)
-    concentration = 1 - min(1, max(0, len(candidates) - 1) / max(1, len(CATALOG) - 1))
-    open_conflicts = [item for item in state["conflicts"] if item["status"] == "open"]
+    concentration = (1 - min(1, max(0, len(candidates) - 1) / max(1, len(CATALOG) - 1))) if candidates else 0
+    open_conflicts = [item for item in state["conflicts"] if item["status"] in {'open', 'escalated'}]
     agreement = 1.0 if not open_conflicts else max(0.0, 1 - len(open_conflicts) * 0.35)
     critical = [item for item in state["constraints"] if item["severity"] == "critical"]
     risk_clearance = 0.0 if critical else 1.0
@@ -533,7 +556,9 @@ def _readiness(state: dict[str, Any]) -> dict[str, Any]:
         "agreement": round(agreement, 3),
         "riskClearance": round(risk_clearance, 3),
         "stage": stage,
-        "readyForApproval": coverage >= 0.85 and not open_conflicts and not critical,
+        "readyForApproval": coverage == 1 and not open_conflicts and not critical,
+        "missingDimensions": [dimension for dimension in DIMENSIONS if dimension not in confirmed],
+        "exactCandidateCount": len(candidates),
     }
 
 
@@ -556,6 +581,7 @@ def bump_and_recompute(state: dict[str, Any]) -> dict[str, Any]:
     state["stateVersion"] += 1
     state["briefVersion"] += 1
     state["approvals"] = []
+    state['status'] = 'homeowner_review'
     return recompute(state)
 
 
@@ -603,7 +629,7 @@ def build_brief(state: dict[str, Any]) -> dict[str, Any]:
         "attributes": attributes,
         "constraints": constraints,
         "conflicts": conflicts,
-        "unresolvedDecisions": [item["summary"] for item in state["conflicts"] if item["status"] == "open"],
+        "unresolvedDecisions": [item["summary"] for item in state["conflicts"] if item["status"] in {'open', 'escalated'}] + [f"Choose {d}" for d in state['readiness']['missingDimensions']],
         "completeness": state["readiness"]["coverage"],
         "version": state["briefVersion"],
         "approvals": state["approvals"],

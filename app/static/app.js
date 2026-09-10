@@ -19,10 +19,13 @@ const labels = {
 };
 
 function human(value) {
-  return labels[value] || String(value || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
+  return escapeHtml(labels[value] || String(value || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()));
 }
 
 async function api(path, options = {}) {
+  const writing = options.method && options.method !== 'GET';
+  if (writing) document.body.inert = true;
+  try {
   const response = await fetch(path, {
     ...options,
     headers: options.body instanceof FormData ? options.headers : { "Content-Type": "application/json", ...(options.headers || {}) }
@@ -33,6 +36,9 @@ async function api(path, options = {}) {
     throw new Error(typeof message === "string" ? message : JSON.stringify(message));
   }
   return payload;
+  } finally {
+    if (writing) document.body.inert = false;
+  }
 }
 
 function notify(message, error = false) {
@@ -136,7 +142,7 @@ function renderProposals() {
   $("#analyse-button").disabled = !state.project.references.length;
   $("#proposal-list").innerHTML = proposals.map(item => `
     <div class="proposal">
-      <p><strong>${human(item.dimension)}: ${human(item.value)}</strong><br><span class="muted">AI-proposed · ${Math.round(item.confidence * 100)}% confidence</span></p>
+      <p><strong>${human(item.dimension)}: ${human(item.value)}</strong><br><span class="muted">Rule-based note proposal · needs your confirmation</span><br>${escapeHtml(item.evidence[0]?.description || '')}</p>
       <div class="proposal-actions"><button data-attribute="${item.id}" data-decision="confirm">Confirm</button><button data-attribute="${item.id}" data-decision="reject">Reject</button></div>
     </div>`).join("");
   $$('[data-attribute]', $("#proposal-list")).forEach(button => button.addEventListener("click", () => reviewAttribute(button.dataset.attribute, button.dataset.decision)));
@@ -153,7 +159,7 @@ async function reviewAttribute(id, decision) {
 
 function renderConflicts() {
   const card = $("#conflicts-card");
-  const open = state.project.conflicts.filter(item => item.status === "open");
+  const open = state.project.conflicts.filter(item => ['open', 'escalated'].includes(item.status));
   card.innerHTML = `<div class="panel-heading"><div><p class="eyebrow">Alignment decisions</p><h2>Open conflicts</h2></div><span class="count-badge">${open.length}</span></div>` +
     (open.length ? open.map(item => `<div class="conflict"><p><strong>${escapeHtml(item.summary)}</strong><br><span class="muted">${escapeHtml(item.impact)}</span></p><div class="conflict-actions"><button data-resolve="${item.id}" data-resolution="accept_designer_constraint">Accept constraint</button><button data-resolve="${item.id}" data-resolution="retain_preference_after_discussion">Retain preference</button><button data-resolve="${item.id}" data-resolution="discuss_offline">Discuss offline</button></div></div>`).join("") : '<p class="muted">No unresolved disagreement. New constraints are cross-checked automatically.</p>');
   $$('[data-resolve]', card).forEach(button => button.addEventListener("click", () => resolveConflict(button.dataset.resolve, button.dataset.resolution)));
@@ -170,7 +176,7 @@ async function resolveConflict(id, resolution) {
 
 function renderBrief() {
   const brief = state.project.brief;
-  const attributes = brief.attributes.length ? brief.attributes.map(item => `<div class="attribute"><span>${human(item.dimension)}</span><strong>${human(item.value)}</strong></div>`).join("") : '<p class="muted">Answer the adaptive questions to build the brief.</p>';
+  const attributes = brief.attributes.filter(item => item.status === 'confirmed').map(item => `<div class="attribute"><span>${human(item.dimension)}</span><strong>${human(item.value)}</strong></div>`).join("") || '<p class="muted">Answer the adaptive questions to build the brief.</p>';
   $("#brief-content").innerHTML = `
     <div class="brief-section"><h3>Project intent</h3><ul>${brief.goals.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>Not stated yet</li>"}</ul></div>
     <div class="brief-section"><h3>Confirmed design language</h3><div class="attribute-grid">${attributes}</div></div>
@@ -181,6 +187,7 @@ function renderBrief() {
 }
 
 function renderApprovals() {
+  $('#approval-help').textContent = state.project.status === 'approved' ? 'Both participants approved this version. Ready to export.' : state.project.readiness.readyForApproval ? 'Ready for both approvals.' : `Complete missing decisions: ${state.project.readiness.missingDimensions.join(', ') || 'none'}. Resolve open conflicts and critical professional review tasks.`;
   const roles = new Map(state.project.approvals.map(item => [item.role, item]));
   $("#approval-status").innerHTML = ["homeowner", "designer"].map(role => `<div class="approval-state"><span>${human(role)}</span><span class="${roles.has(role) ? "approved" : "waiting"}">${roles.has(role) ? "Approved" : "Waiting"}</span></div>`).join("");
   $$('[data-approve]').forEach(button => {
@@ -240,23 +247,25 @@ $("#preferences-form").addEventListener("submit", async event => {
 
 $("#constraint-form").addEventListener("submit", async event => {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
+  const formElement = event.currentTarget;
+  const form = new FormData(formElement);
   const payload = Object.fromEntries(form.entries());
   if (!payload.affectedDimension) delete payload.affectedDimension;
   if (!payload.incompatibleValue) delete payload.incompatibleValue;
   payload.expectedStateVersion = state.project.stateVersion;
   try {
     state.project = await api(`/api/projects/${state.project.id}/constraints`, { method: "POST", body: JSON.stringify(payload) });
-    event.currentTarget.reset(); render(); notify("Constraint added and cross-checked against confirmed preferences.");
+    formElement.reset(); render(); notify("Constraint added and cross-checked against confirmed preferences.");
   } catch (error) { notify(error.message, true); }
 });
 
 $("#reference-form").addEventListener("submit", async event => {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
+  const formElement = event.currentTarget;
+  const form = new FormData(formElement);
   try {
     state.project = await api(`/api/projects/${state.project.id}/references`, { method: "POST", body: form });
-    event.currentTarget.reset(); render(); notify("Reference uploaded with its provenance note.");
+    formElement.reset(); render(); notify("Reference uploaded with its provenance note.");
   } catch (error) { notify(error.message, true); }
 });
 
@@ -292,3 +301,32 @@ $$('.tab').forEach(button => button.addEventListener("click", () => {
 
 const savedProject = localStorage.getItem("alignspaceProjectId");
 if (savedProject) loadProject(savedProject).catch(() => localStorage.removeItem("alignspaceProjectId"));
+
+$('#guided-button').addEventListener('click', async () => {
+  try {
+    state.project = await api('/api/demo/start', {method: 'POST', body: '{}'});
+    localStorage.setItem('alignspaceProjectId', state.project.id);
+    render();
+    notify('Start with Analyse reference notes, review the proposals, then answer the remaining questions.');
+  } catch (error) { alert(error.message); }
+});
+$('#print-button').addEventListener('click', () => window.print());
+let decisionOptions = [];
+function updateDecisionValues() {
+  const question = decisionOptions.find(q => q.id === $('#decision-question').value);
+  $('#decision-value').innerHTML = question.options.map(v => `<option value="${v}">${human(v)}</option>`).join('');
+}
+api('/api/decision-options').then(options => {
+  decisionOptions = options;
+  $('#decision-question').innerHTML = options.map(q => `<option value="${q.id}">${human(q.dimension)} (${q.target})</option>`).join('');
+  updateDecisionValues();
+}).catch(error => console.error(error));
+$('#decision-question').addEventListener('change', updateDecisionValues);
+$('#decision-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const q = decisionOptions.find(q => q.id === $('#decision-question').value);
+  try {
+    state.project = await api(`/api/projects/${state.project.id}/decisions/${q.id}`, {method:'PUT', body: JSON.stringify({role:q.target, value:$('#decision-value').value, expectedStateVersion:state.project.stateVersion})});
+    render(); notify('Decision revised. Both approvals must be renewed.');
+  } catch (error) { notify(error.message, true); }
+});

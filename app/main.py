@@ -166,6 +166,29 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
     def get_project(project_id: str, request: Request) -> dict[str, Any]:
         return _present(store(request).get(project_id))
 
+    @application.post('/api/demo/start', status_code=201)
+    def start_demo(request: Request) -> dict[str, Any]:
+        state = engine.create_project('Project Haven — guided demo', '15k_to_30k_sgd', 'HDB 4-room')
+        state = engine.add_preferences(state, ['Comfortable family evenings', 'A calm, warm living room'], ['Cold grey surfaces'])
+        state = engine.add_reference(state, {'id': engine.new_id('reference'), 'filename': 'Sample inspiration note', 'note': 'I like warm modern style and soft textiles', 'status': 'demo_note'})
+        return _present(store(request).create(state, 'demo_seed'))
+
+    @application.put('/api/projects/{project_id}/decisions/{question_id}')
+    def revise_decision(project_id: str, question_id: str, data: AnswerCreate, request: Request):
+        def change(current):
+            # Manual revision is not another automated interview question.
+            count = current['questionCount']
+            current['answers'] = [a for a in current['answers'] if a['questionId'] != question_id]
+            current['questionCount'] = 0
+            engine.answer_question(current, question_id, data.role, data.value)
+            current['questionCount'] = count
+            return current
+        return _present(store(request).mutate(project_id, 'decision_revised', data.role, change, data.expectedStateVersion))
+
+    @application.get('/api/decision-options')
+    def decision_options():
+        return engine.QUESTION_BANK
+
     @application.put("/api/projects/{project_id}/preferences")
     def update_preferences(project_id: str, data: PreferencesUpdate, request: Request) -> dict[str, Any]:
         state = store(request).mutate(

@@ -57,6 +57,8 @@
           <label class="consent"><input type="checkbox" required> I have the right to use uploaded references and consent to AI-assisted analysis for this project.</label>
           <button class="button primary" type="submit">Create alignment workspace <span>→</span></button>
           <button class="button ghost" id="demo-button" type="button">Open completed demo</button>
+          <button class="button secondary" id="guided-button" type="button">Start guided demo from scratch</button>
+          <p class="muted">Offline demo: rule-based questions and reference-note extraction. Both roles are operated on this device; no account authentication.</p>
         </form>
       </div>
     </section>
@@ -157,12 +159,20 @@
             <div id="brief-content"></div>
           </article>
           <aside class="panel approval-panel">
+            <p id="approval-help" role="status"></p>
             <p class="eyebrow">Human approval gate</p>
             <h2>Confirm the same brief</h2>
             <p class="muted">Any later edit clears both approvals.</p>
             <div id="approval-status"></div>
             <button class="button secondary" data-approve="homeowner" type="button">Approve as homeowner</button>
             <button class="button secondary" data-approve="designer" type="button">Approve as designer</button>
+            <button class="button ghost" id="print-button" type="button">Print / Save PDF</button>
+            <h2>Revise a decision</h2>
+            <form id="decision-form">
+              <label>Decision<select id="decision-question"></select></label>
+              <label>Confirmed value<select id="decision-value"></select></label>
+              <button class="button ghost" type="submit">Save revision</button>
+            </form>
           </aside>
         </div>
       </section>
