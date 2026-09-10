@@ -6,7 +6,7 @@ from jsonschema import Draft202012Validator
 from alignspace.agents.contracts import AgentResult
 from alignspace.domain.enums import ReviewDecision
 from alignspace.domain.models import ProjectState
-from alignspace.domain.policies import can_draft_brief
+from alignspace.domain.policies import can_draft_brief, professional_content_category
 
 
 class ReviewAgent:
@@ -21,4 +21,6 @@ class ReviewAgent:
         latest = max(state.brief_versions, key=lambda brief: brief.version)
         if list(self._validator.iter_errors(latest.payload)):
             return AgentResult(state=state, review_decision=ReviewDecision.REPAIR)
+        if professional_content_category(latest.payload) is not None:
+            return AgentResult(state=state, review_decision=ReviewDecision.ESCALATE)
         return AgentResult(state=state, review_decision=ReviewDecision.PASS)

@@ -19,6 +19,7 @@ from alignspace.domain.enums import (
 )
 from alignspace.domain.models import (
     Approval,
+    Attribute,
     BriefVersion,
     DomainModel,
     Evidence,
@@ -37,9 +38,11 @@ from alignspace.domain.patches import (
 from alignspace.domain.policies import (
     DomainRuleError,
     StaleStateError,
+    calculate_completeness,
     can_approve,
     can_draft_brief,
     record_conflict_attempt,
+    validate_professional_claim,
 )
 from alignspace.persistence.repository import canonical_request_hash
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
@@ -162,8 +165,6 @@ class WorkflowService:
                 (item for item in state.attributes if item.id == attribute_id),
                 None,
             )
-            if attribute is None:
-                raise KeyError(f"attribute {attribute_id} not found")
             status = AttributeStatus(raw_status)
             if status not in {
                 AttributeStatus.CONFIRMED,
@@ -177,24 +178,46 @@ class WorkflowService:
                 if actor.role == Role.HOMEOWNER
                 else EvidenceSource.DESIGNER_NOTE
             )
-            changed = attribute.model_copy(
-                update={
-                    "value": envelope.data.get("value", attribute.value),
-                    "status": status,
-                    "confidence": 1.0,
-                    "actor": (
-                        ActorKind.HOMEOWNER if actor.role == Role.HOMEOWNER else ActorKind.DESIGNER
-                    ),
-                    "evidence": [
-                        *attribute.evidence,
-                        Evidence(
-                            source_type=source,
-                            source_id=envelope.idempotency_key,
-                            description="Explicit human attribute correction.",
-                        ),
-                    ],
-                }
+            default_value = attribute.value if attribute is not None else None
+            changed_value = envelope.data.get("value", default_value)
+            if not isinstance(changed_value, str):
+                raise DomainRuleError("attribute value must be a string")
+            validate_professional_claim(changed_value)
+            evidence = Evidence(
+                source_type=source,
+                source_id=envelope.idempotency_key,
+                description="Explicit human attribute correction.",
             )
+            actor_kind = (
+                ActorKind.HOMEOWNER if actor.role == Role.HOMEOWNER else ActorKind.DESIGNER
+            )
+            if attribute is None:
+                target_element = envelope.data.get("targetElement")
+                dimension = envelope.data.get("dimension")
+                if not isinstance(target_element, str) or not target_element.strip():
+                    raise DomainRuleError("new attribute requires targetElement")
+                if not isinstance(dimension, str) or not dimension.strip():
+                    raise DomainRuleError("new attribute requires dimension")
+                changed = Attribute(
+                    id=attribute_id,
+                    target_element=target_element.strip(),
+                    dimension=dimension.strip(),
+                    value=changed_value,
+                    status=status,
+                    confidence=1.0,
+                    actor=actor_kind,
+                    evidence=[evidence],
+                )
+            else:
+                changed = attribute.model_copy(
+                    update={
+                        "value": changed_value,
+                        "status": status,
+                        "confidence": 1.0,
+                        "actor": actor_kind,
+                        "evidence": [*attribute.evidence, evidence],
+                    }
+                )
             updated = apply_patch(
                 state,
                 StatePatch(
@@ -202,6 +225,7 @@ class WorkflowService:
                     operations=[UpsertAttribute(attribute=changed)],
                 ),
             )
+            updated = updated.model_copy(update={"completeness": calculate_completeness(updated)})
             response = self._response(updated)
             uow.projects.save(updated, expected_version=state.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)
@@ -286,6 +310,7 @@ class WorkflowService:
             resolution = envelope.data.get("resolution")
             if not isinstance(resolution, str) or not resolution.strip():
                 raise DomainRuleError("conflict resolution text is required")
+            validate_professional_claim(resolution)
             changed = attempted.model_copy(
                 update={"status": status, "resolution": resolution.strip()}
             )
@@ -347,6 +372,7 @@ class WorkflowService:
             payload["approvals"] = []
             payload.pop("contentHash", None)
             payload["project"] = {**project, "status": ProjectStatus.AWAITING_APPROVAL.value}
+            self._validate_professional_content(payload)
             self._validate_brief(payload)
             completeness = payload.get("completeness")
             if not isinstance(completeness, (int, float)):
@@ -585,6 +611,17 @@ class WorkflowService:
             first = errors[0]
             path = ".".join(str(item) for item in first.path) or "$"
             raise BriefSchemaError(f"brief schema error at {path}: {first.message}")
+
+    @classmethod
+    def _validate_professional_content(cls, value: object) -> None:
+        if isinstance(value, str):
+            validate_professional_claim(value)
+        elif isinstance(value, dict):
+            for item in value.values():
+                cls._validate_professional_content(item)
+        elif isinstance(value, list):
+            for item in value:
+                cls._validate_professional_content(item)
 
     @staticmethod
     def _record_replay(

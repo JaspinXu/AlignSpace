@@ -5,9 +5,16 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from alignspace.agents.contracts import AgentBundle
-from alignspace.domain.enums import NextAction, ProjectStatus, ReviewDecision
+from alignspace.domain.enums import ConflictStatus, NextAction, ProjectStatus, ReviewDecision
 from alignspace.domain.models import BriefVersion, ProjectState, calculate_brief_content_hash
-from alignspace.domain.patches import StatePatch, UpsertBriefVersion, UpsertQuestion, apply_patch
+from alignspace.domain.patches import (
+    StatePatch,
+    UpsertBriefVersion,
+    UpsertConflict,
+    UpsertQuestion,
+    apply_patch,
+)
+from alignspace.domain.policies import record_conflict_attempt
 from alignspace.workflow.state import WorkflowState
 
 
@@ -54,10 +61,27 @@ def build_graph(agents: AgentBundle, checkpointer: object):
             return {"next_action": NextAction.ASK_HOMEOWNER.value}
         state = _project_state(workflow_state)
         question = next(item for item in state.questions if item.id == pending["id"])
-        operation = UpsertQuestion(question=question.model_copy(update={"answer": answer.strip()}))
+        operations = [
+            UpsertQuestion(question=question.model_copy(update={"answer": answer.strip()}))
+        ]
+        conflict_prefix = "question-conflict-"
+        if question.id.startswith(conflict_prefix):
+            conflict_id = question.id.removeprefix(conflict_prefix)
+            conflict = next(item for item in state.conflicts if item.id == conflict_id)
+            attempted = record_conflict_attempt(conflict)
+            operations.append(
+                UpsertConflict(
+                    conflict=attempted.model_copy(
+                        update={
+                            "status": ConflictStatus.RESOLVED,
+                            "resolution": answer.strip(),
+                        }
+                    )
+                )
+            )
         updated = apply_patch(
             state,
-            StatePatch(expected_state_version=state.state_version, operations=[operation]),
+            StatePatch(expected_state_version=state.state_version, operations=operations),
         )
         return {"project_state": _dump(updated), "pending_question": {}}
 
@@ -101,6 +125,30 @@ def build_graph(agents: AgentBundle, checkpointer: object):
         payload["completeness"] = state.completeness
         version = max((brief.version for brief in state.brief_versions), default=0) + 1
         payload["version"] = version
+        payload.pop("contentHash", None)
+        payload["approvals"] = []
+        payload["attributes"] = [
+            attribute.model_dump(mode="json", by_alias=True, exclude_none=True)
+            for attribute in state.attributes
+        ]
+        payload["constraints"] = [
+            constraint.model_dump(
+                mode="json",
+                by_alias=True,
+                exclude={"evidence", "verified_by"},
+                exclude_none=True,
+            )
+            for constraint in state.constraints
+        ]
+        payload["conflicts"] = [
+            conflict.model_dump(mode="json", by_alias=True, exclude_none=True)
+            for conflict in state.conflicts
+        ]
+        payload["unresolvedDecisions"] = [
+            attribute.value
+            for attribute in state.attributes
+            if attribute.status.value == "unresolved"
+        ]
         brief = BriefVersion(
             version=version,
             content_hash=calculate_brief_content_hash(payload),

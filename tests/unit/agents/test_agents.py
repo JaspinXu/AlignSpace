@@ -6,9 +6,21 @@ import pytest
 from pydantic import BaseModel
 
 from alignspace.agents.contracts import AgentBundle
-from alignspace.domain.enums import AttributeStatus, NextAction, ReviewDecision, Role
+from alignspace.domain.enums import (
+    AttributeStatus,
+    ConstraintCategory,
+    ConstraintOwner,
+    ConstraintSeverity,
+    ConstraintVerificationStatus,
+    EvidenceSource,
+    NextAction,
+    ReviewDecision,
+    Role,
+)
 from alignspace.domain.models import (
     BriefVersion,
+    Constraint,
+    Evidence,
     ProjectState,
     Question,
     calculate_brief_content_hash,
@@ -76,6 +88,17 @@ def test_designer_agent_only_applies_configured_fixture_feedback() -> None:
 
     assert len(result.state.constraints) == 1
     assert result.state.constraints[0].evidence[0].source_id == "designer-fixture-1"
+    assert len(result.state.conflicts) == 1
+    assert result.state.conflicts[0].status == "open"
+
+
+def test_alignment_routes_open_tradeoff_to_homeowner() -> None:
+    agents = build_mock_agents()
+    reviewed = agents.designer.run(ProjectState(project_id="project-1", completeness=1)).state
+
+    result = agents.alignment.run(reviewed)
+
+    assert result.next_action == NextAction.ASK_HOMEOWNER
 
 
 def test_review_requires_policy_and_schema_gates() -> None:
@@ -142,3 +165,52 @@ def test_homeowner_question_budget_is_not_bypassed() -> None:
 
     assert result.state == state
     assert result.next_action == NextAction.STOP_UNRESOLVED
+
+
+def test_alignment_escalates_unsupported_professional_claim() -> None:
+    agents = build_mock_agents()
+    state = ProjectState(
+        project_id="project-1",
+        completeness=1,
+        constraints=[
+            Constraint(
+                id="unsafe-assurance",
+                category=ConstraintCategory.SAFETY,
+                statement="This wall is definitely non-load-bearing and safe to remove",
+                severity=ConstraintSeverity.CRITICAL,
+                verification_status=ConstraintVerificationStatus.DESIGNER_ASSERTED,
+                owner=ConstraintOwner.DESIGNER,
+                evidence=[
+                    Evidence(
+                        source_type=EvidenceSource.DESIGNER_NOTE,
+                        source_id="designer-note-unsafe",
+                        description="Unverified assurance.",
+                    )
+                ],
+            )
+        ],
+    )
+
+    result = agents.alignment.run(state)
+
+    assert result.next_action == NextAction.REQUEST_PROFESSIONAL_REVIEW
+
+
+def test_review_escalates_unsafe_claim_in_otherwise_valid_brief() -> None:
+    agents = build_mock_agents()
+    root = Path(__file__).resolve().parents[3]
+    payload = json.loads((root / "examples/project-haven.design-brief.json").read_text())
+    payload["goals"] = ["This wall is definitely non-load-bearing and safe to remove"]
+    payload["completeness"] = 0.9
+    brief = BriefVersion(
+        version=payload["version"],
+        content_hash=calculate_brief_content_hash(payload),
+        payload=payload,
+        completeness=0.9,
+    )
+
+    reviewed = agents.review.run(
+        ProjectState(project_id="project-1", completeness=0.9, brief_versions=[brief])
+    )
+
+    assert reviewed.review_decision == ReviewDecision.ESCALATE

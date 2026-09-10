@@ -129,3 +129,9 @@ def test_designer_cannot_delete_project(client) -> None:
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "FORBIDDEN"
     assert client.get(f"/v1/projects/{project_id}", headers=_headers()).status_code == 200
+
+
+def test_default_asgi_app_exposes_openapi() -> None:
+    from alignspace.main import app
+
+    assert app.openapi()["info"]["title"] == "AlignSpace API"

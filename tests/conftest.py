@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from jsonschema import Draft202012Validator
 
 from alignspace.application.service import WorkflowService
 from alignspace.domain.enums import (
@@ -229,3 +230,201 @@ def brief_ready_project(client: TestClient) -> str:
         uow.projects.save(updated, expected_version=0)
         uow.commit()
     return project_id
+
+
+class WorkflowDriver:
+    def __init__(self, client: TestClient) -> None:
+        self.client = client
+        self.homeowner_headers = {
+            "X-Actor-Id": "homeowner-1",
+            "X-Actor-Role": "homeowner",
+        }
+        self.designer_headers = {
+            "X-Actor-Id": "designer-1",
+            "X-Actor-Role": "designer",
+        }
+
+    def _project(self, project_id: str, headers: dict[str, str] | None = None) -> dict:
+        response = self.client.get(
+            f"/v1/projects/{project_id}",
+            headers=headers or self.homeowner_headers,
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def _write(
+        self,
+        method: str,
+        path: str,
+        project_id: str,
+        key: str,
+        data: dict[str, object],
+        *,
+        headers: dict[str, str] | None = None,
+        expected_status: int = 200,
+    ) -> dict:
+        current = self._project(project_id, headers)
+        response = self.client.request(
+            method,
+            path,
+            headers=headers or self.homeowner_headers,
+            json={
+                "idempotencyKey": key,
+                "expectedStateVersion": current["stateVersion"],
+                "data": data,
+            },
+        )
+        assert response.status_code == expected_status, response.text
+        return response.json()
+
+    def complete(self) -> dict[str, object]:
+        created = self.client.post(
+            "/v1/projects",
+            headers=self.homeowner_headers,
+            json={
+                "roomType": "living_room",
+                "budgetBand": "15k_to_30k_sgd",
+                "consent": True,
+                "designerId": "designer-1",
+            },
+        )
+        assert created.status_code == 201, created.text
+        project_id = created.json()["id"]
+
+        for index in range(3):
+            self._write(
+                "POST",
+                f"/v1/projects/{project_id}/assets",
+                project_id,
+                f"asset-{index}",
+                {
+                    "fixtureId": f"lawful-living-room-{index}",
+                    "mediaType": "image/jpeg",
+                    "sizeBytes": 1024,
+                },
+                expected_status=201,
+            )
+
+        started = self._write(
+            "POST",
+            f"/v1/projects/{project_id}/analysis-runs",
+            project_id,
+            "analysis-1",
+            {},
+            expected_status=202,
+        )
+        broad = self._write(
+            "POST",
+            (
+                f"/v1/projects/{project_id}/questions/"
+                f"{started['pendingQuestion']['id']}/answer"
+            ),
+            project_id,
+            "answer-liked-elements",
+            {"answer": "I also like the warm lighting"},
+            expected_status=202,
+        )
+
+        for attribute in broad["projectState"]["attributes"]:
+            self._write(
+                "PATCH",
+                f"/v1/projects/{project_id}/attributes/{attribute['id']}",
+                project_id,
+                f"confirm-{attribute['id']}",
+                {"status": "confirmed", "value": attribute["value"]},
+            )
+
+        explicit_preferences = {
+            "style": "warm modern",
+            "layout": "clear conversational seating layout",
+            "furniture": "compact rounded furniture",
+            "mood": "calm and welcoming",
+            "function": "conversation and reading",
+        }
+        for dimension, value in explicit_preferences.items():
+            self._write(
+                "PATCH",
+                f"/v1/projects/{project_id}/attributes/manual-{dimension}",
+                project_id,
+                f"manual-{dimension}",
+                {
+                    "targetElement": "living_room",
+                    "dimension": dimension,
+                    "value": value,
+                    "status": "confirmed",
+                },
+            )
+
+        detail = self.client.get(
+            f"/v1/projects/{project_id}/questions/next",
+            headers=self.homeowner_headers,
+        )
+        assert detail.status_code == 200, detail.text
+        tradeoff = self._write(
+            "POST",
+            f"/v1/projects/{project_id}/questions/{detail.json()['id']}/answer",
+            project_id,
+            "answer-lighting-detail",
+            {"answer": "Warm ambient lighting around 2700K"},
+            expected_status=202,
+        )
+        assert tradeoff["pendingQuestion"]["id"].startswith("question-conflict-")
+
+        drafted = self._write(
+            "POST",
+            (
+                f"/v1/projects/{project_id}/questions/"
+                f"{tradeoff['pendingQuestion']['id']}/answer"
+            ),
+            project_id,
+            "resolve-stone-budget",
+            {"answer": "Use the lower-cost stone-effect finish."},
+        )
+        assert drafted["status"] == "awaiting_approval"
+
+        latest_response = self.client.get(
+            f"/v1/projects/{project_id}/briefs/latest",
+            headers=self.homeowner_headers,
+        )
+        assert latest_response.status_code == 200, latest_response.text
+        latest = latest_response.json()
+
+        homeowner_approval = self._write(
+            "POST",
+            f"/v1/projects/{project_id}/briefs/{latest['version']}/approvals",
+            project_id,
+            "approve-homeowner",
+            {"contentHash": latest["contentHash"]},
+        )
+        assert homeowner_approval["status"] == "awaiting_approval"
+        designer_approval = self._write(
+            "POST",
+            f"/v1/projects/{project_id}/briefs/{latest['version']}/approvals",
+            project_id,
+            "approve-designer",
+            {"contentHash": latest["contentHash"]},
+            headers=self.designer_headers,
+        )
+
+        final_brief_response = self.client.get(
+            f"/v1/projects/{project_id}/briefs/latest",
+            headers=self.homeowner_headers,
+        )
+        assert final_brief_response.status_code == 200, final_brief_response.text
+        final_brief = final_brief_response.json()
+        schema = json.loads(
+            (Path(__file__).resolve().parents[1] / "schemas/design-brief.schema.json").read_text()
+        )
+        state = designer_approval["projectState"]
+        return {
+            "status": designer_approval["status"],
+            "latestBrief": final_brief,
+            "questions": state["questions"],
+            "conflicts": state["conflicts"],
+            "briefSchemaValid": Draft202012Validator(schema).is_valid(final_brief["payload"]),
+        }
+
+
+@pytest.fixture
+def workflow_driver(client: TestClient) -> WorkflowDriver:
+    return WorkflowDriver(client)

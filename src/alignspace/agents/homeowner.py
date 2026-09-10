@@ -38,6 +38,29 @@ class HomeownerInterviewAgent:
             ),
             "",
         )
+        open_conflict = next(
+            (
+                conflict
+                for conflict in state.conflicts
+                if conflict.status.value == "open"
+                and f"conflict:{conflict.id}" not in history
+            ),
+            None,
+        )
+        if open_conflict is not None:
+            return self._append(
+                state,
+                Question(
+                    id=f"question-conflict-{open_conflict.id}",
+                    target_role=Role.HOMEOWNER,
+                    text=(
+                        f"The designer identified this trade-off: {open_conflict.summary} "
+                        "Which option do you want to adopt?"
+                    ),
+                    rationale=open_conflict.impact,
+                    repetition_fingerprint=f"conflict:{open_conflict.id}",
+                ),
+            )
         selected_attributes = [
             attribute
             for attribute in state.attributes

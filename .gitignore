@@ -6,8 +6,12 @@ output/
 node_modules/
 dist/
 coverage/
+.coverage
 __pycache__/
 *.pyc
+*.db
+*.db-shm
+*.db-wal
 .DS_Store
 .worktrees/
 .superpowers/

@@ -12,7 +12,7 @@ from alignspace.application.service import (
     BriefReviewError,
     BriefSchemaError,
 )
-from alignspace.domain.policies import StaleStateError
+from alignspace.domain.policies import PolicyViolationError, StaleStateError
 from alignspace.persistence.repository import IdempotencyConflictError
 
 
@@ -124,6 +124,19 @@ def install_error_handlers(app: FastAPI) -> None:
             request,
             status_code=409,
             code="BRIEF_REVIEW_FAILED",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(PolicyViolationError)
+    async def professional_review_handler(
+        request: Request,
+        exc: PolicyViolationError,
+    ) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="PROFESSIONAL_REVIEW_REQUIRED",
             message=str(exc),
             recoverable=True,
         )

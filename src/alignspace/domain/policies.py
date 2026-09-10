@@ -1,3 +1,5 @@
+import unicodedata
+
 from alignspace.domain.enums import (
     AttributeStatus,
     ConflictStatus,
@@ -13,6 +15,90 @@ class DomainRuleError(ValueError):
 
 class StaleStateError(ValueError):
     """Raised when a patch was generated from an older state version."""
+
+
+class PolicyViolationError(ValueError):
+    """Raised when an unsupported assurance requires qualified review."""
+
+
+PROFESSIONAL_CLAIM_PATTERNS: dict[str, tuple[str, ...]] = {
+    "structural": (
+        "non load bearing",
+        "load bearing",
+        "safe to remove",
+        "structurally safe",
+    ),
+    "electrical": (
+        "existing wiring",
+        "electrical load",
+        "circuit capacity",
+        "wiring can safely",
+    ),
+    "regulatory": (
+        "hdb approval",
+        "ura approval",
+        "bca approval",
+        "code compliant",
+        "permit guaranteed",
+    ),
+    "safety-critical": (
+        "definitely fire safe",
+        "definitely safe",
+        "asbestos free",
+        "safety guaranteed",
+    ),
+    "exact-price": (
+        "cost exactly",
+        "exactly sgd",
+        "guaranteed price",
+        "fixed price",
+    ),
+    "live-availability": (
+        "in stock now",
+        "available today",
+        "currently available",
+        "live availability",
+    ),
+}
+
+
+def _normalize_claim(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    return " ".join(
+        "".join(character if character.isalnum() else " " for character in normalized).split()
+    )
+
+
+def professional_claim_category(text: str) -> str | None:
+    normalized = _normalize_claim(text)
+    for category, patterns in PROFESSIONAL_CLAIM_PATTERNS.items():
+        if any(pattern in normalized for pattern in patterns):
+            return category
+    return None
+
+
+def professional_content_category(value: object) -> str | None:
+    if isinstance(value, str):
+        return professional_claim_category(value)
+    if isinstance(value, dict):
+        for item in value.values():
+            category = professional_content_category(item)
+            if category is not None:
+                return category
+    if isinstance(value, list):
+        for item in value:
+            category = professional_content_category(item)
+            if category is not None:
+                return category
+    return None
+
+
+def validate_professional_claim(text: str) -> None:
+    category = professional_claim_category(text)
+    if category is not None:
+        raise PolicyViolationError(
+            f"professional review required for unsupported {category} assurance"
+        )
 
 
 REQUIRED_DIMENSIONS = frozenset(

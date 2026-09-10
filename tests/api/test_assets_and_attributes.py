@@ -157,3 +157,24 @@ def test_attribute_correction_requires_a_status(client, project_with_attribute) 
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "INVALID_REQUEST"
+
+
+def test_homeowner_can_add_an_explicit_sparse_preference(client, ready_project) -> None:
+    response = client.patch(
+        f"/v1/projects/{ready_project}/attributes/manual-style",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "manual-style",
+            "expectedStateVersion": 0,
+            "data": {
+                "targetElement": "living_room",
+                "dimension": "style",
+                "value": "warm modern",
+                "status": "confirmed",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["projectState"]["completeness"] == 0.125
+    assert response.json()["projectState"]["attributes"][0]["id"] == "manual-style"

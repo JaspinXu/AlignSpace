@@ -7,7 +7,7 @@ from alignspace.domain.enums import (
     Role,
 )
 from alignspace.domain.models import ProjectState
-from alignspace.domain.policies import can_draft_brief
+from alignspace.domain.policies import can_draft_brief, professional_claim_category
 
 
 class AlignmentAgent:
@@ -18,10 +18,15 @@ class AlignmentAgent:
             conflict.status == ConflictStatus.OPEN
             and conflict.severity == ConstraintSeverity.CRITICAL
             for conflict in state.conflicts
+        ) or any(
+            professional_claim_category(constraint.statement) is not None
+            for constraint in state.constraints
         ):
             action = NextAction.REQUEST_PROFESSIONAL_REVIEW
         elif not state.constraints:
             action = NextAction.ASK_DESIGNER
+        elif any(conflict.status == ConflictStatus.OPEN for conflict in state.conflicts):
+            action = NextAction.ASK_HOMEOWNER
         elif can_draft_brief(state):
             action = NextAction.DRAFT_BRIEF
         elif sum(question.target_role == Role.HOMEOWNER for question in state.questions) < 10:

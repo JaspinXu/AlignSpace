@@ -105,10 +105,15 @@ The architecture combines two complementary ideas:
 - **Akinator-inspired questioning:** instead of following a fixed questionnaire, the system selects the next question by expected information gain. Each answer should eliminate incompatible design directions, resolve an important conflict, or narrow the reference set.
 - **Controlled convergence:** the loop continues until preferences, professional constraints, and retrieved design directions are sufficiently aligned. The output is released only after both people approve the same versioned brief.
 
+## Implemented backend
+
+The local backend now implements the shared-state and approval workflow with FastAPI, LangGraph, and SQLite. It uses deterministic image fixtures for network-free testing; real image upload, a production identity provider, the competition JSON LLM API, AWS deployment, and design visualisation remain separate integration stages. See the [backend runbook](README.backend.md) for setup, API scope, and verification commands.
+
 ## Repository guide
 
 | File | Purpose |
 |---|---|
+| [Backend runbook](README.backend.md) | Implemented local FastAPI/LangGraph backend, API usage, tests, and current limitations |
 | [Official hackathon briefing](docs/references/showmeyouragent-hackathon-briefing-2026-09-06.pdf) | Organiser-provided rules, rubric, dates, submission format, and AWS/Kiro support |
 | [Official context](docs/00-official-context.md) | Verified event facts vs team assumptions |
 | [Product requirements](docs/01-product-requirements.md) | PRD, scope, users, stories, acceptance criteria |

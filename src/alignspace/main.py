@@ -73,3 +73,6 @@ def create_app(
     app.include_router(workflow_router)
     app.include_router(briefs_router)
     return app
+
+
+app = create_app()

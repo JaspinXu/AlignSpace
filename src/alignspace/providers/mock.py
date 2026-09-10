@@ -7,13 +7,15 @@ from alignspace.agents.vision import VisionAnalyst
 from alignspace.domain.enums import (
     ActorKind,
     AttributeStatus,
+    ConflictStatus,
+    ConflictType,
     ConstraintCategory,
     ConstraintOwner,
     ConstraintSeverity,
     ConstraintVerificationStatus,
     EvidenceSource,
 )
-from alignspace.domain.models import Attribute, Constraint, Evidence, ProjectState
+from alignspace.domain.models import Attribute, Conflict, Constraint, Evidence, ProjectState
 
 
 class SequenceLanguageProvider:
@@ -77,10 +79,18 @@ def build_mock_agents() -> AgentBundle:
             )
         ],
     )
+    budget_conflict = Conflict(
+        id="mock-natural-stone-budget-conflict",
+        type=ConflictType.PREFERENCE_VS_CONSTRAINT,
+        summary="Natural stone exceeds the configured budget fixture.",
+        impact="The homeowner must choose whether to use a lower-cost stone-effect finish.",
+        status=ConflictStatus.OPEN,
+        severity=ConstraintSeverity.IMPORTANT,
+    )
     return AgentBundle(
         vision=VisionAnalyst(MockVisionProvider()),
         homeowner=HomeownerInterviewAgent(),
-        designer=DesignerAgent([budget_constraint]),
+        designer=DesignerAgent([budget_constraint], [budget_conflict]),
         alignment=AlignmentAgent(),
         review=ReviewAgent(),
     )
