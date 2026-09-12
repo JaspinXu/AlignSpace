@@ -19,10 +19,15 @@
 
 ```bash
 uv sync --extra dev
+export ALIGNSPACE_AUTH_SECRET="$(openssl rand -hex 32)"
+export ALIGNSPACE_DEV=1
+export ALIGNSPACE_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
 uv run uvicorn alignspace.main:app --reload
 ```
 
-服务默认监听 `http://127.0.0.1:8000`，交互式 OpenAPI 位于 `http://127.0.0.1:8000/docs`。默认数据文件为 `alignspace.db` 和 `alignspace-checkpoints.db`，两者已被 Git 忽略。
+服务默认监听 `http://127.0.0.1:8000`，交互式 OpenAPI 位于 `http://127.0.0.1:8000/docs`。真实账户版本默认数据文件为 `alignspace-accounts.db` 和 `alignspace-accounts-checkpoints.db`，两者已被 Git 忽略。认证密钥不得打印或提交；缺少密钥时服务拒绝启动，换密钥会使已有访问令牌失效。
+
+业务接口使用真实 Bearer 身份，屋主创建项目后通过一次性项目码邀请设计师。前端启动及双账户浏览器验收见 [前端运行说明](README.frontend.md)。
 
 ## 验证
 
