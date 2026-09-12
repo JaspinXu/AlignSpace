@@ -1,0 +1,60 @@
+import hashlib
+from dataclasses import dataclass
+from io import BytesIO
+
+from PIL import Image, UnidentifiedImageError
+
+MAX_BYTES = 10 * 1024 * 1024
+
+FORMATS = {
+    "JPEG": ("image/jpeg", "jpg"),
+    "PNG": ("image/png", "png"),
+    "WEBP": ("image/webp", "webp"),
+}
+
+
+class ImageValidationError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class PreparedImage:
+    data: bytes
+    media_type: str
+    extension: str
+    sha256: str
+    width: int
+    height: int
+
+
+def prepare_image(raw: bytes) -> PreparedImage:
+    if len(raw) > MAX_BYTES:
+        raise ImageValidationError("ASSET_TOO_LARGE", "图片不得超过 10MB。")
+    try:
+        with Image.open(BytesIO(raw)) as probe:
+            probe.verify()
+        with Image.open(BytesIO(raw)) as image:
+            image.load()
+            image_format = image.format or ""
+            if image_format not in FORMATS:
+                raise ImageValidationError("UNSUPPORTED_MEDIA_TYPE", "仅支持 JPEG、PNG、WebP。")
+            media_type, extension = FORMATS[image_format]
+            width, height = image.size
+            buffer = BytesIO()
+            # Re-encoding without passing exif= drops EXIF/GPS metadata.
+            image.save(buffer, format=image_format)
+            cleaned = buffer.getvalue()
+    except ImageValidationError:
+        raise
+    except (UnidentifiedImageError, OSError, ValueError):
+        raise ImageValidationError("INVALID_IMAGE", "无法识别的图片文件。") from None
+    return PreparedImage(
+        data=cleaned,
+        media_type=media_type,
+        extension=extension,
+        sha256=hashlib.sha256(cleaned).hexdigest(),
+        width=width,
+        height=height,
+    )

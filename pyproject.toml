@@ -14,6 +14,7 @@ dependencies = [
   "argon2-cffi>=23.1,<26",
   "pyjwt>=2.10,<3",
   "email-validator>=2.2,<3",
+  "pillow>=11,<12",
 ]
 
 [project.optional-dependencies]
