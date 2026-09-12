@@ -13,9 +13,12 @@ export type AuthResponse = {
 
 export type Asset = {
   id: string;
-  fixtureId: string;
+  originalFilename: string;
   mediaType: string;
   sizeBytes: number;
+  sha256: string;
+  deleted: boolean;
+  deletedAt: number | null;
 };
 
 export type Project = {

@@ -176,3 +176,41 @@ describe('workflow writes', () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });
+
+import { newIdempotencyKey } from './api';
+
+describe('asset transfer', () => {
+  it('uploads multipart data without a JSON content type', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(auth())
+      .mockResolvedValueOnce(json({ id: 'a1' }, 201));
+    const client = new ApiClient({ fetcher, locks: null, channel: null });
+    await client.restore();
+
+    const file = new Blob(['x'], { type: 'image/png' });
+    await client.upload('/v1/projects/p/assets', file, {
+      expectedStateVersion: '0',
+      idempotencyKey: 'k1',
+    });
+
+    const init = fetcher.mock.calls[1][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.headers as Headers).has('Content-Type')).toBe(false);
+  });
+
+  it('downloads image bytes as a blob', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(auth())
+      .mockResolvedValueOnce(new Response(new Blob(['img']), { status: 200 }));
+    const client = new ApiClient({ fetcher, locks: null, channel: null });
+    await client.restore();
+
+    const blob = await client.blob('/v1/projects/p/assets/a1/content');
+    expect(blob).toBeInstanceOf(Blob);
+  });
+
+  it('generates distinct idempotency keys', () => {
+    expect(newIdempotencyKey()).not.toBe(newIdempotencyKey());
+  });
+});

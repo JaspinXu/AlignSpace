@@ -85,7 +85,7 @@ export interface PreparedWrite {
   body: string;
 }
 
-function newIdempotencyKey(): string {
+export function newIdempotencyKey(): string {
   const cryptoApi = globalThis.crypto as Crypto | undefined;
   if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
   return `key-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -205,6 +205,19 @@ export class ApiClient {
 
   async delete(path: string): Promise<void> {
     await this.requestWithRefresh(path, { method: 'DELETE' });
+  }
+
+  async upload<T>(path: string, file: Blob, fields: Record<string, string>): Promise<T> {
+    const body = new FormData();
+    for (const [key, value] of Object.entries(fields)) body.append(key, value);
+    body.append('file', file);
+    const response = await this.requestWithRefresh(path, { method: 'POST', body });
+    return (await response.json()) as T;
+  }
+
+  async blob(path: string): Promise<Blob> {
+    const response = await this.requestWithRefresh(path, { method: 'GET' });
+    return response.blob();
   }
 
   /** Runs a versioned workflow write, retrying a lost response with the same envelope. */
