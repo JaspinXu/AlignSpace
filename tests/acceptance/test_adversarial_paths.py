@@ -32,7 +32,6 @@ def test_cross_project_member_cannot_read_another_project(client) -> None:
             "roomType": "living_room",
             "budgetBand": "under_15k_sgd",
             "consent": True,
-            "designerId": "designer-1",
         },
     ).json()["id"]
 

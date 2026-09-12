@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from alignspace.application.commands import ActorContext, WriteEnvelope
 from alignspace.application.service import AuthorizationError
 from alignspace.domain.enums import Role
-from alignspace.domain.models import DomainModel, NonBlankString, ProjectState
+from alignspace.domain.models import DomainModel, NonBlankString, ProjectState, Question
 from alignspace.domain.policies import StaleStateError
-from alignspace.persistence.repository import canonical_request_hash
+from alignspace.persistence.database import read_transaction
+from alignspace.persistence.repository import ProjectRepository, canonical_request_hash
 from alignspace.persistence.tables import ImageAssetRow, ProjectMemberRow, ProjectRow
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
 
@@ -32,7 +33,6 @@ class CreateProjectCommand(DomainModel):
     room_type: NonBlankString
     budget_band: NonBlankString
     consent: bool
-    designer_id: NonBlankString
 
 
 class AssetInput(DomainModel):
@@ -65,6 +65,14 @@ class ProjectView(DomainModel):
     status: str
     state_version: int
     assets: list[AssetView]
+    role: Role
+    designer_joined: bool
+
+
+class ProjectSnapshot(DomainModel):
+    project: ProjectView
+    project_state: ProjectState
+    pending_question: Question | None = None
 
 
 CheckpointDelete = Callable[[str], Any]
@@ -83,8 +91,6 @@ class ProjectResourceService:
     def create(self, actor: ActorContext, command: CreateProjectCommand) -> ProjectView:
         if actor.role != Role.HOMEOWNER:
             raise AuthorizationError("only a homeowner can create a project")
-        if actor.actor_id == command.designer_id:
-            raise ValueError("homeowner and designer must be distinct project members")
         project_id = str(uuid4())
         with SqlAlchemyUnitOfWork(self._session_factory) as uow:
             state = ProjectState(project_id=project_id)
@@ -94,21 +100,13 @@ class ProjectResourceService:
                 budget_band=command.budget_band,
                 consent=command.consent,
             )
-            uow.session.add_all(
-                [
-                    ProjectMemberRow(
-                        project_id=project_id,
-                        member_id=actor.actor_id,
-                        role=Role.HOMEOWNER.value,
-                        payload={},
-                    ),
-                    ProjectMemberRow(
-                        project_id=project_id,
-                        member_id=command.designer_id,
-                        role=Role.DESIGNER.value,
-                        payload={},
-                    ),
-                ]
+            uow.session.add(
+                ProjectMemberRow(
+                    project_id=project_id,
+                    member_id=actor.actor_id,
+                    role=Role.HOMEOWNER.value,
+                    payload={},
+                )
             )
             uow.commit()
         return self.get(project_id, actor)
@@ -117,7 +115,29 @@ class ProjectResourceService:
         with self._session_factory() as session:
             project = self._project(session, project_id)
             self._authorize_in_session(session, project_id, actor)
-            return self._project_view(session, project)
+            return self._project_view(session, project, actor.role)
+
+    def list_for_member(self, actor: ActorContext) -> list[ProjectView]:
+        with self._session_factory() as session:
+            memberships = session.execute(
+                select(ProjectRow, ProjectMemberRow.role)
+                .join(ProjectMemberRow, ProjectMemberRow.project_id == ProjectRow.id)
+                .where(ProjectMemberRow.member_id == actor.actor_id)
+                .order_by(ProjectRow.id)
+            ).all()
+            return [
+                self._project_view(session, project, Role(role))
+                for project, role in memberships
+            ]
+
+    def snapshot(self, project_id: str, actor: ActorContext) -> ProjectSnapshot:
+        with read_transaction(self._session_factory) as session:
+            project = self._project(session, project_id)
+            self._authorize_in_session(session, project_id, actor)
+            state = ProjectRepository(session).load(project_id)
+            view = self._project_view(session, project, actor.role)
+            pending = next((item for item in state.questions if item.answer is None), None)
+            return ProjectSnapshot(project=view, project_state=state, pending_question=pending)
 
     def delete(self, project_id: str, actor: ActorContext) -> None:
         with self._session_factory() as session:
@@ -138,6 +158,8 @@ class ProjectResourceService:
         request_hash = self._request_hash("register_asset", project_id, actor, envelope)
         with SqlAlchemyUnitOfWork(self._session_factory) as uow:
             self._authorize_in_session(uow.session, project_id, actor)
+            if actor.role != Role.HOMEOWNER:
+                raise AuthorizationError("only the homeowner can manage reference assets")
             replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
             if replay is not None:
                 return AssetWriteView.model_validate(replay.response_payload)
@@ -193,6 +215,8 @@ class ProjectResourceService:
         )
         with SqlAlchemyUnitOfWork(self._session_factory) as uow:
             self._authorize_in_session(uow.session, project_id, actor)
+            if actor.role != Role.HOMEOWNER:
+                raise AuthorizationError("only the homeowner can manage reference assets")
             replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
             if replay is not None:
                 return AssetDeleteView.model_validate(replay.response_payload)
@@ -261,12 +285,18 @@ class ProjectResourceService:
         )
 
     @staticmethod
-    def _project_view(session: Session, project: ProjectRow) -> ProjectView:
+    def _project_view(session: Session, project: ProjectRow, role: Role) -> ProjectView:
         assets = session.scalars(
             select(ImageAssetRow)
             .where(ImageAssetRow.project_id == project.id)
             .order_by(ImageAssetRow.id)
         ).all()
+        designer_joined = session.scalar(
+            select(func.count()).select_from(ProjectMemberRow).where(
+                ProjectMemberRow.project_id == project.id,
+                ProjectMemberRow.role == Role.DESIGNER.value,
+            )
+        ) > 0
         return ProjectView(
             id=project.id,
             room_type=project.room_type or "unknown",
@@ -275,6 +305,8 @@ class ProjectResourceService:
             status=project.status,
             state_version=project.state_version,
             assets=[AssetView.model_validate(item.payload | {"id": item.id}) for item in assets],
+            role=role,
+            designer_joined=designer_joined,
         )
 
     @staticmethod
