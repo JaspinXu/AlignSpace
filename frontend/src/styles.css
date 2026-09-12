@@ -1,0 +1,266 @@
+:root {
+  color-scheme: light;
+  --paper: #f6f3ec;
+  --surface: #fffdf8;
+  --ink: #2f3320;
+  --olive: #4a5133;
+  --terracotta: #b4552d;
+  --terracotta-dark: #92401f;
+  --line: #ddd6c6;
+  --muted: #6f6a5b;
+  font-family: 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+}
+
+.app-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--olive);
+  line-height: 1.25;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+}
+
+button {
+  font: inherit;
+  border-radius: 8px;
+  border: 1px solid var(--terracotta);
+  background: var(--terracotta);
+  color: #fff;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--terracotta-dark);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #d99a6c;
+  outline-offset: 2px;
+}
+
+.topbar button,
+.section-head button {
+  background: transparent;
+  color: var(--terracotta-dark);
+}
+
+label {
+  display: block;
+  margin: 0.6rem 0 0.2rem;
+  font-weight: 600;
+}
+
+input,
+select {
+  font: inherit;
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  margin: 0.4rem 0;
+}
+
+.option input {
+  width: auto;
+}
+
+.auth {
+  max-width: 420px;
+  margin-top: 4rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.tabs button[aria-selected='false'] {
+  background: transparent;
+  color: var(--terracotta-dark);
+}
+
+.tagline,
+.meta,
+.hint,
+.question-hint {
+  color: var(--muted);
+}
+
+.demo-badge {
+  background: #f0e4d2;
+  color: var(--terracotta-dark);
+  border: 1px solid #e0c9a8;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.workspace-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workspace-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  gap: 1.5rem;
+}
+
+.task,
+.sidebar,
+.panels form,
+.project-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+
+.task section {
+  border-top: 1px solid var(--line);
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.notice {
+  background: #eef1e4;
+  border: 1px solid #cfd6bc;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+}
+
+.error {
+  background: #fbeae4;
+  border: 1px solid #e6b8a8;
+  color: #7d3018;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+}
+
+.waiting {
+  font-weight: 600;
+  color: var(--olive);
+}
+
+.project-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.project-open {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  padding: 0;
+}
+
+.project-open strong {
+  color: var(--olive);
+}
+
+.project-actions {
+  margin-top: 0.75rem;
+  border-top: 1px dashed var(--line);
+  padding-top: 0.6rem;
+}
+
+.join-code code {
+  background: #f0e4d2;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  letter-spacing: 0.1em;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.assets {
+  color: var(--muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  .workspace-body {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    order: 2;
+  }
+}
