@@ -138,3 +138,47 @@ def test_members_can_read_image_content_but_outsiders_cannot(api):
         headers=auth(owner),
     )
     assert missing.status_code == 404
+
+
+def test_soft_delete_removes_bytes_but_keeps_a_tombstone(api):
+    owner = register(api, "owner@example.com")
+    project = create_project(api, owner)
+    asset = upload(api, owner, project["id"]).json()
+
+    deleted = api.request(
+        "DELETE",
+        f"/v1/projects/{project['id']}/assets/{asset['id']}",
+        headers=auth(owner),
+        json={"idempotencyKey": "delete-1", "expectedStateVersion": 1, "data": {}},
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["stateVersion"] == 2
+
+    listed = api.get(f"/v1/projects/{project['id']}", headers=auth(owner)).json()
+    assert listed["assets"][0]["deleted"] is True
+    assert listed["assets"][0]["deletedAt"] is not None
+
+    content = api.get(
+        f"/v1/projects/{project['id']}/assets/{asset['id']}/content",
+        headers=auth(owner),
+    )
+    assert content.status_code == 404
+
+
+def test_analysis_readiness_ignores_deleted_assets(api):
+    owner = register(api, "owner@example.com")
+    project = create_project(api, owner)
+    assets = [upload(api, owner, project["id"], key=f"u{i}", version=i).json() for i in range(3)]
+    api.request(
+        "DELETE",
+        f"/v1/projects/{project['id']}/assets/{assets[0]['id']}",
+        headers=auth(owner),
+        json={"idempotencyKey": "delete-1", "expectedStateVersion": 3, "data": {}},
+    )
+    started = api.post(
+        f"/v1/projects/{project['id']}/analysis-runs",
+        headers=auth(owner),
+        json={"idempotencyKey": "run-1", "expectedStateVersion": 4, "data": {}},
+    )
+    assert started.status_code == 409
+    assert started.json()["error"]["code"] == "ASSET_COUNT_INVALID"

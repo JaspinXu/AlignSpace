@@ -1,3 +1,4 @@
+import time
 from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
@@ -271,15 +272,15 @@ class ProjectResourceService:
             state = uow.projects.load(project_id)
             self._check_version(state, envelope.expected_state_version)
             asset = uow.session.get(ImageAssetRow, (project_id, asset_id))
-            if asset is None:
+            if asset is None or asset.deleted_at is not None:
                 raise KeyError(f"asset {asset_id} not found")
-            uow.session.delete(asset)
+            self._storage.delete(asset.payload["storage_key"])
+            asset.deleted_at = int(time.time())
             updated = state.model_copy(update={"state_version": state.state_version + 1})
             uow.projects.save(updated, expected_version=state.state_version)
             response = AssetDeleteView(id=asset_id, state_version=updated.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)
             uow.commit()
-        self._checkpoint_delete(project_id)
         return response
 
     def is_member(self, project_id: str, actor: ActorContext) -> bool:
@@ -294,7 +295,8 @@ class ProjectResourceService:
                 raise ConsentRequiredError("image consent is required before analysis")
             asset_count = session.scalar(
                 select(func.count()).select_from(ImageAssetRow).where(
-                    ImageAssetRow.project_id == project_id
+                    ImageAssetRow.project_id == project_id,
+                    ImageAssetRow.deleted_at.is_(None),
                 )
             )
             if not 3 <= asset_count <= 10:
