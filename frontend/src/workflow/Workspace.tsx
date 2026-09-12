@@ -36,17 +36,26 @@ const STATUS_LABEL: Record<string, string> = {
   archived: '已归档',
 };
 
+type QuestionDraft = { text: string; answer: string; selected: string[] };
+
+function draftText(draft: QuestionDraft): string {
+  return draft.answer || BROAD_OPTIONS.filter((option) => draft.selected.includes(option.keyword))
+    .map((option) => option.label).join('、');
+}
+
 export function Workspace({ client, projectId }: { client: ApiClient; projectId: string }) {
   const [snapshot, setSnapshot] = useState<ProjectSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [questionDrafts, setQuestionDrafts] = useState<Record<string, QuestionDraft>>({});
   const [value, setValue] = useState('');
   const [dimension, setDimension] = useState('style');
   const [showForm, setShowForm] = useState(true);
   const [conflictResolution, setConflictResolution] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [goalsDraft, setGoalsDraft] = useState('');
+  const goalsDirty = useRef(false);
+  const goalsRevision = useRef(0);
   const attributeId = useRef(`manual-${Math.random().toString(36).slice(2)}`);
 
   const load = useCallback(async () => {
@@ -72,13 +81,19 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   }, [load]);
 
   const pending = snapshot?.pendingQuestion ?? null;
+  const currentDraft = pending ? questionDrafts[pending.id] : undefined;
+  const selected = currentDraft?.selected ?? [];
+  const answerDraft = currentDraft?.answer ?? '';
+  const isBroadQuestion = pending?.repetitionFingerprint === 'liked-elements';
+  const shouldPoll = Boolean(snapshot && (pending || snapshot.projectState.waitReason ||
+    snapshot.projectState.status === 'awaiting_approval'));
   useEffect(() => {
-    if (!pending) return;
+    if (!shouldPoll) return;
     const timer = window.setInterval(() => {
       if (!document.hidden) void load();
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [pending, load]);
+  }, [shouldPoll, load]);
 
   const latestBrief =
     snapshot && snapshot.projectState.briefVersions.length > 0
@@ -88,7 +103,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
       : null;
 
   useEffect(() => {
-    if (!latestBrief) return;
+    if (!latestBrief || goalsDirty.current) return;
     const goals = Array.isArray(latestBrief.payload.goals) ? latestBrief.payload.goals : [];
     setGoalsDraft(goals.map((goal) => String(goal)).join('\n'));
   }, [latestBrief?.version, latestBrief?.contentHash]);
@@ -119,6 +134,19 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   const openConflict =
     projectState.conflicts.find((conflict) => conflict.status === 'open') ?? null;
 
+  const updateQuestionDraft = (change: Partial<QuestionDraft>) => {
+    if (!pending) return;
+    setQuestionDrafts((current) => ({
+      ...current,
+      [pending.id]: {
+        ...(current[pending.id] ?? { text: pending.text, answer: '', selected: [] }), ...change,
+      },
+    }));
+  };
+  const goalsMatchBrief = latestBrief && JSON.stringify(goalsDraft.split('\n')
+    .map((line) => line.trim()).filter(Boolean)) === JSON.stringify(latestBrief.payload.goals);
+  const canApprove = !goalsDirty.current && Boolean(goalsMatchBrief);
+
   const handleWriteError = async (error: unknown) => {
     if (error instanceof ApiError && error.status === 409) {
       setNotice('输入已保留。项目状态已被另一方更新，请检查后重新提交。');
@@ -133,8 +161,11 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     const keywords = BROAD_OPTIONS.filter((option) => selected.includes(option.keyword)).map(
       (option) => option.keyword,
     );
-    if (keywords.length === 0) {
-      setNotice('请先选择至少一个喜欢的部分。');
+    const answer = isBroadQuestion
+      ? (keywords.length ? `I also like the ${keywords.join(', ')}` : '')
+      : answerDraft.trim();
+    if (!answer) {
+      setNotice(isBroadQuestion ? '请先选择至少一个喜欢的部分。' : '请填写您的回答。');
       return;
     }
     try {
@@ -143,10 +174,15 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
           `/v1/projects/${projectId}/questions/${pending.id}/answer`,
           'POST',
           project.stateVersion,
-          { answer: `I also like the ${keywords.join(', ')}` },
+          { answer },
         ),
       );
-      setSelected([]);
+      setQuestionDrafts((current) => {
+        if (current[pending.id] !== currentDraft) return current;
+        const next = { ...current };
+        delete next[pending.id];
+        return next;
+      });
       setNotice('回答已提交。');
       await load();
     } catch (error) {
@@ -169,6 +205,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
         ),
       );
       setValue('');
+      attributeId.current = `manual-${crypto.randomUUID()}`;
       setNotice('偏好已保存。');
       await load();
     } catch (error) {
@@ -263,6 +300,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   };
 
   const approveBrief = async (version: number, contentHash: string) => {
+    if (!canApprove) return;
     try {
       await client.execute(
         prepareWrite(
@@ -281,6 +319,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
 
   const saveBriefEdit = async () => {
     if (!latestBrief) return;
+    const submittedRevision = goalsRevision.current;
     const goals = goalsDraft
       .split('\n')
       .map((line) => line.trim())
@@ -294,7 +333,10 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
           { payload: { ...latestBrief.payload, goals } },
         ),
       );
-      setNotice('已保存方案修改，旧审批已失效。');
+      if (goalsRevision.current === submittedRevision) goalsDirty.current = false;
+      setNotice(goalsDirty.current
+        ? '已保存提交时的方案，后续输入仍为未保存草稿。'
+        : '已保存方案修改，旧审批已失效。');
       await load();
     } catch (error) {
       await handleWriteError(error);
@@ -324,13 +366,28 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
         <main className="task">
           <h2>当前任务</h2>
 
+          {Object.entries(questionDrafts).filter(([id, draft]) => id !== pending?.id && draftText(draft))
+            .map(([id, draft]) => (
+              <section key={id} aria-label="保留的未提交回答">
+                <h3>上一问题的未提交回答</h3>
+                <p>{draft.text}</p>
+                <textarea readOnly aria-label={`未提交的回答：${draft.text}`} value={draftText(draft)} />
+                <p className="hint">问题已更新，旧草稿保留在本页，供您复制参考，不会自动提交到新问题。</p>
+              </section>
+            ))}
+
           {pending && pending.targetRole !== project.role && (
             <p className="waiting">等待{ROLE_LABEL[pending.targetRole] ?? pending.targetRole}回答</p>
           )}
 
+          {!pending && projectState.waitReason === 'designer' && isHomeowner && (
+            <p className="waiting">等待设计师反馈</p>
+          )}
+
           {pending && pending.targetRole === 'homeowner' && isHomeowner && (
-            <section aria-label="广泛偏好问题">
-              <p className="question-text">除了已识别的部分，您还喜欢哪些？</p>
+            <section aria-label={isBroadQuestion ? '广泛偏好问题' : '当前问题'}>
+              <p className="question-text">{pending.text}</p>
+              {isBroadQuestion ? <>
               <p className="question-hint">
                 演示模式：请选择受支持的样本选项，系统会映射为后端可识别的内容。
               </p>
@@ -341,25 +398,27 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                     <input
                       type="checkbox"
                       checked={selected.includes(option.keyword)}
-                      onChange={(event) =>
-                        setSelected((current) =>
-                          event.target.checked
-                            ? [...current, option.keyword]
-                            : current.filter((item) => item !== option.keyword),
-                        )
-                      }
+                      onChange={(event) => updateQuestionDraft({ selected: event.target.checked
+                        ? [...selected, option.keyword]
+                        : selected.filter((item) => item !== option.keyword) })}
                     />
                     {option.label}
                   </label>
                 ))}
               </fieldset>
+              </> : <>
+                <label htmlFor="question-answer">您的回答</label>
+                <textarea id="question-answer" value={answerDraft}
+                  onChange={(event) => updateQuestionDraft({ answer: event.target.value })} />
+                <p className="hint">回答将记录在项目中；具体偏好请在共享状态中确认或通过“显式偏好”填写。</p>
+              </>}
               <button type="button" onClick={() => void submitAnswer()}>
                 提交回答
               </button>
             </section>
           )}
 
-          {pending && pending.targetRole === 'designer' && !isHomeowner && (
+          {projectState.waitReason === 'designer' && !isHomeowner && (
             <section aria-label="设计师反馈">
               <p className="question-text">请提交当前支持的约束反馈。</p>
               <label htmlFor="designer-review">设计师反馈</label>
@@ -442,7 +501,11 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
               <textarea
                 id="brief-goals"
                 value={goalsDraft}
-                onChange={(event) => setGoalsDraft(event.target.value)}
+                onChange={(event) => {
+                  goalsDirty.current = true;
+                  goalsRevision.current += 1;
+                  setGoalsDraft(event.target.value);
+                }}
               />
               <div className="actions">
                 <button type="button" onClick={() => void saveBriefEdit()}>
@@ -450,11 +513,13 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                 </button>
                 <button
                   type="button"
+                  disabled={!canApprove}
                   onClick={() => void approveBrief(latestBrief.version, latestBrief.contentHash)}
                 >
                   批准此版本
                 </button>
               </div>
+              {goalsDirty.current && <p className="hint">方案目标有未保存的修改，请先保存再审批。</p>}
             </section>
           )}
         </main>
@@ -508,7 +573,10 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                 </li>
               ))}
             </ul>
-            {openConflict && (
+            {openConflict && pending?.id === `question-conflict-${openConflict.id}` && (
+              <p className="hint">请由屋主回答当前冲突问题，提交后继续对齐流程。</p>
+            )}
+            {openConflict && pending?.id !== `question-conflict-${openConflict.id}` && (
               <div className="resolve">
                 <label htmlFor="conflict-resolution">冲突解决说明</label>
                 <textarea

@@ -1,12 +1,94 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClient, ApiError, prepareWrite } from './api';
 
 const user = { id: 'u1', email: 'owner@example.com', emailVerified: false as const };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 const auth = (token = 'access-1') => json({ accessToken: token, user });
+beforeEach(() => localStorage.clear());
 
 describe('session and request boundaries', () => {
-  it('restores a session through a bodyless cookie refresh without browser storage', async () => {
+  it('finishes pending logout after reload instead of restoring the cookie session', async () => {
+    let finish!: (response: Response) => void;
+    const firstFetch = vi.fn<typeof fetch>().mockResolvedValueOnce(auth())
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { finish = resolve; }));
+    const first = new ApiClient({ fetcher: firstFetch, channel: null, locks: null });
+    await first.restore();
+    const logout = first.logout();
+    const reloadFetch = vi.fn<typeof fetch>(async (url) => url === '/v1/auth/logout'
+      ? new Response(null, { status: 204 }) : auth());
+    const reloaded = new ApiClient({ fetcher: reloadFetch, channel: null, locks: null });
+    await reloaded.restore();
+    finish(new Response(null, { status: 204 }));
+    await logout;
+    expect(reloaded.user).toBeNull();
+    expect(reloadFetch.mock.calls.map(([url]) => url)).toEqual(['/v1/auth/logout']);
+  });
+  it('serializes a new login behind logout cookie revocation', async () => {
+    let finish!: (response: Response) => void;
+    let queue: Promise<unknown> = Promise.resolve();
+    const locks = { request: (_name: string, callback: () => Promise<unknown>) => {
+      const result = queue.then(callback);
+      queue = result.catch(() => undefined);
+      return result;
+    } };
+    const fetcher = vi.fn<typeof fetch>(async (url) => {
+      if (url === '/v1/auth/logout') return new Promise<Response>((resolve) => { finish = resolve; });
+      return auth();
+    });
+    const client = new ApiClient({ fetcher, channel: null, locks });
+    await client.restore();
+    const logout = client.logout();
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    const login = client.login('owner@example.com', 'a sufficiently long password');
+    await Promise.resolve();
+    const loginsWhileRevoking = fetcher.mock.calls.filter(([url]) => url === '/v1/auth/login').length;
+    finish(new Response(null, { status: 204 }));
+    await Promise.all([logout, login]);
+    expect(loginsWhileRevoking).toBe(0);
+    expect(client.user).toEqual(user);
+  });
+  it('clears and broadcasts logout before a slow revoke response arrives', async () => {
+    let finish!: (response: Response) => void;
+    const channel = { postMessage: vi.fn(), onmessage: null, close: vi.fn() };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(auth())
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { finish = resolve; }));
+    const client = new ApiClient({ fetcher, channel, locks: null });
+    await client.restore();
+    const logout = client.logout();
+    const userWhilePending = client.user;
+    const broadcastWhilePending = channel.postMessage.mock.calls.length;
+    finish(new Response(null, { status: 204 }));
+    await logout;
+    expect(userWhilePending).toBeNull();
+    expect(broadcastWhilePending).toBe(1);
+  });
+
+  it('ignores a login response that arrives after another tab logged out', async () => {
+    let finish!: (response: Response) => void;
+    const channel = { postMessage: vi.fn(), close: vi.fn(), onmessage: null as ((event: { data: unknown }) => void) | null };
+    const fetcher = vi.fn<typeof fetch>(() => new Promise<Response>((resolve) => { finish = resolve; }));
+    const client = new ApiClient({ fetcher, channel, locks: null });
+    const login = client.login('owner@example.com', 'a sufficiently long password');
+    channel.onmessage?.({ data: { type: 'logout' } });
+    finish(auth());
+    await login;
+    expect(client.user).toBeNull();
+  });
+  it('does not refresh a session after logout while queued on a Web Lock', async () => {
+    let release!: () => Promise<unknown>;
+    const channel = { postMessage: vi.fn(), close: vi.fn(), onmessage: null as ((event: { data: unknown }) => void) | null };
+    const fetcher = vi.fn<typeof fetch>(async () => auth());
+    const client = new ApiClient({ fetcher, channel, locks: {
+      request: (_name, callback) => new Promise((resolve) => { release = async () => resolve(await callback()); }),
+    } });
+    const restoring = client.restore();
+    channel.onmessage?.({ data: { type: 'logout' } });
+    await release();
+    await restoring;
+    expect(client.user).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('restores a session through a bodyless cookie refresh without persisting credentials', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(auth());
     const storage = vi.spyOn(Storage.prototype, 'setItem');
     const client = new ApiClient({ fetcher, channel: null, locks: null });
@@ -64,6 +146,16 @@ describe('session and request boundaries', () => {
 });
 
 describe('workflow writes', () => {
+  it('ends the session after a write retry also receives 401', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(auth())
+      .mockResolvedValueOnce(json({}, 401)).mockResolvedValueOnce(auth('access-2'))
+      .mockResolvedValueOnce(json({}, 401));
+    const client = new ApiClient({ fetcher, locks: null, channel: null });
+    await client.restore();
+    await expect(client.execute(prepareWrite('/v1/projects/p/assets', 'POST', 0, {}))).rejects.toMatchObject({ status: 401 });
+    expect(client.user).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(4);
+  });
   it('retries an ambiguous network write with the exact serialized envelope', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(auth()).mockRejectedValueOnce(new TypeError('lost response')).mockResolvedValueOnce(json({ stateVersion: 3 }));
     const client = new ApiClient({ fetcher, locks: null, channel: null });

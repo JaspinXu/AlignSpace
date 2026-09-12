@@ -32,14 +32,41 @@ function errorMessage(error: unknown): string {
   return '发生未知错误，请重试。';
 }
 
-export function App({ client = new ApiClient() }: { client?: ApiClient }) {
+function projectFromUrl(): string | null {
+  return new URL(window.location.href).searchParams.get('project');
+}
+
+export function App({ client: suppliedClient }: { client?: ApiClient }) {
+  const [client] = useState(() => suppliedClient ?? new ApiClient());
   const [session, setSession] = useState<'loading' | 'anonymous' | 'ready'>('loading');
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState(projectFromUrl);
+
+  const openProject = useCallback((projectId: string | null, replace = false) => {
+    const url = new URL(window.location.href);
+    if (projectId) url.searchParams.set('project', projectId);
+    else url.searchParams.delete('project');
+    window.history[replace ? 'replaceState' : 'pushState'](null, '', url);
+    setSelectedProjectId(projectId);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => setSelectedProjectId(projectFromUrl());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => client.onSessionEnded(() => {
+    openProject(null, true);
+    setProjects([]);
+    setSession('anonymous');
+  }), [client, openProject]);
 
   const loadProjects = useCallback(async () => {
-    setProjects(await client.get<Project[]>('/v1/projects'));
+    const user = client.user;
+    const next = await client.get<Project[]>('/v1/projects');
+    if (user && client.user?.id === user.id) setProjects(next);
   }, [client]);
 
   useEffect(() => {
@@ -53,11 +80,11 @@ export function App({ client = new ApiClient() }: { client?: ApiClient }) {
           return;
         }
         await loadProjects();
-        if (active) setSession('ready');
+        if (active && client.user) setSession('ready');
       })
       .catch((error) => {
         if (!active) return;
-        setRestoreError(errorMessage(error));
+        if (!(error instanceof ApiError && error.status === 401)) setRestoreError(errorMessage(error));
         setSession('anonymous');
       });
     return () => {
@@ -67,18 +94,18 @@ export function App({ client = new ApiClient() }: { client?: ApiClient }) {
 
   const onAuthenticated = useCallback(async () => {
     await loadProjects();
-    setSession('ready');
-  }, [loadProjects]);
+    if (client.user) {
+      setRestoreError(null);
+      setSession('ready');
+    }
+  }, [client, loadProjects]);
 
   const onLogout = useCallback(async () => {
     try {
       await client.logout();
-    } catch {
-      // Local state is already cleared; surface it as a local logout.
+    } catch (error) {
+      setRestoreError(errorMessage(error));
     }
-    setSelectedProjectId(null);
-    setProjects([]);
-    setSession('anonymous');
   }, [client]);
 
   if (session === 'loading') {
@@ -98,14 +125,14 @@ export function App({ client = new ApiClient() }: { client?: ApiClient }) {
     return (
       <div className="app-shell">
         <nav className="topbar">
-          <button type="button" onClick={() => setSelectedProjectId(null)}>
+          <button type="button" onClick={() => openProject(null)}>
             返回我的项目
           </button>
           <button type="button" onClick={() => void onLogout()}>
             退出登录
           </button>
         </nav>
-        <Workspace client={client} projectId={selected.id} />
+        <Workspace key={selected.id} client={client} projectId={selected.id} />
       </div>
     );
   }
@@ -115,7 +142,7 @@ export function App({ client = new ApiClient() }: { client?: ApiClient }) {
       client={client}
       projects={projects}
       onRefresh={loadProjects}
-      onOpen={setSelectedProjectId}
+      onOpen={openProject}
       onLogout={onLogout}
     />
   );

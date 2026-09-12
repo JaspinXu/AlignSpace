@@ -6,6 +6,8 @@ output/
 node_modules/
 dist/
 coverage/
+playwright-report/
+test-results/
 .coverage
 __pycache__/
 *.pyc

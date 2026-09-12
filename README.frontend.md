@@ -52,9 +52,25 @@ share cookies.
 
 ```bash
 cd frontend
-npm test          # Vitest: API client + workspace component
+npm test          # Vitest: API client + App + workspace components
 npm run build     # tsc --noEmit && vite build
+npx playwright install chromium  # once per browser dependency update
+npm run test:e2e  # real backend + two isolated Chromium account contexts
 ```
+
+The browser test starts its own backend on `127.0.0.1:8013` and Vite on
+`127.0.0.1:5174`, with a random secret and fresh databases in an
+`alignspace-e2e-*` temporary directory. It refuses to reuse an existing server
+on those ports and stops its servers on completion. Run `uv sync --extra dev`
+from the repository root first; the harness uses `.venv/bin/uvicorn`.
+Temporary databases are retained for local diagnostics; they contain test
+accounts only. Screenshots are in ignored `frontend/test-results/`.
+
+The acceptance drives registration, password login, code-based joining, reload into the same
+project URL, broad/detail/conflict answers, separate explicit preferences,
+brief edits, a real stale-write 409 with retained input, same-version dual
+approval, and cross-tab logout. It also checks mobile overflow and captures
+desktop/mobile workspace screenshots. No test identity bypass is used.
 
 Backend suites:
 
@@ -67,13 +83,23 @@ uv run ruff check src tests
 
 - Email/password registration, login, logout, and session restore after reload.
   No email verification and no password recovery in this version.
+  Logout clears the local UI immediately. Cookie-mutating auth operations use
+  the same Web Lock, and late login/refresh responses cannot restore a logged-out
+  local session. A non-secret localStorage logout-pending flag survives navigation
+  and retries revocation before any cookie-based restore; tokens remain memory-only.
 - Project list, project creation, and joining with a 12-character one-time code.
+- Reloadable `?project=<id>` navigation and browser back/forward support.
 - Role-aware workspace: demo sample registration, analysis start, broad
   question, explicit preferences, confirm/reject of proposed observations,
   conflict decisions, designer review notes, brief edit and dual approval.
 - Versioned writes keep `idempotencyKey` + `expectedStateVersion`; a 409 keeps
   the typed input, refetches state, and requires a deliberate resubmit with a
-  new key. Waiting views poll every 5 seconds only while the tab is visible.
+  new key. Unsaved brief goals survive newer server versions; save them before
+  approving. Edits typed while saving remain unsaved and cannot approve a
+  different persisted goal list. Answers are kept by question ID; when another
+  tab advances the task, previous unsent answers remain visible for copying in
+  the current workspace (not persisted across reloads). Waiting views, including designer waits without a question and
+  pending approvals, poll every 5 seconds only while the tab is visible.
 
 ## Known boundaries
 
@@ -82,5 +108,13 @@ uv run ruff check src tests
   English keywords. Arbitrary Chinese free text is not parsed.
 - Brief editing exposes the goals list; other schema fields are not editable
   from the UI yet.
-- Browser end-to-end (Playwright) acceptance is not set up in this version.
+- Detail answers are recorded verbatim; they do not automatically become
+  structured preferences. Confirm observations or add explicit preferences.
+- Active conflict questions are answered by the homeowner to resume the graph;
+  the sidebar directs both parties to that task instead of offering a second
+  resolution action that would leave the graph paused.
+- Designer constraints still come from deterministic fixtures. The designer
+  waiting form is component-tested against `waitReason=designer` with no
+  pending question; the default real-backend flow uses fixture constraints
+  and does not enter that form. Review notes are not free-text constraint extraction.
 - The SQLite migrations are SQLite-specific.

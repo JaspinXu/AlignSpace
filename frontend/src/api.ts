@@ -12,6 +12,19 @@ type LocksLike = {
   request: (name: string, callback: () => Promise<unknown>) => Promise<unknown>;
 };
 
+// Persist only logout intent, never credentials, so navigation cannot undo logout.
+const LOGOUT_PENDING = 'alignspace-logout-pending';
+function hasPendingLogout(): boolean {
+  try { return localStorage.getItem(LOGOUT_PENDING) === '1'; }
+  catch { return false; }
+}
+function markPendingLogout(pending: boolean): void {
+  try {
+    if (pending) localStorage.setItem(LOGOUT_PENDING, '1');
+    else localStorage.removeItem(LOGOUT_PENDING);
+  } catch { /* Storage may be disabled; in-memory logout still works. */ }
+}
+
 function createDefaultChannel(): ChannelLike | null {
   if (typeof BroadcastChannel === 'undefined') return null;
   const underlying = new BroadcastChannel('alignspace-auth');
@@ -101,6 +114,12 @@ export class ApiClient {
   private accessToken: string | null = null;
   private refreshPromise: Promise<void> | null = null;
   private generation = 0;
+  private readonly sessionEndedListeners = new Set<() => void>();
+
+  onSessionEnded(listener: () => void): () => void {
+    this.sessionEndedListeners.add(listener);
+    return () => { this.sessionEndedListeners.delete(listener); };
+  }
 
   constructor(options: ApiClientOptions = {}) {
     this.fetcher = options.fetcher ?? fetch.bind(globalThis);
@@ -119,8 +138,12 @@ export class ApiClient {
 
   /** Restores the session from the HttpOnly refresh cookie. */
   async restore(): Promise<void> {
+    if (hasPendingLogout()) return this.logout();
     if (this.refreshPromise) return this.refreshPromise;
-    const promise = this.withRefreshLock(() => this.refresh());
+    const generation = this.generation;
+    const promise = this.withAuthLock(async () => {
+      if (generation === this.generation) await this.refresh();
+    });
     this.refreshPromise = promise;
     try {
       await promise;
@@ -130,28 +153,39 @@ export class ApiClient {
   }
 
   async register(email: string, password: string): Promise<void> {
-    await this.acceptAuth(
-      await this.fetcher('/v1/auth/register', this.jsonRequest('POST', { email, password })),
-    );
+    await this.authenticate('/v1/auth/register', email, password);
   }
 
   async login(email: string, password: string): Promise<void> {
-    await this.acceptAuth(
-      await this.fetcher('/v1/auth/login', this.jsonRequest('POST', { email, password })),
-    );
+    await this.authenticate('/v1/auth/login', email, password);
+  }
+
+  private async authenticate(path: string, email: string, password: string): Promise<void> {
+    const generation = this.generation;
+    await this.withAuthLock(async () => {
+      if (generation !== this.generation) return;
+      await this.acceptAuth(
+        await this.fetcher(path, this.jsonRequest('POST', { email, password })),
+        generation,
+      );
+    });
   }
 
   /** Clears local state, then revokes the server session; broadcasts to other tabs. */
   async logout(): Promise<void> {
+    markPendingLogout(true);
+    this.clearSession();
+    this.channel?.postMessage({ type: 'logout' });
     let failure: unknown = null;
     try {
-      const response = await this.send('/v1/auth/logout', { method: 'POST' });
-      if (!response.ok) failure = await this.toError(response);
+      await this.withAuthLock(async () => {
+        const response = await this.send('/v1/auth/logout', { method: 'POST', keepalive: true });
+        if (!response.ok) failure = await this.toError(response);
+        else markPendingLogout(false);
+      });
     } catch (error) {
       failure = error;
     }
-    this.clearSession();
-    this.channel?.postMessage({ type: 'logout' });
     if (failure) {
       throw failure instanceof ApiError
         ? failure
@@ -192,8 +226,9 @@ export class ApiClient {
       } catch {
         // fall through to structured error below
       }
-      response = await this.send(write.path, init);
+      if (this.user) response = await this.send(write.path, init);
     }
+    if (response.status === 401) this.clearSession();
     if (!response.ok) throw await this.toError(response);
     return (await response.json()) as T;
   }
@@ -208,7 +243,7 @@ export class ApiClient {
       if (!response.ok) throw await this.toError(response);
       return response;
     }
-    if (allowRefresh) {
+    if (allowRefresh && this.user) {
       try {
         await this.restore();
       } catch {
@@ -236,7 +271,7 @@ export class ApiClient {
     this.user = body.user;
   }
 
-  private withRefreshLock(callback: () => Promise<void>): Promise<void> {
+  private withAuthLock(callback: () => Promise<void>): Promise<void> {
     if (this.locks) return this.locks.request('alignspace-auth-cookie', callback) as Promise<void>;
     return callback();
   }
@@ -256,9 +291,11 @@ export class ApiClient {
     };
   }
 
-  private async acceptAuth(response: Response): Promise<void> {
+  private async acceptAuth(response: Response, generation: number): Promise<void> {
     if (!response.ok) throw await this.toError(response);
     const body = (await response.json()) as AuthResponse;
+    if (generation !== this.generation) return;
+    markPendingLogout(false);
     this.accessToken = body.accessToken;
     this.user = body.user;
   }
@@ -267,6 +304,7 @@ export class ApiClient {
     this.accessToken = null;
     this.user = null;
     this.generation += 1;
+    for (const listener of this.sessionEndedListeners) listener();
   }
 
   private async toError(response: Response): Promise<ApiError> {

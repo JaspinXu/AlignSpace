@@ -59,9 +59,15 @@ button:hover {
   background: var(--terracotta-dark);
 }
 
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid #d99a6c;
   outline-offset: 2px;
 }
