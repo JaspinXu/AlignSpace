@@ -6,11 +6,13 @@ one-time code, and every call carries a real Bearer token.
 """
 
 import json
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
+from PIL import Image
 
 from alignspace.auth.config import AuthConfig
 
@@ -69,15 +71,18 @@ class TwoAccountDriver:
         return response.json()
 
     def run(self):
+        version = self._version(self.owner)
         for index in range(3):
-            self.write(
-                "POST",
+            buffer = BytesIO()
+            Image.new("RGB", (8, 8), "red").save(buffer, format="PNG")
+            asset = self.api.post(
                 f"/v1/projects/{self.project_id}/assets",
-                f"asset-{index}",
-                {"fixtureId": f"living-room-{index}", "mediaType": "image/jpeg", "sizeBytes": 1024},
                 headers=self.owner,
-                expected=201,
+                data={"expectedStateVersion": str(version), "idempotencyKey": f"asset-{index}"},
+                files={"file": (f"room-{index}.png", buffer.getvalue(), "image/png")},
             )
+            assert asset.status_code == 201, asset.text
+            version = asset.json()["stateVersion"]
 
         started = self.write(
             "POST",
