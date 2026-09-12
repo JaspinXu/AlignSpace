@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from alignspace.agents.contracts import AgentBundle
+from alignspace.agents.contracts import AgentBundle, AssetRef
 from alignspace.domain.enums import (
     AttributeStatus,
     ConstraintCategory,
@@ -40,8 +40,9 @@ def test_review_schema_validator_is_a_runtime_dependency() -> None:
 
 def test_mock_vision_returns_proposals_only() -> None:
     agents: AgentBundle = build_mock_agents()
+    assets = [AssetRef(id="asset-1", media_type="image/png", sha256="abc123")]
 
-    result = agents.vision.run(ProjectState(project_id="project-1"))
+    result = agents.vision.run(ProjectState(project_id="project-1"), assets)
 
     assert len(result.patches) == 4
     assert all(operation.attribute.status == AttributeStatus.PROPOSED for operation in result.patches)
@@ -50,7 +51,8 @@ def test_mock_vision_returns_proposals_only() -> None:
 
 def test_alignment_requests_homeowner_when_visual_proposals_are_unconfirmed() -> None:
     agents = build_mock_agents()
-    state = agents.vision.run(ProjectState(project_id="project-1")).state
+    assets = [AssetRef(id="asset-1", media_type="image/png", sha256="abc123")]
+    state = agents.vision.run(ProjectState(project_id="project-1"), assets).state
 
     result = agents.alignment.run(state)
 
@@ -59,7 +61,8 @@ def test_alignment_requests_homeowner_when_visual_proposals_are_unconfirmed() ->
 
 def test_homeowner_agent_asks_broad_question_before_detail() -> None:
     agents = build_mock_agents()
-    state = agents.vision.run(ProjectState(project_id="project-1")).state
+    assets = [AssetRef(id="asset-1", media_type="image/png", sha256="abc123")]
+    state = agents.vision.run(ProjectState(project_id="project-1"), assets).state
 
     broad = agents.homeowner.run(state)
 

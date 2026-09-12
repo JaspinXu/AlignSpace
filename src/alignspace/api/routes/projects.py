@@ -1,19 +1,19 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
 
 from alignspace.api.dependencies import get_actor, get_container
 from alignspace.application.commands import ActorContext, WriteEnvelope
 from alignspace.application.membership import JoinCodeView, JoinRequest
 from alignspace.application.resources import (
     AssetDeleteView,
-    AssetInput,
     AssetWriteView,
     CreateProjectCommand,
     ProjectSnapshot,
     ProjectView,
 )
 from alignspace.application.service import WorkflowResponse
+from alignspace.storage.images import MAX_BYTES
 
 router = APIRouter(prefix="/v1/projects", tags=["projects"])
 Actor = Annotated[ActorContext, Depends(get_actor)]
@@ -64,6 +64,16 @@ def generate_join_code(
     return container.membership.generate_code(project_id, actor)
 
 
+@router.get("/{project_id}/assets/{asset_id}/content")
+def asset_content(project_id: str, asset_id: str, actor: Actor, container: Container) -> Response:
+    data, media_type = container.resources.asset_content(project_id, asset_id, actor)
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=0"},
+    )
+
+
 @router.get("/{project_id}", response_model=ProjectView)
 def get_project(project_id: str, actor: Actor, container: Container) -> ProjectView:
     return container.resources.get(project_id, actor)
@@ -82,11 +92,24 @@ def delete_project(project_id: str, actor: Actor, container: Container) -> Respo
 )
 def register_asset(
     project_id: str,
-    envelope: WriteEnvelope[AssetInput],
+    file: Annotated[UploadFile, File()],
+    expected_state_version: Annotated[int, Form(alias="expectedStateVersion")],
+    idempotency_key: Annotated[str, Form(alias="idempotencyKey")],
+    request: Request,
     actor: Actor,
     container: Container,
 ) -> AssetWriteView:
-    return container.resources.register_asset(project_id, actor, envelope)
+    container.auth.throttle("upload-user", actor.actor_id, limit=20, window=60)
+    container.auth.throttle("upload-ip", request.client.host, limit=60, window=60)
+    return container.resources.register_asset(
+        project_id,
+        actor,
+        expected_state_version=expected_state_version,
+        idempotency_key=idempotency_key,
+        filename=file.filename or "upload",
+        raw=file.file.read(MAX_BYTES + 1),
+        declared_type=file.content_type,
+    )
 
 
 @router.delete("/{project_id}/assets/{asset_id}", response_model=AssetDeleteView)

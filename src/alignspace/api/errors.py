@@ -16,6 +16,7 @@ from alignspace.application.service import (
 from alignspace.auth.service import AuthError
 from alignspace.domain.policies import PolicyViolationError, StaleStateError
 from alignspace.persistence.repository import IdempotencyConflictError
+from alignspace.storage.images import ImageValidationError
 
 
 def _response(
@@ -103,6 +104,20 @@ def install_error_handlers(app: FastAPI) -> None:
             request,
             status_code=409,
             code="ASSET_COUNT_INVALID",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(ImageValidationError)
+    async def image_handler(request: Request, exc: ImageValidationError) -> JSONResponse:
+        status_code = {
+            "ASSET_TOO_LARGE": 413,
+            "UNSUPPORTED_MEDIA_TYPE": 415,
+        }.get(exc.code, 400)
+        return _response(
+            request,
+            status_code=status_code,
+            code=exc.code,
             message=str(exc),
             recoverable=True,
         )

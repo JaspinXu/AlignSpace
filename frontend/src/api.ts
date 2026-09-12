@@ -85,7 +85,7 @@ export interface PreparedWrite {
   body: string;
 }
 
-function newIdempotencyKey(): string {
+export function newIdempotencyKey(): string {
   const cryptoApi = globalThis.crypto as Crypto | undefined;
   if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
   return `key-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -207,6 +207,19 @@ export class ApiClient {
     await this.requestWithRefresh(path, { method: 'DELETE' });
   }
 
+  async upload<T>(path: string, file: Blob, fields: Record<string, string>): Promise<T> {
+    const body = new FormData();
+    for (const [key, value] of Object.entries(fields)) body.append(key, value);
+    body.append('file', file);
+    const response = await this.requestWithRefresh(path, { method: 'POST', body }, true, true);
+    return (await response.json()) as T;
+  }
+
+  async blob(path: string): Promise<Blob> {
+    const response = await this.requestWithRefresh(path, { method: 'GET' });
+    return response.blob();
+  }
+
   /** Runs a versioned workflow write, retrying a lost response with the same envelope. */
   async execute<T>(write: PreparedWrite): Promise<T> {
     const init: RequestInit = {
@@ -237,8 +250,15 @@ export class ApiClient {
     path: string,
     init: RequestInit,
     allowRefresh = true,
+    retryNetwork = false,
   ): Promise<Response> {
-    const response = await this.send(path, init);
+    let response: Response;
+    try {
+      response = await this.send(path, init);
+    } catch (error) {
+      if (!retryNetwork) throw error;
+      response = await this.send(path, init);
+    }
     if (response.status !== 401) {
       if (!response.ok) throw await this.toError(response);
       return response;

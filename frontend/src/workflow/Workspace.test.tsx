@@ -198,6 +198,16 @@ describe('role-aware work area', () => {
     expect(screen.queryByRole('button', { name: '新增偏好' })).not.toBeInTheDocument();
   });
 
+  it('lets a designer view reference images without upload or delete controls', async () => {
+    const env = setup('designer');
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await screen.findByRole('heading', { name: '参考图片' });
+    expect(screen.getByText(/room\.png/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('上传参考图片')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /删除 room\.png/ })).not.toBeInTheDocument();
+  });
+
   it('preserves an edited attribute on 409, refetches and uses a new key/version on deliberate resubmit', async () => {
     const env = setup();
     await env.client.restore();
@@ -390,6 +400,7 @@ describe('designer review and brief approval', () => {
     await env.client.restore();
     render(<Workspace client={env.client} projectId="p1" />);
     const field = await screen.findByRole('textbox', { name: /方案目标/ });
+    await waitFor(() => expect(field).toHaveValue('warm modern'));
     await userEvent.clear(field);
     await userEvent.type(field, 'warm modern{enter}calm lighting');
     await userEvent.click(screen.getByRole('button', { name: '保存方案修改' }));
@@ -397,5 +408,36 @@ describe('designer review and brief approval', () => {
     const body = JSON.parse(String(env.writes[0].body));
     expect(body.data.payload.project.id).toBe('p1');
     expect(body.data.payload.goals).toEqual(['warm modern', 'calm lighting']);
+  });
+});
+
+describe('real image uploads', () => {
+  it('uploads a selected file with the current version and a new key', async () => {
+    const env = setup('homeowner');
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    const input = await screen.findByLabelText('上传参考图片');
+    const file = new File([new Uint8Array([1, 2, 3])], 'room.png', { type: 'image/png' });
+    await userEvent.upload(input, file);
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    expect(env.writes[0].method).toBe('POST');
+    expect(env.writes[0].body).toBeInstanceOf(FormData);
+    expect((env.writes[0].body as FormData).get('expectedStateVersion')).toBe('4');
+    expect((env.writes[0].body as FormData).get('file')).toBeInstanceOf(File);
+  });
+
+  it('marks observations whose source image was deleted', async () => {
+    const base = snapshot('homeowner');
+    const initial: ProjectSnapshot = {
+      ...base,
+      project: {
+        ...base.project,
+        assets: [{ ...base.project.assets[0], deleted: true, deletedAt: 1 }],
+      },
+    };
+    const env = setup('homeowner', initial);
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    expect(await screen.findByText('来源图片已删除')).toBeInTheDocument();
   });
 });

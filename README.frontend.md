@@ -4,9 +4,16 @@ React + TypeScript + Vite client for the authenticated AlignSpace backend. It
 talks to the FastAPI service over the same origin (`/v1`), keeps the access
 token in memory only, and refreshes the session through an HttpOnly cookie.
 
-> **Demo status:** reference images are fixture records (`fixtureId`), not real
-> uploads. Vision observations are deterministic mock output. The UI labels this
-> as "演示样本 · 模拟分析" and does not claim real image understanding.
+> **Demo status:** reference images are real uploads stored locally under
+> `ALIGNSPACE_ASSET_DIR` (default `var/assets/`). Vision observations are still
+> deterministic mock output — analysis remains simulated until step 2. The UI
+> labels this as "真实图片 · 分析为模拟" and does not claim real image
+> understanding.
+>
+> Accepted formats are JPEG, PNG and WebP, each up to 10MB and at most 10 per
+> project. Use asset/project deletion APIs for normal removal. For a fresh demo,
+> configure new database, checkpoint and asset paths together; do not clear only
+> the asset directory while retaining database references. Back up all three together.
 
 ## Prerequisites
 
@@ -15,8 +22,7 @@ token in memory only, and refreshes the session through an HttpOnly cookie.
 
 ## 1. Start the backend
 
-From the repository root, use the authenticated application (not the legacy
-`shawn` demo defaults):
+From the repository root, start the authenticated application:
 
 ```bash
 export ALIGNSPACE_AUTH_SECRET="$(openssl rand -hex 32)"   # never print or commit this
@@ -89,7 +95,7 @@ uv run ruff check src tests
   and retries revocation before any cookie-based restore; tokens remain memory-only.
 - Project list, project creation, and joining with a 12-character one-time code.
 - Reloadable `?project=<id>` navigation and browser back/forward support.
-- Role-aware workspace: demo sample registration, analysis start, broad
+- Role-aware workspace: reference image upload, analysis start, broad
   question, explicit preferences, confirm/reject of proposed observations,
   conflict decisions, designer review notes, brief edit and dual approval.
 - Versioned writes keep `idempotencyKey` + `expectedStateVersion`; a 409 keeps
@@ -103,7 +109,15 @@ uv run ruff check src tests
 
 ## Known boundaries
 
-- Fixture-based analysis only; no real image upload, object storage, or LLM.
+- Image previews are bounded thumbnails with links to full images. Uploads retry
+  one network failure with the same multipart body/key; 409 requires reselection
+  after state refresh. Files are not retained across page reloads.
+- The browser acceptance uses real 1600×1200 PNG uploads, checks thumbnail size,
+  full-image links and deletion, then completes the two-account workflow.
+  Each run isolates databases, checkpoints and uploaded files in a temporary directory.
+
+- Vision analysis remains simulated mock output; no object storage or LLM yet.
+  Uploaded images are real and stored locally (see the demo status above).
 - Broad answers use a fixed mapping from Chinese sample options to supported
   English keywords. Arbitrary Chinese free text is not parsed.
 - Brief editing exposes the goals list; other schema fields are not editable

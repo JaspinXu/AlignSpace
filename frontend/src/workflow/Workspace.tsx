@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiClient, ApiError, prepareWrite } from '../api';
-import type { Attribute, Conflict, ProjectSnapshot } from '../types';
+import { ApiClient, ApiError, newIdempotencyKey, prepareWrite } from '../api';
+import type { Asset, Attribute, Conflict, ProjectSnapshot } from '../types';
 
 const BROAD_OPTIONS = [
   { label: '暖色灯光', keyword: 'lighting' },
@@ -22,8 +22,6 @@ const DIMENSIONS = [
   { value: 'function', label: '功能' },
 ];
 
-const SAMPLE_FIXTURES = ['living-room-1', 'living-room-2', 'living-room-3'];
-
 const ROLE_LABEL: Record<string, string> = { homeowner: '屋主', designer: '设计师' };
 const STATUS_LABEL: Record<string, string> = {
   draft: '草稿',
@@ -41,6 +39,33 @@ type QuestionDraft = { text: string; answer: string; selected: string[] };
 function draftText(draft: QuestionDraft): string {
   return draft.answer || BROAD_OPTIONS.filter((option) => draft.selected.includes(option.keyword))
     .map((option) => option.label).join('、');
+}
+
+function AssetThumb({ client, projectId, asset }: { client: ApiClient; projectId: string; asset: Asset }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (asset.deleted) return;
+    let active = true;
+    let objectUrl: string | null = null;
+    client
+      .blob(`/v1/projects/${projectId}/assets/${asset.id}/content`)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [client, projectId, asset.id, asset.deleted]);
+  if (asset.deleted) return <span className="asset-missing">已删除</span>;
+  return url ? (
+    <a href={url} target="_blank" rel="noreferrer" aria-label={`查看原图：${asset.originalFilename}`}>
+      <img className="asset-thumb" src={url} alt={asset.originalFilename} />
+    </a>
+  ) : null;
 }
 
 export function Workspace({ client, projectId }: { client: ApiClient; projectId: string }) {
@@ -133,6 +158,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   const isHomeowner = project.role === 'homeowner';
   const openConflict =
     projectState.conflicts.find((conflict) => conflict.status === 'open') ?? null;
+  const deletedAssetIds = new Set(project.assets.filter((asset) => asset.deleted).map((asset) => asset.id));
 
   const updateQuestionDraft = (change: Partial<QuestionDraft>) => {
     if (!pending) return;
@@ -213,17 +239,31 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     }
   };
 
-  const registerSample = async () => {
-    const index = project.assets.length % SAMPLE_FIXTURES.length;
+  const uploadAsset = async (file: File) => {
+    try {
+      await client.upload(`/v1/projects/${projectId}/assets`, file, {
+        expectedStateVersion: String(project.stateVersion),
+        idempotencyKey: newIdempotencyKey(),
+      });
+      setNotice('图片已上传。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const deleteAsset = async (asset: Asset) => {
+    if (!window.confirm(`确认删除 ${asset.originalFilename}？`)) return;
     try {
       await client.execute(
-        prepareWrite(`/v1/projects/${projectId}/assets`, 'POST', project.stateVersion, {
-          fixtureId: SAMPLE_FIXTURES[index],
-          mediaType: 'image/jpeg',
-          sizeBytes: 1024,
-        }),
+        prepareWrite(
+          `/v1/projects/${projectId}/assets/${asset.id}`,
+          'DELETE',
+          project.stateVersion,
+          {},
+        ),
       );
-      setNotice('已登记一张演示样本。');
+      setNotice('图片已删除，相关观察仍会保留并标注来源已删除。');
       await load();
     } catch (error) {
       await handleWriteError(error);
@@ -353,7 +393,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
             {STATUS_LABEL[project.status] ?? project.status} · v{project.stateVersion}
           </p>
         </div>
-        <p className="demo-badge">演示样本 · 模拟分析</p>
+        <p className="demo-badge">真实图片 · 分析为模拟（第 2 步接入）</p>
       </header>
 
       {notice && (
@@ -433,22 +473,47 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
             </section>
           )}
 
-          {isHomeowner && (
-            <section aria-label="演示样本">
-              <h3>参考样本</h3>
-              <ul className="assets">
-                {project.assets.map((asset) => (
-                  <li key={asset.id}>{asset.fixtureId}（{asset.mediaType}）</li>
-                ))}
-              </ul>
-              <button type="button" onClick={() => void registerSample()}>
-                登记演示样本
-              </button>
-              <button type="button" onClick={() => void startAnalysis()}>
-                启动分析
-              </button>
-            </section>
-          )}
+          <section aria-label="参考图片">
+            <h3>参考图片</h3>
+            {isHomeowner && <>
+              <label htmlFor="asset-upload">上传参考图片</label>
+              <input
+                id="asset-upload"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) void uploadAsset(file);
+                }}
+              />
+              <p className="question-hint">
+                支持 JPEG / PNG / WebP，单张不超过 10MB，最多 10 张。
+              </p>
+            </>}
+            <ul className="assets">
+              {project.assets.map((asset: Asset) => (
+                <li key={asset.id}>
+                  <AssetThumb client={client} projectId={projectId} asset={asset} />
+                  <span>
+                    {asset.originalFilename}（{asset.mediaType}）
+                  </span>
+                  {isHomeowner && !asset.deleted && (
+                    <button
+                      type="button"
+                      aria-label={`删除 ${asset.originalFilename}`}
+                      onClick={() => void deleteAsset(asset)}
+                    >
+                      删除
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {isHomeowner && <button type="button" onClick={() => void startAnalysis()}>
+              启动分析
+            </button>}
+          </section>
 
           {isHomeowner && (
             <section aria-label="显式偏好">
@@ -534,6 +599,10 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                   <span>
                     {attribute.dimension}：{attribute.value}（{attribute.status}）
                   </span>
+                  {attribute.evidence.some(
+                    (evidence) =>
+                      evidence.sourceType === 'image' && deletedAssetIds.has(evidence.sourceId),
+                  ) && <span className="asset-missing">来源图片已删除</span>}
                   {isHomeowner && attribute.status === 'proposed' && (
                     <span className="actions">
                       <button

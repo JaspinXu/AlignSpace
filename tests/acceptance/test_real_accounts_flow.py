@@ -6,17 +6,25 @@ one-time code, and every call carries a real Bearer token.
 """
 
 import json
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
+from PIL import Image
 
 from alignspace.auth.config import AuthConfig
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 PASSWORD = "a sufficiently long password"
 SECRET = "real-accounts-acceptance-secret-long-enough"
+
+
+def image_bytes() -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), "red").save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 @pytest.fixture
@@ -69,15 +77,18 @@ class TwoAccountDriver:
         return response.json()
 
     def run(self):
+        version = self._version(self.owner)
+        asset_ids: list[str] = []
         for index in range(3):
-            self.write(
-                "POST",
+            asset = self.api.post(
                 f"/v1/projects/{self.project_id}/assets",
-                f"asset-{index}",
-                {"fixtureId": f"living-room-{index}", "mediaType": "image/jpeg", "sizeBytes": 1024},
                 headers=self.owner,
-                expected=201,
+                data={"expectedStateVersion": str(version), "idempotencyKey": f"asset-{index}"},
+                files={"file": (f"room-{index}.png", image_bytes(), "image/png")},
             )
+            assert asset.status_code == 201, asset.text
+            version = asset.json()["stateVersion"]
+            asset_ids.append(asset.json()["id"])
 
         started = self.write(
             "POST",
@@ -87,6 +98,15 @@ class TwoAccountDriver:
             headers=self.owner,
             expected=202,
         )
+        proposed_image_sources = {
+            evidence["sourceId"]
+            for attribute in started["projectState"]["attributes"]
+            if attribute["status"] == "proposed"
+            for evidence in attribute["evidence"]
+            if evidence["sourceType"] == "image"
+        }
+        assert proposed_image_sources == set(asset_ids)
+
         broad = self.write(
             "POST",
             f"/v1/projects/{self.project_id}/questions/{started['pendingQuestion']['id']}/answer",

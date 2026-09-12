@@ -41,6 +41,7 @@ class ImageAssetRow(Base):
     )
     id: Mapped[str] = mapped_column(String, primary_key=True)
     payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    deleted_at: Mapped[int | None] = mapped_column(Integer)
 
 
 class AttributeRow(Base):

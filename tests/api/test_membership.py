@@ -1,7 +1,9 @@
 import concurrent.futures
+from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import select, update
 
 from alignspace.auth.config import AuthConfig
@@ -175,18 +177,13 @@ def test_full_state_exposes_the_pending_homeowner_question_after_analysis(api):
     headers = auth(owner)
     version = 0
     for index in range(3):
+        buffer = BytesIO()
+        Image.new("RGB", (8, 8), "red").save(buffer, format="PNG")
         asset = api.post(
             f"/v1/projects/{project['id']}/assets",
             headers=headers,
-            json={
-                "idempotencyKey": f"asset-{index}",
-                "expectedStateVersion": version,
-                "data": {
-                    "fixtureId": f"living-room-{index}",
-                    "mediaType": "image/jpeg",
-                    "sizeBytes": 1024,
-                },
-            },
+            data={"expectedStateVersion": str(version), "idempotencyKey": f"asset-{index}"},
+            files={"file": (f"room-{index}.png", buffer.getvalue(), "image/png")},
         )
         assert asset.status_code == 201, asset.text
         version = asset.json()["stateVersion"]

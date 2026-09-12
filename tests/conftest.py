@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 from pathlib import Path
 from typing import Annotated
 
@@ -6,6 +7,7 @@ import pytest
 from fastapi import Header
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
+from PIL import Image
 
 from alignspace.api.dependencies import get_actor
 from alignspace.application.commands import ActorContext
@@ -30,10 +32,63 @@ from alignspace.domain.models import (
     calculate_brief_content_hash,
 )
 from alignspace.persistence.database import create_engine_and_session
-from alignspace.persistence.tables import ProjectMemberRow
+from alignspace.persistence.tables import ImageAssetRow, ProjectMemberRow
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
 from alignspace.providers.mock import build_mock_agents
 from alignspace.workflow.runtime import memory_graph
+
+
+@pytest.fixture(autouse=True)
+def isolated_asset_storage(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALIGNSPACE_ASSET_DIR", str(tmp_path / "assets"))
+
+
+def image_bytes(fmt: str = "PNG", color: str = "red") -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), color).save(buffer, format=fmt)
+    return buffer.getvalue()
+
+
+def upload_asset(
+    client: TestClient,
+    project_id: str,
+    *,
+    headers: dict[str, str],
+    key: str,
+    version: int,
+    fmt: str = "PNG",
+) -> dict:
+    response = client.post(
+        f"/v1/projects/{project_id}/assets",
+        headers=headers,
+        data={"expectedStateVersion": str(version), "idempotencyKey": key},
+        files={"file": (f"room.{fmt.lower()}", image_bytes(fmt), f"image/{fmt.lower()}")},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+@pytest.fixture
+def upload_image(client: TestClient):
+    def _upload(
+        project_id: str,
+        *,
+        headers: dict[str, str],
+        key: str,
+        version: int,
+        fmt: str = "PNG",
+        color: str = "red",
+    ):
+        return client.post(
+            f"/v1/projects/{project_id}/assets",
+            headers=headers,
+            data={"expectedStateVersion": str(version), "idempotencyKey": key},
+            files={
+                "file": (f"room.{fmt.lower()}", image_bytes(fmt, color), f"image/{fmt.lower()}")
+            },
+        )
+
+    return _upload
 
 
 @pytest.fixture
@@ -61,6 +116,14 @@ def service(tmp_path):
                         actor=ActorKind.VISION_AGENT,
                     )
                 ],
+            )
+        )
+        uow.session.add(
+            ImageAssetRow(
+                project_id="project-1",
+                id="asset-1",
+                payload={"media_type": "image/png", "sha256": "abc123"},
+                deleted_at=None,
             )
         )
         uow.commit()
@@ -200,21 +263,12 @@ def project_with_attribute(client: TestClient) -> str:
 def analysis_ready_project(client: TestClient) -> str:
     project_id = _create_project(client, consent=True)
     headers = {"X-Actor-Id": "homeowner-1", "X-Actor-Role": "homeowner"}
+    version = 0
     for index in range(3):
-        response = client.post(
-            f"/v1/projects/{project_id}/assets",
-            headers=headers,
-            json={
-                "idempotencyKey": f"ready-asset-{index}",
-                "expectedStateVersion": index,
-                "data": {
-                    "fixtureId": f"living-room-{index}",
-                    "mediaType": "image/jpeg",
-                    "sizeBytes": 1024,
-                },
-            },
+        asset = upload_asset(
+            client, project_id, headers=headers, key=f"ready-asset-{index}", version=version
         )
-        assert response.status_code == 201
+        version = asset["stateVersion"]
     return project_id
 
 
@@ -329,19 +383,16 @@ class WorkflowDriver:
     def complete(self) -> dict[str, object]:
         project_id = _create_project(self.client, consent=True)
 
+        version = 0
         for index in range(3):
-            self._write(
-                "POST",
-                f"/v1/projects/{project_id}/assets",
+            asset = upload_asset(
+                self.client,
                 project_id,
-                f"asset-{index}",
-                {
-                    "fixtureId": f"lawful-living-room-{index}",
-                    "mediaType": "image/jpeg",
-                    "sizeBytes": 1024,
-                },
-                expected_status=201,
+                headers=self.homeowner_headers,
+                key=f"asset-{index}",
+                version=version,
             )
+            version = asset["stateVersion"]
 
         started = self._write(
             "POST",

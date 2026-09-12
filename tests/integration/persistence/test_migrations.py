@@ -3,7 +3,8 @@ from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
 from alignspace.persistence.database import create_engine_and_session
-from alignspace.persistence.tables import ProjectMemberRow, ProjectRow
+from alignspace.persistence.migrations import migrate
+from alignspace.persistence.tables import ImageAssetRow, ProjectMemberRow, ProjectRow
 
 
 def test_migrate_is_idempotent_and_creates_auth_tables(tmp_path):
@@ -62,5 +63,68 @@ def test_unique_role_index_blocks_a_second_member_in_the_same_role(tmp_path):
             with pytest.raises(IntegrityError):
                 session.commit()
             session.rollback()
+    finally:
+        engine.dispose()
+
+
+def test_migration_adds_soft_delete_column_and_is_repeatable(tmp_path):
+    url = f"sqlite:///{tmp_path / 'soft-delete.db'}"
+    first_engine, _ = create_engine_and_session(url)
+    first_engine.dispose()
+
+    engine, _ = create_engine_and_session(url)
+    try:
+        columns = {
+            row[1] for row in engine.connect().exec_driver_sql("PRAGMA table_info(image_assets)")
+        }
+        assert "deleted_at" in columns
+        versions = {
+            row[0]
+            for row in engine.connect().exec_driver_sql(
+                "SELECT version FROM schema_migrations"
+            )
+        }
+        assert versions == {1, 2, 3}
+    finally:
+        engine.dispose()
+
+
+def test_migration_tombstones_legacy_image_asset_payloads(tmp_path):
+    engine, session_factory = create_engine_and_session(f"sqlite:///{tmp_path / 'legacy.db'}")
+    try:
+        with session_factory() as session:
+            session.add(
+                ProjectRow(
+                    id="legacy-project",
+                    state_version=0,
+                    status="draft",
+                    completeness=0,
+                    consent=False,
+                )
+            )
+            session.flush()
+            session.add(
+                ImageAssetRow(
+                    project_id="legacy-project",
+                    id="legacy-asset",
+                    payload={"fixtureId": "x", "mediaType": "image/jpeg", "sizeBytes": 1},
+                    deleted_at=None,
+                )
+            )
+            session.commit()
+
+        migrate(engine)
+
+        with session_factory() as session:
+            asset = session.get(ImageAssetRow, ("legacy-project", "legacy-asset"))
+            assert asset is not None
+            assert asset.deleted_at is not None
+        versions = {
+            row[0]
+            for row in engine.connect().exec_driver_sql(
+                "SELECT version FROM schema_migrations"
+            )
+        }
+        assert 3 in versions
     finally:
         engine.dispose()

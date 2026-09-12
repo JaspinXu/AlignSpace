@@ -2,150 +2,78 @@ def _headers(actor_id: str = "homeowner-1", role: str = "homeowner") -> dict[str
     return {"X-Actor-Id": actor_id, "X-Actor-Role": role}
 
 
-def _asset_envelope(key: str, version: int) -> dict[str, object]:
-    return {
-        "idempotencyKey": key,
-        "expectedStateVersion": version,
-        "data": {
-            "fixtureId": "living-room-1",
-            "mediaType": "image/jpeg",
-            "sizeBytes": 1024,
-        },
-    }
-
-
-def test_designer_cannot_manage_reference_assets(client, ready_project) -> None:
-    project_id = ready_project
-    created = client.post(
-        f"/v1/projects/{project_id}/assets",
-        headers=_headers(),
-        json=_asset_envelope("homeowner-asset", 0),
-    )
+def test_designer_cannot_manage_reference_assets(client, ready_project, upload_image) -> None:
+    created = upload_image(ready_project, headers=_headers(), key="homeowner-asset", version=0)
     assert created.status_code == 201
-    add_attempt = client.post(
-        f"/v1/projects/{project_id}/assets",
-        headers=_headers("designer-1", "designer"),
-        json=_asset_envelope("designer-asset", 1),
+    add_attempt = upload_image(
+        ready_project, headers=_headers("designer-1", "designer"),
+        key="designer-asset", version=1,
     )
     assert add_attempt.status_code == 403
     assert add_attempt.json()["error"]["code"] == "FORBIDDEN"
     remove_attempt = client.request(
         "DELETE",
-        f"/v1/projects/{project_id}/assets/{created.json()['id']}",
+        f"/v1/projects/{ready_project}/assets/{created.json()['id']}",
         headers=_headers("designer-1", "designer"),
-        json={
-            "idempotencyKey": "designer-delete",
-            "expectedStateVersion": 1,
-            "data": {},
-        },
+        json={"idempotencyKey": "designer-delete", "expectedStateVersion": 1, "data": {}},
     )
     assert remove_attempt.status_code == 403
 
 
-def test_asset_registration_requires_consent(client, project_without_consent) -> None:
-    response = client.post(
-        f"/v1/projects/{project_without_consent}/assets",
-        headers=_headers(),
-        json=_asset_envelope("asset-1", 0),
+def test_asset_registration_requires_consent(client, project_without_consent, upload_image) -> None:
+    response = upload_image(
+        project_without_consent, headers=_headers(), key="asset-1", version=0
     )
-
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "CONSENT_REQUIRED"
 
 
-def test_register_and_delete_asset_are_versioned_and_idempotent(
-    client,
-    ready_project,
-    monkeypatch,
+def test_register_and_soft_delete_are_versioned_and_idempotent(
+    client, ready_project, upload_image
 ) -> None:
-    project_id = ready_project
-    first = client.post(
-        f"/v1/projects/{project_id}/assets",
-        headers=_headers(),
-        json=_asset_envelope("asset-create", 0),
-    )
-    replay = client.post(
-        f"/v1/projects/{project_id}/assets",
-        headers=_headers(),
-        json=_asset_envelope("asset-create", 0),
-    )
-
+    first = upload_image(ready_project, headers=_headers(), key="asset-create", version=0)
+    replay = upload_image(ready_project, headers=_headers(), key="asset-create", version=0)
     assert first.status_code == 201
-    assert replay.json() == first.json()
     assert first.json()["stateVersion"] == 1
+    assert replay.json() == first.json()
 
     asset_id = first.json()["id"]
-    listed = client.get(f"/v1/projects/{project_id}", headers=_headers())
-    assert listed.json()["assets"] == [
-        {
-            "id": asset_id,
-            "fixtureId": "living-room-1",
-            "mediaType": "image/jpeg",
-            "sizeBytes": 1024,
-        }
-    ]
-    deleted_threads: list[str] = []
-    monkeypatch.setattr(
-        client.app.state.container.resources,
-        "_checkpoint_delete",
-        deleted_threads.append,
-    )
+    listed = client.get(f"/v1/projects/{ready_project}", headers=_headers()).json()["assets"]
+    assert listed[0]["id"] == asset_id
+    assert listed[0]["deleted"] is False
+    assert listed[0]["mediaType"] == "image/png"
+    assert listed[0]["sizeBytes"] > 0
+
     deleted = client.request(
         "DELETE",
-        f"/v1/projects/{project_id}/assets/{asset_id}",
+        f"/v1/projects/{ready_project}/assets/{asset_id}",
         headers=_headers(),
-        json={
-            "idempotencyKey": "asset-delete",
-            "expectedStateVersion": 1,
-            "data": {},
-        },
+        json={"idempotencyKey": "asset-delete", "expectedStateVersion": 1, "data": {}},
     )
-    project = client.get(f"/v1/projects/{project_id}", headers=_headers())
-
     assert deleted.status_code == 200
     assert deleted.json()["stateVersion"] == 2
-    assert deleted_threads == [project_id]
-    assert project.json()["assets"] == []
+    after = client.get(f"/v1/projects/{ready_project}", headers=_headers()).json()["assets"]
+    assert after[0]["deleted"] is True
+    assert after[0]["mediaType"] == "image/png"
 
 
-def test_asset_conflicting_replay_returns_stable_error(client, ready_project) -> None:
-    project_id = ready_project
-    first = client.post(
-        f"/v1/projects/{project_id}/assets",
-        headers=_headers(),
-        json=_asset_envelope("asset-create", 0),
+def test_asset_conflicting_replay_returns_stable_error(client, ready_project, upload_image) -> None:
+    first = upload_image(ready_project, headers=_headers(), key="asset-create", version=0)
+    conflict = upload_image(
+        ready_project, headers=_headers(), key="asset-create", version=0, color="blue"
     )
-    changed = _asset_envelope("asset-create", 0)
-    changed["data"]["sizeBytes"] = 2048
-    conflict = client.post(
-        f"/v1/projects/{project_id}/assets",
-        headers=_headers(),
-        json=changed,
-    )
-
     assert first.status_code == 201
     assert conflict.status_code == 409
     assert conflict.json()["error"]["code"] == "IDEMPOTENCY_KEY_CONFLICT"
 
 
-def test_project_accepts_at_most_ten_reference_assets(client, ready_project) -> None:
-    project_id = ready_project
+def test_project_accepts_at_most_ten_reference_assets(client, ready_project, upload_image) -> None:
     for index in range(10):
-        payload = _asset_envelope(f"asset-{index}", index)
-        payload["data"]["fixtureId"] = f"living-room-{index}"
-        response = client.post(
-            f"/v1/projects/{project_id}/assets",
-            headers=_headers(),
-            json=payload,
+        response = upload_image(
+            ready_project, headers=_headers(), key=f"asset-{index}", version=index
         )
         assert response.status_code == 201
-
-    rejected = client.post(
-        f"/v1/projects/{project_id}/assets",
-        headers=_headers(),
-        json=_asset_envelope("asset-11", 10),
-    )
-
+    rejected = upload_image(ready_project, headers=_headers(), key="asset-11", version=10)
     assert rejected.status_code == 409
     assert rejected.json()["error"]["code"] == "ASSET_LIMIT_REACHED"
 

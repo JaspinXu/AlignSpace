@@ -375,7 +375,7 @@ function ProjectsScreen({
               checked={consent}
               onChange={(event) => setConsent(event.target.checked)}
             />
-            同意处理参考图片（演示样本）
+            同意处理参考图片（真实上传，模拟分析）
           </label>
           <button type="submit">创建</button>
         </form>

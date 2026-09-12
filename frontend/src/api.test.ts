@@ -7,6 +7,27 @@ const auth = (token = 'access-1') => json({ accessToken: token, user });
 beforeEach(() => localStorage.clear());
 
 describe('session and request boundaries', () => {
+  it('retries a lost upload response with exactly the same multipart body and key', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError('network lost'))
+      .mockResolvedValueOnce(json({ id: 'asset' }));
+    const client = new ApiClient({ fetcher, channel: null, locks: null });
+    await expect(client.upload('/v1/projects/p/assets', new Blob(['image']), {
+      expectedStateVersion: '4', idempotencyKey: 'fixed-key',
+    })).resolves.toEqual({ id: 'asset' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0][1]?.body).toBe(fetcher.mock.calls[1][1]?.body);
+  });
+
+  it('does not retry a stale upload', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({ error: {
+      code: 'STATE_VERSION_STALE', message: 'stale', recoverable: true,
+    } }, 409));
+    const client = new ApiClient({ fetcher, channel: null, locks: null });
+    await expect(client.upload('/v1/projects/p/assets', new Blob(['image']), {
+      expectedStateVersion: '4', idempotencyKey: 'fixed-key',
+    })).rejects.toBeInstanceOf(ApiError);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it('finishes pending logout after reload instead of restoring the cookie session', async () => {
     let finish!: (response: Response) => void;
     const firstFetch = vi.fn<typeof fetch>().mockResolvedValueOnce(auth())
@@ -174,5 +195,43 @@ describe('workflow writes', () => {
     await client.restore();
     await expect(client.execute(prepareWrite('/v1/projects/p/assets', 'POST', 0, {}))).rejects.toMatchObject({ status: 409, code: 'STATE_VERSION_STALE', correlationId: 'trace-1' });
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+});
+
+import { newIdempotencyKey } from './api';
+
+describe('asset transfer', () => {
+  it('uploads multipart data without a JSON content type', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(auth())
+      .mockResolvedValueOnce(json({ id: 'a1' }, 201));
+    const client = new ApiClient({ fetcher, locks: null, channel: null });
+    await client.restore();
+
+    const file = new Blob(['x'], { type: 'image/png' });
+    await client.upload('/v1/projects/p/assets', file, {
+      expectedStateVersion: '0',
+      idempotencyKey: 'k1',
+    });
+
+    const init = fetcher.mock.calls[1][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.headers as Headers).has('Content-Type')).toBe(false);
+  });
+
+  it('downloads image bytes as a blob', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(auth())
+      .mockResolvedValueOnce(new Response(new Blob(['img']), { status: 200 }));
+    const client = new ApiClient({ fetcher, locks: null, channel: null });
+    await client.restore();
+
+    const blob = await client.blob('/v1/projects/p/assets/a1/content');
+    expect(blob).toBeInstanceOf(Blob);
+  });
+
+  it('generates distinct idempotency keys', () => {
+    expect(newIdempotencyKey()).not.toBe(newIdempotencyKey());
   });
 });

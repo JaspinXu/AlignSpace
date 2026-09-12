@@ -16,8 +16,14 @@ if TYPE_CHECKING:
     from alignspace.agents.vision import VisionAnalyst
 
 
+class AssetRef(NamedTuple):
+    id: str
+    media_type: str
+    sha256: str
+
+
 class VisionProvider(Protocol):
-    def analyze(self, state: ProjectState) -> list[Attribute]: ...
+    def analyze(self, state: ProjectState, assets: list[AssetRef]) -> list[Attribute]: ...
 
 
 class LanguageModelProvider(Protocol):

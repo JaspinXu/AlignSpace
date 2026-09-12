@@ -4,7 +4,7 @@ from pathlib import Path
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from alignspace.agents.contracts import AgentBundle
+from alignspace.agents.contracts import AgentBundle, AssetRef
 from alignspace.domain.enums import ConflictStatus, NextAction, ProjectStatus, ReviewDecision
 from alignspace.domain.models import BriefVersion, ProjectState, calculate_brief_content_hash
 from alignspace.domain.patches import (
@@ -33,7 +33,11 @@ def build_graph(agents: AgentBundle, checkpointer: object):
     builder = StateGraph(WorkflowState)
 
     def vision_analysis(workflow_state: WorkflowState) -> WorkflowState:
-        result = agents.vision.run(_project_state(workflow_state))
+        assets = [
+            AssetRef(id=item["id"], media_type=item["media_type"], sha256=item["sha256"])
+            for item in workflow_state.get("assets", [])
+        ]
+        result = agents.vision.run(_project_state(workflow_state), assets)
         return {"project_state": _dump(result.state)}
 
     def homeowner_interview(workflow_state: WorkflowState) -> WorkflowState:
