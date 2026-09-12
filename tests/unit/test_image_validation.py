@@ -24,6 +24,13 @@ def test_supported_formats_are_normalized(fmt, media_type, extension):
     assert len(prepared.sha256) == 64
 
 
+def test_decompression_bomb_is_rejected(monkeypatch):
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 4)
+    with pytest.raises(ImageValidationError) as error:
+        prepare_image(encode(Image.new("RGB", (8, 8), "red"), "PNG"))
+    assert error.value.code == "ASSET_TOO_LARGE"
+
+
 def test_oversized_payload_is_rejected():
     with pytest.raises(ImageValidationError) as error:
         prepare_image(b"\x00" * (MAX_BYTES + 1))

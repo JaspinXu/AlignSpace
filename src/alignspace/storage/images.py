@@ -48,6 +48,8 @@ def prepare_image(raw: bytes) -> PreparedImage:
             cleaned = buffer.getvalue()
     except ImageValidationError:
         raise
+    except Image.DecompressionBombError:
+        raise ImageValidationError("ASSET_TOO_LARGE", "图片像素尺寸过大。") from None
     except (UnidentifiedImageError, OSError, ValueError):
         raise ImageValidationError("INVALID_IMAGE", "无法识别的图片文件。") from None
     return PreparedImage(
