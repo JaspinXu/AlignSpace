@@ -10,6 +10,7 @@ def test_designer_cannot_manage_reference_assets(client, ready_project, upload_i
         key="designer-asset", version=1,
     )
     assert add_attempt.status_code == 403
+    assert add_attempt.json()["error"]["code"] == "FORBIDDEN"
     remove_attempt = client.request(
         "DELETE",
         f"/v1/projects/{ready_project}/assets/{created.json()['id']}",
@@ -33,12 +34,15 @@ def test_register_and_soft_delete_are_versioned_and_idempotent(
     first = upload_image(ready_project, headers=_headers(), key="asset-create", version=0)
     replay = upload_image(ready_project, headers=_headers(), key="asset-create", version=0)
     assert first.status_code == 201
+    assert first.json()["stateVersion"] == 1
     assert replay.json() == first.json()
 
     asset_id = first.json()["id"]
     listed = client.get(f"/v1/projects/{ready_project}", headers=_headers()).json()["assets"]
     assert listed[0]["id"] == asset_id
     assert listed[0]["deleted"] is False
+    assert listed[0]["mediaType"] == "image/png"
+    assert listed[0]["sizeBytes"] > 0
 
     deleted = client.request(
         "DELETE",
@@ -50,6 +54,7 @@ def test_register_and_soft_delete_are_versioned_and_idempotent(
     assert deleted.json()["stateVersion"] == 2
     after = client.get(f"/v1/projects/{ready_project}", headers=_headers()).json()["assets"]
     assert after[0]["deleted"] is True
+    assert after[0]["mediaType"] == "image/png"
 
 
 def test_asset_conflicting_replay_returns_stable_error(client, ready_project, upload_image) -> None:
