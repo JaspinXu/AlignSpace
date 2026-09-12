@@ -111,3 +111,30 @@ def test_stale_version_and_non_member_are_rejected(api):
     assert stale.status_code == 409
     assert stale.json()["error"]["code"] == "STATE_VERSION_STALE"
     assert upload(api, stranger, project["id"]).status_code == 403
+
+
+def test_members_can_read_image_content_but_outsiders_cannot(api):
+    owner = register(api, "owner@example.com")
+    project = create_project(api, owner)
+    asset = upload(api, owner, project["id"]).json()
+
+    fetched = api.get(
+        f"/v1/projects/{project['id']}/assets/{asset['id']}/content",
+        headers=auth(owner),
+    )
+    assert fetched.status_code == 200
+    assert fetched.headers["content-type"].startswith("image/png")
+    assert Image.open(BytesIO(fetched.content)).size == (8, 8)
+
+    stranger = register(api, "stranger@example.com")
+    denied = api.get(
+        f"/v1/projects/{project['id']}/assets/{asset['id']}/content",
+        headers=auth(stranger),
+    )
+    assert denied.status_code == 403
+
+    missing = api.get(
+        f"/v1/projects/{project['id']}/assets/does-not-exist/content",
+        headers=auth(owner),
+    )
+    assert missing.status_code == 404

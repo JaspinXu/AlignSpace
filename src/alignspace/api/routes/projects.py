@@ -63,6 +63,16 @@ def generate_join_code(
     return container.membership.generate_code(project_id, actor)
 
 
+@router.get("/{project_id}/assets/{asset_id}/content")
+def asset_content(project_id: str, asset_id: str, actor: Actor, container: Container) -> Response:
+    data, media_type = container.resources.asset_content(project_id, asset_id, actor)
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=0"},
+    )
+
+
 @router.get("/{project_id}", response_model=ProjectView)
 def get_project(project_id: str, actor: Actor, container: Container) -> ProjectView:
     return container.resources.get(project_id, actor)

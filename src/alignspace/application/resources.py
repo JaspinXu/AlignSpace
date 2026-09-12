@@ -231,6 +231,15 @@ class ProjectResourceService:
             uow.commit()
             return asset
 
+    def asset_content(self, project_id: str, asset_id: str, actor: ActorContext) -> tuple[bytes, str]:
+        with read_transaction(self._session_factory) as session:
+            self._project(session, project_id)
+            self._authorize_in_session(session, project_id, actor)
+            asset = session.get(ImageAssetRow, (project_id, asset_id))
+            if asset is None or asset.deleted_at is not None:
+                raise KeyError(f"asset {asset_id} not found")
+            return self._storage.open(asset.payload["storage_key"]), asset.payload["media_type"]
+
     def _authorize_homeowner(self, project_id: str, actor: ActorContext) -> None:
         with self._session_factory() as session:
             self._project(session, project_id)
