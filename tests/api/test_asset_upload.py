@@ -198,6 +198,22 @@ def test_upload_rejects_declared_type_and_filename_mismatches(api):
         filename="photo.jpg",
         content_type="image/jpeg",
     ).status_code == 415
+    assert upload(
+        api,
+        owner,
+        project["id"],
+        data=png,
+        filename="photo.txt",
+        content_type="application/octet-stream",
+    ).status_code == 415
+    assert upload(
+        api,
+        owner,
+        project["id"],
+        data=png,
+        filename="photo.jpeg",
+        content_type="application/octet-stream",
+    ).status_code == 415
 
 
 def test_upload_is_rate_limited_per_account(api):

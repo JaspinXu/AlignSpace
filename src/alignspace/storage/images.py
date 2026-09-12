@@ -51,6 +51,8 @@ def prepare_image(
             if filename:
                 suffix = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
                 declared_extension = {"jpg": "jpg", "jpeg": "jpg", "png": "png", "webp": "webp"}.get(suffix)
+                if suffix and declared_extension is None:
+                    raise ImageValidationError("UNSUPPORTED_MEDIA_TYPE", "仅支持 JPEG、PNG、WebP。")
                 if declared_extension is not None and declared_extension != extension:
                     raise ImageValidationError("UNSUPPORTED_MEDIA_TYPE", "文件扩展名与图片内容不匹配。")
             width, height = image.size
