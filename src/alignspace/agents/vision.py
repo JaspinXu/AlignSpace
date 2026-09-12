@@ -1,4 +1,4 @@
-from alignspace.agents.contracts import AgentResult, VisionProvider
+from alignspace.agents.contracts import AgentResult, AssetRef, VisionProvider
 from alignspace.domain.models import ProjectState
 from alignspace.domain.patches import StatePatch, UpsertAttribute, apply_patch
 
@@ -7,9 +7,10 @@ class VisionAnalyst:
     def __init__(self, provider: VisionProvider) -> None:
         self._provider = provider
 
-    def run(self, state: ProjectState) -> AgentResult:
+    def run(self, state: ProjectState, assets: list[AssetRef]) -> AgentResult:
         operations = [
-            UpsertAttribute(attribute=attribute) for attribute in self._provider.analyze(state)
+            UpsertAttribute(attribute=attribute)
+            for attribute in self._provider.analyze(state, assets)
         ]
         if not operations:
             return AgentResult(state=state)

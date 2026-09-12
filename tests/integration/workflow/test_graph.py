@@ -6,7 +6,13 @@ def test_graph_starts_with_vision_and_pauses_for_homeowner() -> None:
     graph = memory_graph(build_mock_agents())
     config = {"configurable": {"thread_id": "project-1"}}
 
-    result = graph.invoke({"project_id": "project-1"}, config=config)
+    result = graph.invoke(
+        {
+            "project_id": "project-1",
+            "assets": [{"id": "asset-1", "media_type": "image/png", "sha256": "abc123"}],
+        },
+        config=config,
+    )
 
     assert result["project_state"]["attributes"]
     assert result["__interrupt__"][0].value["waitReason"] == "homeowner"

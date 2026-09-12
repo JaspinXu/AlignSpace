@@ -6,6 +6,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from langgraph.types import Command
 from pydantic import Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from alignspace.application.commands import ActorContext, WriteEnvelope
@@ -45,6 +46,7 @@ from alignspace.domain.policies import (
     validate_professional_claim,
 )
 from alignspace.persistence.repository import canonical_request_hash
+from alignspace.persistence.tables import ImageAssetRow
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
 
 
@@ -491,6 +493,7 @@ class WorkflowService:
                 graph_input = {
                     "project_id": project_id,
                     "project_state": current.model_dump(mode="json", by_alias=True),
+                    "assets": self._active_assets(project_id),
                 }
             graph_result = self._graph.invoke(graph_input, config=config)
             returned = ProjectState.model_validate(graph_result["project_state"])
@@ -509,6 +512,25 @@ class WorkflowService:
             self._record_replay(uow, project_id, envelope, request_hash, response)
             uow.commit()
             return response
+
+    def _active_assets(self, project_id: str) -> list[dict[str, object]]:
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(ImageAssetRow)
+                .where(
+                    ImageAssetRow.project_id == project_id,
+                    ImageAssetRow.deleted_at.is_(None),
+                )
+                .order_by(ImageAssetRow.id)
+            ).all()
+            return [
+                {
+                    "id": row.id,
+                    "media_type": row.payload["media_type"],
+                    "sha256": row.payload["sha256"],
+                }
+                for row in rows
+            ]
 
     def _reconcile_checkpoint(self, config: dict[str, object], current: ProjectState) -> None:
         snapshot = self._graph.get_state(config)

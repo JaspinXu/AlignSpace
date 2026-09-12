@@ -182,3 +182,33 @@ def test_analysis_readiness_ignores_deleted_assets(api):
     )
     assert started.status_code == 409
     assert started.json()["error"]["code"] == "ASSET_COUNT_INVALID"
+
+
+def test_vision_observations_reference_the_real_asset(api):
+    owner = register(api, "owner@example.com")
+    project = create_project(api, owner)
+    asset_ids = []
+    for index in range(3):
+        uploaded = upload(
+            api, owner, project["id"], key=f"u{index}", version=index
+        ).json()
+        asset_ids.append(uploaded["id"])
+
+    started = api.post(
+        f"/v1/projects/{project['id']}/analysis-runs",
+        headers=auth(owner),
+        json={"idempotencyKey": "run-1", "expectedStateVersion": 3, "data": {}},
+    )
+    assert started.status_code == 202, started.text
+    attributes = started.json()["projectState"]["attributes"]
+    assert attributes
+    proposed = [item for item in attributes if item["status"] == "proposed"]
+    assert proposed
+    sources = {
+        evidence["sourceId"]
+        for item in proposed
+        for evidence in item["evidence"]
+        if evidence["sourceType"] == "image"
+    }
+    assert sources <= set(asset_ids)
+    assert sources

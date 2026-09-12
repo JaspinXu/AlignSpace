@@ -30,7 +30,7 @@ from alignspace.domain.models import (
     calculate_brief_content_hash,
 )
 from alignspace.persistence.database import create_engine_and_session
-from alignspace.persistence.tables import ProjectMemberRow
+from alignspace.persistence.tables import ImageAssetRow, ProjectMemberRow
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
 from alignspace.providers.mock import build_mock_agents
 from alignspace.workflow.runtime import memory_graph
@@ -61,6 +61,14 @@ def service(tmp_path):
                         actor=ActorKind.VISION_AGENT,
                     )
                 ],
+            )
+        )
+        uow.session.add(
+            ImageAssetRow(
+                project_id="project-1",
+                id="asset-1",
+                payload={"media_type": "image/png", "sha256": "abc123"},
+                deleted_at=None,
             )
         )
         uow.commit()
