@@ -116,6 +116,7 @@ For contributors and other coding models, start with the [Chinese project handof
 | File | Purpose |
 |---|---|
 | [Backend runbook](README.backend.md) | Implemented local FastAPI/LangGraph backend, API usage, tests, and current limitations |
+| [Frontend runbook](README.frontend.md) | React + TypeScript client setup, authenticated local demo, tests, and boundaries |
 | [Official hackathon briefing](docs/references/showmeyouragent-hackathon-briefing-2026-09-06.pdf) | Organiser-provided rules, rubric, dates, submission format, and AWS/Kiro support |
 | [Official context](docs/00-official-context.md) | Verified event facts vs team assumptions |
 | [Product requirements](docs/01-product-requirements.md) | PRD, scope, users, stories, acceptance criteria |
