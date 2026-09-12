@@ -3,7 +3,7 @@ from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from alignspace.application.commands import ActorContext, WriteEnvelope
@@ -185,6 +185,8 @@ class ProjectResourceService:
             }
         )
         with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            # Serialize file creation + live-reference commit with shared-file GC.
+            uow.session.execute(text("BEGIN IMMEDIATE"))
             self._authorize_in_session(uow.session, project_id, actor)
             if actor.role != Role.HOMEOWNER:
                 raise AuthorizationError("only the homeowner can manage reference assets")
@@ -297,13 +299,15 @@ class ProjectResourceService:
 
     def _gc_storage_key(self, storage_key: str) -> None:
         with self._session_factory() as session:
+            session.execute(text("BEGIN IMMEDIATE"))
             references = session.scalar(
                 select(func.count()).select_from(ImageAssetRow).where(
                     ImageAssetRow.payload["storage_key"].as_string() == storage_key
                 )
             )
-        if references == 0:
-            self._storage.delete(storage_key)
+            if references == 0:
+                self._storage.delete(storage_key)
+            session.commit()
 
     def is_member(self, project_id: str, actor: ActorContext) -> bool:
         with self._session_factory() as session:

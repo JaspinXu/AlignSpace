@@ -2,11 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 
 const password = 'local browser acceptance password';
 
-const ONE_PIXEL_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-  'base64',
-);
-
 async function register(page: Page, email: string) {
   await page.goto('/');
   await page.getByRole('tab', { name: '注册' }).click();
@@ -30,8 +25,15 @@ async function write(page: Page, button: string, suffix: string, status = 200) {
 }
 
 async function uploadAsset(page: Page, name: string) {
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1600;
+    canvas.height = 1200;
+    canvas.getContext('2d')!.fillRect(0, 0, 1600, 1200);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
   const response = page.waitForResponse((r) => r.url().endsWith('/assets') && r.request().method() !== 'GET');
-  await page.getByLabel('上传参考图片').setInputFiles({ name, mimeType: 'image/png', buffer: ONE_PIXEL_PNG });
+  await page.getByLabel('上传参考图片').setInputFiles({ name, mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   const result = await response;
   expect(result.status(), await result.text()).toBe(201);
   const body = await result.json();
@@ -39,6 +41,11 @@ async function uploadAsset(page: Page, name: string) {
   await expect.poll(async () => {
     return page.locator('.meta').innerText().then((text) => text.includes(`v${body.stateVersion}`));
   }).toBe(true);
+  const preview = page.getByRole('img', { name, exact: true });
+  await expect(preview).toBeVisible();
+  await expect.poll(() => preview.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(1600);
+  expect((await preview.boundingBox())!.width).toBeLessThanOrEqual(120);
+  await expect(page.getByRole('link', { name: `查看原图：${name}`, exact: true })).toHaveAttribute('href', /^blob:/);
 }
 
 test('two real accounts complete a shared brief, retain stale input and restore sessions', async ({ browser }, testInfo) => {
@@ -64,7 +71,7 @@ test('two real accounts complete a shared brief, retain stale input and restore 
   try {
     await register(owner, ownerEmail);
     await register(designer, `designer-${Date.now()}@example.com`);
-    await owner.getByLabel('同意处理参考图片（演示样本）').check();
+    await owner.getByLabel('同意处理参考图片（真实上传，模拟分析）').check();
     await owner.getByRole('button', { name: '创建', exact: true }).click();
     await owner.getByRole('button', { name: '生成项目码' }).click();
     const code = await owner.locator('.join-code code').innerText();
@@ -79,6 +86,13 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     expect(refreshes).toBe(2); // initial anonymous restore + explicit reload
 
     for (let i = 0; i < 3; i++) await uploadAsset(owner, `room-${i}.png`);
+    await uploadAsset(owner, 'to-delete.png');
+    const deletion = owner.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/assets/'));
+    owner.once('dialog', (dialog) => dialog.accept());
+    await owner.getByRole('button', { name: '删除 to-delete.png', exact: true }).click();
+    expect((await deletion).status()).toBe(200);
+    await expect(owner.getByRole('img', { name: 'to-delete.png', exact: true })).toHaveCount(0);
+    await expect(owner.getByText('已删除', { exact: true })).toBeVisible();
     await write(owner, '启动分析', '/analysis-runs', 202);
     await owner.getByRole('checkbox', { name: '暖色灯光' }).check();
     await write(owner, '提交回答', '/answer', 202);

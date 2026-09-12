@@ -1,7 +1,7 @@
 # AlignSpace：真实图片上传与存储设计
 
 日期：2026-09-12
-状态：设计已确认，待用户复核书面规格；尚未实施。
+状态：已实现；2026-09-13 本地集成验收，最新结果见项目交接文档顶部。下文背景描述实施前状态。
 范围：交接文档第 14 节“本阶段之后”的第 1 步。
 
 ## 1. 背景
@@ -99,12 +99,12 @@ DELETE /v1/projects/{projectId}/assets/{assetId}
 
 - `image_assets` 增加 `deleted_at`（可空整数）列；其余新字段（`sha256`、`storage_key`、
   `original_filename`、宽高）放在现有 JSON `payload` 中，无需改列。
-- 迁移升级到版本 2，SQLite 增量、可重复执行。
+- 当前迁移版本为 3：v2 增加软删除列，v3 将没有真实文件的历史 fixture 资产标记为已删除，SQLite 增量、可重复执行。
 
 ### 4.5 追溯与模拟视觉
 
 - 观察的 `Evidence.sourceId` 改为真实 `assetId`。
-- 第 1 步保持确定性模拟视觉：`MockVisionProvider` 改为对每个有效资产各产生一条
+- 第 1 步保持确定性模拟视觉：`MockVisionProvider` 对每个有效资产产生四条固定示例
   `proposed` 观察，`sourceId = assetId`，不直接认定为屋主偏好。
 - 分析前置条件：项目有 3–10 张**未删除**资产且已 consent。
 

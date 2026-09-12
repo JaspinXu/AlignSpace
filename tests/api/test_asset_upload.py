@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
+from threading import Event
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +11,52 @@ from alignspace.auth.config import AuthConfig
 ORIGIN = {"Origin": "http://localhost:5173"}
 PASSWORD = "a sufficiently long password"
 SECRET = "asset-upload-test-secret-long-enough"
+
+
+def test_upload_cannot_race_shared_file_garbage_collection(api, monkeypatch):
+    from alignspace.application.commands import ActorContext
+    from alignspace.domain.enums import Role
+    from alignspace.storage.images import prepare_image
+
+    owner = register(api, "gc-race@example.com")
+    project = create_project(api, owner)
+    resources = api.app.state.container.resources
+    storage = resources._storage
+    prepared = prepare_image(image_bytes())
+    key = storage.save(prepared.data, prepared.extension)
+    deleting, release, started, finished = Event(), Event(), Event(), Event()
+    delete = storage.delete
+
+    def paused_delete(storage_key):
+        deleting.set()
+        assert release.wait(5)
+        delete(storage_key)
+
+    def concurrent_upload():
+        started.set()
+        try:
+            return resources.register_asset(
+                project["id"], ActorContext(actor_id=owner["user"]["id"], role=Role.HOMEOWNER),
+                expected_state_version=0, idempotency_key="race", filename="room.png",
+                raw=image_bytes(), declared_type="image/png",
+            )
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(storage, "delete", paused_delete)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        gc = pool.submit(resources._gc_storage_key, key)
+        assert deleting.wait(5)
+        upload_job = pool.submit(concurrent_upload)
+        try:
+            assert started.wait(5)
+            completed_during_gc = finished.wait(0.2)
+        finally:
+            release.set()
+        gc.result(timeout=5)
+        upload_job.result(timeout=5)
+    assert not completed_during_gc
+    assert storage.open(key) == prepared.data
 
 
 @pytest.fixture

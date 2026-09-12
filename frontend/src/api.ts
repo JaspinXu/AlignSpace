@@ -211,7 +211,7 @@ export class ApiClient {
     const body = new FormData();
     for (const [key, value] of Object.entries(fields)) body.append(key, value);
     body.append('file', file);
-    const response = await this.requestWithRefresh(path, { method: 'POST', body });
+    const response = await this.requestWithRefresh(path, { method: 'POST', body }, true, true);
     return (await response.json()) as T;
   }
 
@@ -250,8 +250,15 @@ export class ApiClient {
     path: string,
     init: RequestInit,
     allowRefresh = true,
+    retryNetwork = false,
   ): Promise<Response> {
-    const response = await this.send(path, init);
+    let response: Response;
+    try {
+      response = await this.send(path, init);
+    } catch (error) {
+      if (!retryNetwork) throw error;
+      response = await this.send(path, init);
+    }
     if (response.status !== 401) {
       if (!response.ok) throw await this.toError(response);
       return response;

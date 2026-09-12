@@ -50,8 +50,9 @@ function AssetThumb({ client, projectId, asset }: { client: ApiClient; projectId
     client
       .blob(`/v1/projects/${projectId}/assets/${asset.id}/content`)
       .then((blob) => {
+        if (!active) return;
         objectUrl = URL.createObjectURL(blob);
-        if (active) setUrl(objectUrl);
+        setUrl(objectUrl);
       })
       .catch(() => undefined);
     return () => {
@@ -60,7 +61,11 @@ function AssetThumb({ client, projectId, asset }: { client: ApiClient; projectId
     };
   }, [client, projectId, asset.id, asset.deleted]);
   if (asset.deleted) return <span className="asset-missing">已删除</span>;
-  return url ? <img className="asset-thumb" src={url} alt={asset.originalFilename} /> : null;
+  return url ? (
+    <a href={url} target="_blank" rel="noreferrer" aria-label={`查看原图：${asset.originalFilename}`}>
+      <img className="asset-thumb" src={url} alt={asset.originalFilename} />
+    </a>
+  ) : null;
 }
 
 export function Workspace({ client, projectId }: { client: ApiClient; projectId: string }) {

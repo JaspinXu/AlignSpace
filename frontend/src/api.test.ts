@@ -7,6 +7,27 @@ const auth = (token = 'access-1') => json({ accessToken: token, user });
 beforeEach(() => localStorage.clear());
 
 describe('session and request boundaries', () => {
+  it('retries a lost upload response with exactly the same multipart body and key', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError('network lost'))
+      .mockResolvedValueOnce(json({ id: 'asset' }));
+    const client = new ApiClient({ fetcher, channel: null, locks: null });
+    await expect(client.upload('/v1/projects/p/assets', new Blob(['image']), {
+      expectedStateVersion: '4', idempotencyKey: 'fixed-key',
+    })).resolves.toEqual({ id: 'asset' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0][1]?.body).toBe(fetcher.mock.calls[1][1]?.body);
+  });
+
+  it('does not retry a stale upload', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({ error: {
+      code: 'STATE_VERSION_STALE', message: 'stale', recoverable: true,
+    } }, 409));
+    const client = new ApiClient({ fetcher, channel: null, locks: null });
+    await expect(client.upload('/v1/projects/p/assets', new Blob(['image']), {
+      expectedStateVersion: '4', idempotencyKey: 'fixed-key',
+    })).rejects.toBeInstanceOf(ApiError);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it('finishes pending logout after reload instead of restoring the cookie session', async () => {
     let finish!: (response: Response) => void;
     const firstFetch = vi.fn<typeof fetch>().mockResolvedValueOnce(auth())

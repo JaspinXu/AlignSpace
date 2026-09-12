@@ -2,7 +2,7 @@ import hashlib
 from dataclasses import dataclass
 from io import BytesIO
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 MAX_BYTES = 10 * 1024 * 1024
 
@@ -55,9 +55,14 @@ def prepare_image(
                     raise ImageValidationError("UNSUPPORTED_MEDIA_TYPE", "仅支持 JPEG、PNG、WebP。")
                 if declared_extension is not None and declared_extension != extension:
                     raise ImageValidationError("UNSUPPORTED_MEDIA_TYPE", "文件扩展名与图片内容不匹配。")
+            image = ImageOps.exif_transpose(image)
+            # Expand palette transparency before discarding metadata.
+            if image.mode == "P" and "transparency" in image.info:
+                image = image.convert("RGBA")
+            image.info.clear()
             width, height = image.size
             buffer = BytesIO()
-            # Re-encoding without passing exif= drops EXIF/GPS metadata.
+            # Preserve visual orientation, but never persist source metadata.
             image.save(buffer, format=image_format)
             cleaned = buffer.getvalue()
     except ImageValidationError:

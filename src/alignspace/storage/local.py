@@ -1,5 +1,6 @@
 import hashlib
 import os
+import tempfile
 from pathlib import Path
 
 
@@ -17,9 +18,14 @@ class LocalStorage:
         key = f"{hashlib.sha256(data).hexdigest()}.{extension.lstrip('.').lower()}"
         target = self._path(key)
         target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = target.with_name(target.name + ".tmp")
-        temporary.write_bytes(data)
-        os.replace(temporary, target)
+        with tempfile.NamedTemporaryFile(dir=target.parent, suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            try:
+                stream.write(data)
+                stream.close()
+                os.replace(temporary, target)
+            finally:
+                temporary.unlink(missing_ok=True)
         return key
 
     def open(self, key: str) -> bytes:

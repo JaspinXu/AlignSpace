@@ -29,7 +29,7 @@ uv run uvicorn alignspace.main:app --reload
 
 服务默认监听 `http://127.0.0.1:8000`，交互式 OpenAPI 位于 `http://127.0.0.1:8000/docs`。真实账户版本默认数据文件为 `alignspace-accounts.db` 和 `alignspace-accounts-checkpoints.db`，两者已被 Git 忽略。认证密钥不得打印或提交；缺少密钥时服务拒绝启动，换密钥会使已有访问令牌失效。
 
-上传的参考图片按内容寻址保存在 `ALIGNSPACE_ASSET_DIR`（默认 `var/assets/`）下。要重置图片目录，停止服务后删除该目录（或把 `ALIGNSPACE_ASSET_DIR` 指向新路径）再启动即可；仍引用旧图片的项目在重新上传前无法预览这些图片。
+上传的参考图片按内容寻址保存在 `ALIGNSPACE_ASSET_DIR`（默认 `var/assets/`）下。正常删除请使用资产或项目删除接口，避免数据库留下失效引用。要运行全新演示，请同时指定新的数据库、检查点和图片目录；备份或恢复时也应保持三者一致。不要只清空图片目录。
 
 业务接口使用真实 Bearer 身份，屋主创建项目后通过一次性项目码邀请设计师。前端启动及双账户浏览器验收见 [前端运行说明](README.frontend.md)。
 
@@ -55,14 +55,13 @@ uv run ruff check src tests
 
 ## 调用约定
 
-项目范围接口要求两个请求头：
+业务接口要求经过验证的访问令牌；角色从项目成员关系确定，不接受客户端伪造身份头：
 
 ```text
-X-Actor-Id: homeowner-1
-X-Actor-Role: homeowner
+Authorization: Bearer <accessToken>
 ```
 
-写请求使用统一 envelope：
+工作流版本化写请求使用统一 envelope：
 
 ```json
 {
@@ -74,13 +73,20 @@ X-Actor-Role: homeowner
 
 客户端每次写入前应读取最新 `stateVersion`。相同幂等键和相同内容会返回第一次的结果；相同键配不同内容会返回 `409`。公开错误统一包含 `code`、`message`、`correlationId`、`recoverable` 和安全的 `details`。
 
+图片上传例外：使用 `multipart/form-data` 的 `file`、`expectedStateVersion`、`idempotencyKey` 三个字段，不再支持公开 `fixtureId` 登记。图片读取同样需要 Bearer 令牌，前端通过 Blob URL 展示。项目创建只传 `roomType`、`budgetBand`、`consent`，不传 `designerId`；设计师使用一次性项目码加入。注册/登录返回访问令牌，刷新令牌由 HttpOnly Cookie 管理；Cookie 认证请求需合法 Origin。
+
 ## 主要接口
 
 ```text
 POST   /v1/projects
+GET    /v1/projects
+POST   /v1/projects/join
+POST   /v1/projects/{projectId}/join-code
+GET    /v1/projects/{projectId}/state
 GET    /v1/projects/{projectId}
 DELETE /v1/projects/{projectId}
 POST   /v1/projects/{projectId}/assets
+GET    /v1/projects/{projectId}/assets/{assetId}/content
 DELETE /v1/projects/{projectId}/assets/{assetId}
 POST   /v1/projects/{projectId}/analysis-runs
 PATCH  /v1/projects/{projectId}/attributes/{attributeId}
@@ -93,4 +99,4 @@ PATCH  /v1/projects/{projectId}/briefs/{version}
 POST   /v1/projects/{projectId}/briefs/{version}/approvals
 ```
 
-当前身份由测试请求头模拟；接入真实前端或部署前，需要把它替换为经过验证的登录令牌与项目成员声明。AWS/Lightsail 和赛事 JSON LLM API 仍位于 provider 适配层之后，不属于本地验收的前置条件。
+当前已实现邮箱密码注册、登录、刷新与退出，不包含邮箱验证与密码找回。真实模型与云端部署尚未实施；任何赛事指定供应商要求应以赛事原始规则为准。

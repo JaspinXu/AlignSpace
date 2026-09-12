@@ -38,6 +38,11 @@ from alignspace.providers.mock import build_mock_agents
 from alignspace.workflow.runtime import memory_graph
 
 
+@pytest.fixture(autouse=True)
+def isolated_asset_storage(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALIGNSPACE_ASSET_DIR", str(tmp_path / "assets"))
+
+
 def image_bytes(fmt: str = "PNG", color: str = "red") -> bytes:
     buffer = BytesIO()
     Image.new("RGB", (8, 8), color).save(buffer, format=fmt)

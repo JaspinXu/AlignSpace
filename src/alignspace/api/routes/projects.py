@@ -13,6 +13,7 @@ from alignspace.application.resources import (
     ProjectView,
 )
 from alignspace.application.service import WorkflowResponse
+from alignspace.storage.images import MAX_BYTES
 
 router = APIRouter(prefix="/v1/projects", tags=["projects"])
 Actor = Annotated[ActorContext, Depends(get_actor)]
@@ -106,7 +107,7 @@ def register_asset(
         expected_state_version=expected_state_version,
         idempotency_key=idempotency_key,
         filename=file.filename or "upload",
-        raw=file.file.read(),
+        raw=file.file.read(MAX_BYTES + 1),
         declared_type=file.content_type,
     )
 

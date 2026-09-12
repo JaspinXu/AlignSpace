@@ -67,14 +67,30 @@ def test_filename_extension_must_match_image_bytes():
     assert error.value.code == "UNSUPPORTED_MEDIA_TYPE"
 
 
-def test_exif_and_gps_are_stripped():
+@pytest.mark.parametrize("fmt", ["JPEG", "PNG", "WEBP"])
+def test_exif_and_gps_are_stripped(fmt):
     source = Image.new("RGB", (8, 8), "blue")
     exif = Image.Exif()
     exif[0x010F] = "SecretCamera"  # Make
     exif[0x0112] = 3  # Orientation
-    raw = encode(source, "JPEG", exif=exif.tobytes())
+    exif[0x8825] = {1: "N", 2: (1, 2, 3)}  # GPS latitude
+    raw = encode(source, fmt, exif=exif.tobytes())
     assert Image.open(BytesIO(raw)).getexif()
 
     prepared = prepare_image(raw)
 
     assert not Image.open(BytesIO(prepared.data)).getexif()
+
+
+@pytest.mark.parametrize("fmt", ["JPEG", "PNG", "WEBP"])
+def test_orientation_is_applied_before_metadata_removal(fmt):
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    prepared = prepare_image(encode(Image.new("RGB", (8, 6), "red"), fmt, exif=exif))
+    assert (prepared.width, prepared.height) == (6, 8)
+
+
+def test_palette_transparency_survives_normalization():
+    source = Image.new("P", (4, 4))
+    prepared = prepare_image(encode(source, "PNG", transparency=0))
+    assert Image.open(BytesIO(prepared.data)).convert("RGBA").getpixel((0, 0))[3] == 0

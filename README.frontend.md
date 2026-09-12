@@ -11,10 +11,9 @@ token in memory only, and refreshes the session through an HttpOnly cookie.
 > understanding.
 >
 > Accepted formats are JPEG, PNG and WebP, each up to 10MB and at most 10 per
-> project. To reset the stored images, stop the server and delete
-> `ALIGNSPACE_ASSET_DIR` (or point the variable at a fresh path) before
-> restarting; projects that still reference the removed files will not preview
-> them until they are uploaded again.
+> project. Use asset/project deletion APIs for normal removal. For a fresh demo,
+> configure new database, checkpoint and asset paths together; do not clear only
+> the asset directory while retaining database references. Back up all three together.
 
 ## Prerequisites
 
@@ -23,8 +22,7 @@ token in memory only, and refreshes the session through an HttpOnly cookie.
 
 ## 1. Start the backend
 
-From the repository root, use the authenticated application (not the legacy
-`shawn` demo defaults):
+From the repository root, start the authenticated application:
 
 ```bash
 export ALIGNSPACE_AUTH_SECRET="$(openssl rand -hex 32)"   # never print or commit this
@@ -110,6 +108,13 @@ uv run ruff check src tests
   pending approvals, poll every 5 seconds only while the tab is visible.
 
 ## Known boundaries
+
+- Image previews are bounded thumbnails with links to full images. Uploads retry
+  one network failure with the same multipart body/key; 409 requires reselection
+  after state refresh. Files are not retained across page reloads.
+- The browser acceptance uses real 1600×1200 PNG uploads, checks thumbnail size,
+  full-image links and deletion, then completes the two-account workflow.
+  Each run isolates databases, checkpoints and uploaded files in a temporary directory.
 
 - Vision analysis remains simulated mock output; no object storage or LLM yet.
   Uploaded images are real and stored locally (see the demo status above).

@@ -35,6 +35,7 @@ export default defineConfig({
         ALIGNSPACE_ORIGINS: frontendUrl,
         ALIGNSPACE_DATABASE_URL: `sqlite:///${join(dataDir, 'accounts.db')}`,
         ALIGNSPACE_CHECKPOINT_PATH: join(dataDir, 'checkpoints.db'),
+        ALIGNSPACE_ASSET_DIR: join(dataDir, 'assets'),
       },
     },
     {
