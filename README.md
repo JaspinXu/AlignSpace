@@ -1,226 +1,100 @@
 # AlignSpace — Design Inspiration Agents
 
-## Project summary
+AlignSpace helps a homeowner and an interior designer turn references, preferences and practical constraints into one versioned living-room brief. The hackathon team is **Four Wolf Kings — 8QFDUS2I**.
 
-**AlignSpace** is a reference-library-driven, two-sided requirements-alignment system for Singapore homeowners and interior-design SMEs. Rather than generating a design from a single prompt, it progressively turns inspiration images, informal preferences, designer feedback, and real-world constraints into a shared, actionable living-room design brief.
+## Try it
 
-The system maintains one versioned **Project Design State** as its source of truth. It clearly separates confirmed requirements, AI inferences, rejected ideas, unresolved conflicts, and professional constraints, with every change linked to its source. After each interaction, hybrid retrieval analyses the remaining design space so the agents can ask the highest-value question, compare genuinely different directions, or focus on feasible details.
+Deployment target: [AlignSpace trial](https://54-255-93-19.sslip.io:80/).
 
-A deterministic readiness score guides the workflow through **Explore, Clarify, Focus, and Commit**. The final brief records agreed preferences, accepted reference elements, constraints, open risks, and approval history. The MVP targets alignment within 10 clarification questions while keeping structural, regulatory, pricing, and other consequential decisions under human review.
+The temporary trial uses HTTPS on port 80 because the managed firewall blocks 443. Keep `https://` and `:80` in the URL. The current certificate expires 11 December 2026; standard HTTPS and renewal require follow-up before then.
 
-## Why this exists
+1. Choose **Start my room brief**, or **Try a guided sample** for labelled sample notes.
+2. Answer a few homeowner questions. Optionally upload an image you have permission to use and explain which elements you like.
+3. Choose **Suggest preferences from notes**, then accept or reject each suggestion. Confirming a new value replaces the previous confirmed value for that dimension, retaining its history.
+4. Select **Invite my designer** and share the private, single-use link. For solo testing, open it in another browser profile or private window. The same session cannot claim both roles.
+5. The designer reviews layout, maintenance and constraints. Use **Refresh shared changes** after the other person edits.
+6. Both participants approve the same brief from their respective sessions. Export JSON or Print / Save PDF. Any content edit invalidates approvals.
 
-Homeowners often say things such as “warm modern” or “hotel-like,” but the same words can mean different colours, materials, layouts, lighting, or price points. Designers spend time reverse-engineering what a client likes from unrelated images, then repeat early concepts when expectations were not actually aligned.
+Invitations expire after 24 hours. Browser sessions are possession-based access, not verified personal identity. Clearing cookies loses access; recovery and account management are not implemented. Existing pre-authentication local demo projects are not automatically exposed to new sessions.
 
-AlignSpace does not replace a designer and does not produce construction advice. Its job is to reduce ambiguity before concept design begins.
+## What works today
 
-## MVP promise
-
-> From 3–10 inspiration images to a mutually approved living-room design brief in one guided session, with every AI inference labelled, editable, and linked to evidence.
-
-## Hackathon operating brief
-
-This section captures organiser guidance from the **ShowMeYourAgent - NUS ISS** Slack workspace and the briefing deck shared there. It was last reconciled on **7 September 2026 (Singapore time)**. Treat newer organiser announcements in Slack as authoritative if they conflict with this summary.
-
-### What must be delivered
-
-- **Shortlisting deadline:** 28 September 2026 at **9:00am SGT**.
-- **Finale:** shortlisted teams must be ready for a face-to-face demo on 10 October 2026 at **8:30am SGT**.
-- Post the shortlisting entry in `#submission`. Ignore `#round1-submission`, which organisers identified as an internal test channel. `#final-submission` is only for finalist updates.
-- The Slack post itself should be text and include the team code, project name, a judge-accessible GitHub repository URL, and a YouTube or other view/download URL for the MP4 demo. Do **not** upload the video directly to the submission channel.
-- Also prepare the PDF write-up and deployment evidence or URL. The briefing deck describes a 30-minute video; verify this unusually long duration against the latest Slack announcement before recording.
-- Incomplete or inaccessible submissions may be rejected. Test repository, video, and deployment links from a signed-out browser before posting.
-
-### Build and deployment constraints
-
-- Any programming language, agent framework, and local development tool may be used. The organiser explicitly allows teams to code a custom agent.
-- Development may use the team's own services and AI tools, but the version assessed for the competition must deploy on the organiser-provided **AWS Lightsail** environment.
-- The organiser plans to expose LLM prompting through a team API in JSON format rather than provide direct Bedrock access. The briefing names **Claude Sonnet 4.5** behind that API; connection details and the team API key are distributed separately.
-- Shortlisting support is stated as **USD 100 of AWS credit per team** and **USD 20 of Kiro credit per participant**. Usage beyond the provided AWS limit may pause the account and affect the entry.
-- Teams may use their own datasets or RAG documents. When real SME data, business rules, or third-party integrations are unavailable, the organiser allows clearly stated assumptions, mock data, mock company APIs, and public APIs.
-
-### What the proposal and judging should demonstrate
-
-- Public-category teams choose one business problem from the proposal form and may narrow a vague statement to a specific industry and target group. SME-category teams propose their own business problem; organisers can help assign one when needed.
-- Work can begin once the problem is selected. The implementation may differ from the initial proposal, but the final agent must still address the business goal.
-- Explain the chosen scope and assumptions, justify the method, and make the business value explicit.
-- The published rubric covers: goal and scope; architecture and reasoning loop; tool use and integration; autonomy and human-in-the-loop controls; safety, security and guardrails; observability and evaluation; and platform/tooling usage.
-- For AlignSpace, the strongest evidence is a complete trace from ambiguous references to an approved brief, including explicit state and memory, typed tool boundaries, human approval gates, prompt-injection resistance, least privilege, logs, and both golden-path and adversarial evaluations.
-
-### Slack channel map
-
-| Channel | Use |
+| Capability | Implementation |
 |---|---|
-| `#tech-support` | AWS and other technical issues |
-| `#solutioning` | Approach, architecture, and solution brainstorming |
-| `#admin-related` | Organiser or mentor questions |
-| `#submission` | Shortlisting deliverables due 28 September |
-| `#final-submission` | Finalist-only updated artifacts |
+| Reference images | Decoded, resized, metadata removed, stored privately and displayed only to project members |
+| Reference understanding | Real model-backed **note** analysis through the competition gateway; every result stays proposed until human confirmation |
+| Image understanding | Adapter implemented, **disabled** pending a working vision endpoint; current competition gateway image probe returned `NO_IMAGE` |
+| Interview | Deterministic information-gain selection from a controlled question bank, filtered by participant role |
+| Candidate directions | 12 illustrative catalogue records; must-avoid filtering, budget-aware ordering, explicit match/trade-off explanations |
+| Alignment | Controlled preference replacement, constraint checks, unresolved-risk blockers and versioned approvals |
+| Collaboration | Separate homeowner/designer browser sessions, project isolation, single-use invitations |
+| Reliability | SQLite transactions, stale-version rejection, per-project and global request caps, limited retry, explicit offline fallback |
+| Evidence | Audit events, model run status, model/prompt version, latency, token counts where the provider returns them |
 
-All announcements, support, and submission changes are communicated through Slack, so this repository summary should be rechecked before packaging.
+Workflow messages are deterministic coordination messages, not autonomous LLM-to-LLM conversations. Candidate budgets are illustrative, not quotes. Confidence is an uncalibrated model estimate; offline rules use 0 to indicate no calibrated estimate. There is no verified business ROI yet.
 
-## Core workflow
+## Local setup
 
-1. Homeowner creates a project, gives consent, uploads references, and supplies room/budget context.
-2. Vision analysis proposes attributes and evidence regions without treating guesses as facts.
-3. The Interview Agent asks at most 10 adaptive questions chosen for expected uncertainty reduction.
-4. The Designer Agent structures professional constraints and explains trade-offs plainly.
-5. The Alignment Agent identifies agreement, conflict, and missing decisions.
-6. The Review Agent checks provenance, confidence, safety, and brief completeness.
-7. Both people edit and explicitly approve a versioned design brief.
-
-## Simplified system architecture
-
-```mermaid
-flowchart TB
-    H["Homeowner<br/>Preferences and inspiration images"]
-    D["Designer<br/>Budget, constraints, and professional judgement"]
-
-    H <-->|"Answer and confirm"| HA["Homeowner-side Agent<br/>Extracts and validates preferences"]
-    D <-->|"Answer and confirm"| DA["Designer-side Agent<br/>Structures constraints and feasibility"]
-
-    HA <-->|"AQ-Agent-QA<br/>Ask · answer · translate · cross-check"| DA
-
-    HA --> S[("Shared Project Design State")]
-    DA --> S
-    L[("Design reference library")] --> K
-
-    S --> K["Akinator-inspired Question Selector<br/>Chooses the highest-information question"]
-    K -->|"Ask the homeowner"| HA
-    K -->|"Ask the designer"| DA
-    K -->|"Eliminate mismatched directions<br/>and narrow the candidate space"| S
-
-    S --> C{"Are preferences, constraints,<br/>and candidate directions aligned?"}
-    C -->|"Not yet"| K
-    C -->|"Yes"| B["Generate shared Design Brief"]
-
-    B --> A["Homeowner and designer review"]
-    A -->|"Revise"| S
-    A -->|"Both approve"| O["Final versioned Design Brief"]
-```
-
-The architecture combines two complementary ideas:
-
-- **AQ-Agent-QA:** the homeowner-side and designer-side agents question, answer, translate, and cross-check each other's structured understanding. They may reason from confirmed state, but any unresolved or consequential assumption is returned to the relevant human for confirmation.
-- **Akinator-inspired questioning:** instead of following a fixed questionnaire, the system selects the next question by expected information gain. Each answer should eliminate incompatible design directions, resolve an important conflict, or narrow the reference set.
-- **Controlled convergence:** the loop continues until preferences, professional constraints, and retrieved design directions are sufficiently aligned. The output is released only after both people approve the same versioned brief.
-
-## Running MVP
-
-### Guided demonstration (5–8 minutes)
-
-Run `python -m uvicorn app.main:app --host 127.0.0.1 --port 8000`, then open http://localhost:8000.
-
-1. Click **Start guided demo from scratch**. This creates a new project with goals and a labelled sample inspiration note.
-2. Click **Analyse reference notes**, then confirm the warm-modern and soft-textiles proposals. Note analysis uses offline keyword rules; it does not inspect image pixels or call an LLM.
-3. Answer the remaining questions: family relaxing, zoned layout, cosy, warm neutrals, soft layered light, balanced care. The order adapts to candidate information gain.
-4. Add a designer constraint: affected preference **Layout**, incompatible value `zoned`, statement “Zoned furniture obstructs the balcony route”. Show the conflict, then select **Accept constraint**.
-5. Open **Shared brief**. Under **Revise a decision**, choose **Layout** and **Open flow**. This replaces the rejected choice. The catalogue may have no exact match; closest directions remain suggestions.
-6. Approve as homeowner, then designer. These are simulated roles on one device, not authenticated separate accounts. Export JSON or use **Print / Save PDF**.
-7. Revise any decision to demonstrate that both approvals are invalidated. Refresh to show persistence, and inspect **Activity** for the audit trail.
-
-If a question was answered “Not sure”, fill it using **Revise a decision**. All eight dimensions must be confirmed before approval. Unresolved escalations and critical constraints block final approval. The service is a local workflow demo; production authentication and the competition model integration are not implemented.
-
-The `jaspin` branch contains a runnable end-to-end prototype with:
-
-- a responsive homeowner/designer workspace;
-- AQ-Agent-QA cross-questioning and plain-language translation;
-- an entropy-based, Akinator-inspired next-question selector;
-- a versioned Project Design State persisted in SQLite;
-- controlled reference-note analysis whose proposals require homeowner confirmation;
-- designer constraints, automatic conflict detection, and human resolution;
-- deterministic readiness scoring across Explore, Clarify, Focus, and Commit;
-- schema-validated JSON brief export, independent approvals, and append-only audit events;
-- optimistic state-version checks to prevent silent concurrent overwrites;
-- a Docker deployment path suitable for the hackathon Lightsail host.
-
-The bundled reference analysis is deliberately conservative and rule-based so the repository runs without a model key. It treats extracted attributes as tentative evidence, never as confirmed preference. A competition-provided multimodal model can later replace this adapter without changing the state and approval contracts.
-
-### Run locally
-
-```bash
+```sh
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source .venv/bin/activate
 pip install -r requirements-dev.txt
-uvicorn app.main:app --reload
+# Copy .env.example to .env and fill in server-side credentials.
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8010
 ```
 
-Open [http://localhost:8000](http://localhost:8000). Choose **Open completed demo** for a populated happy path, or create a project and follow the adaptive interview. Interactive API documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
+Open http://127.0.0.1:8010. `.env` is loaded locally, with real environment variables taking precedence. It is ignored by Git and Docker build context. Never place keys in frontend JavaScript, screenshots, or the submitted repository.
 
-### Run with Docker
+Without credentials, set `ALIGNSPACE_ANALYSIS_MODE=offline`. Offline rules only read explicit positive note keywords. They do not understand arbitrary language or image pixels. Failed model requests never silently become offline results: select the offline button explicitly.
 
-```bash
-docker compose up --build
+### Optional image API
+
+Fill these **in the backend .env**, not in the browser:
+
+```dotenv
+ALIGNSPACE_ALLOW_IMAGES=true
+VISION_API_FORMAT=openai
+VISION_GATEWAY_URL=https://your-vision-provider.example/v1
+VISION_GATEWAY_API_KEY=your-private-key
+VISION_MODEL=your-vision-model
 ```
 
-SQLite state and uploaded demo references are kept in the `alignspace-data` volume.
+Supported formats: `openai` compatible chat completions, `anthropic` messages, `ollama` chat. The vision endpoint and credentials are independent of the text gateway. Perform a known-image capability check before enabling. Adapter tests use mocked providers and do not certify a real provider.
 
-### Verify
+### Request controls
 
-```bash
-pytest -q
+Defaults: 20 analysis requests per project, 100 globally per rolling 24 hours, 10-second project cooldown. Reservations persist across restarts and failed calls count. Each request uses at most 10 references and makes at most two HTTP attempts; 401/403 and transport timeouts are not automatically retried. These caps bound request count, not dollar spend. Upstream generation limits and token reporting depend on the gateway. Check the team's Slack token report as the source for quota.
+
+Model calls run outside the SQLite write transaction. Results are committed only if the original state version still matches. Malformed or unknown-schema output never changes preferences.
+
+## Deploy
+
+One organiser **medium Lightsail instance**. Native systemd deployment files are in `deploy/`; the service listens only on localhost:8010, behind Caddy HTTPS. This keeps the existing Hermes installation separate.
+
+See [deployment runbook](docs/15-deployment-runbook.md) for configuration, health checks, persistence and rollback. For local Docker use, copy `.env.example` to `.env`, then run `docker compose up --build` (localhost trial port 8000). Never expose the development port as the public production endpoint.
+
+## Verify
+
+```sh
+python -m pytest -q
 ```
 
-## Repository guide
+Tests cover approval content hashes, stale edits, negation, preference replacement, budget/avoid filtering, project isolation, role spoofing, invitation replay, consent, image decoding, request caps and model schema boundaries. The [verification report](docs/16-verification-report.md) distinguishes automated evidence from pending user trials.
 
-| File | Purpose |
-|---|---|
-| [`app/main.py`](app/main.py) | FastAPI routes, upload validation, schema validation, and static UI hosting |
-| [`app/engine.py`](app/engine.py) | AQ-Agent-QA state transitions, information-gain questioning, retrieval, conflicts, readiness, and approvals |
-| [`app/store.py`](app/store.py) | Transactional SQLite state and audit persistence |
-| [`app/static`](app/static) | Responsive two-role web workspace |
-| [`tests`](tests) | Engine, safety invariant, schema, API, and concurrency tests |
-| [Official hackathon briefing](docs/references/showmeyouragent-hackathon-briefing-2026-09-06.pdf) | Organiser-provided rules, rubric, dates, submission format, and AWS/Kiro support |
-| [Official context](docs/00-official-context.md) | Verified event facts vs team assumptions |
-| [Product requirements](docs/01-product-requirements.md) | PRD, scope, users, stories, acceptance criteria |
-| [Research plan](docs/02-user-research-plan.md) | Interviews, tests, consent, synthesis |
-| [Experience specification](docs/03-experience-spec.md) | Flows, screens, states, copy |
-| [Agent system design](docs/04-agent-system-design.md) | Agent responsibilities and orchestration |
-| [Technical architecture](docs/05-technical-architecture.md) | AWS design, deployment, observability |
-| [Contracts](docs/06-data-and-api-contracts.md) | Domain model and API boundaries |
-| [Safety and security](docs/07-safety-privacy-security.md) | Threat model, privacy, controls |
-| [Evaluation](docs/08-evaluation-plan.md) | Offline, human, business, red-team tests |
-| [Delivery plan](docs/09-delivery-roadmap.md) | Three-week plan and backlog |
-| [Business case](docs/10-business-case.md) | Value, adoption, pricing hypothesis, pilot |
-| [Demo and pitch](docs/11-demo-and-pitch.md) | Script, fallback, judge Q&A |
-| [Submission checklist](docs/12-submission-checklist.md) | Evidence and artifact checklist |
-| [Decision log](docs/13-decision-log.md) | Decisions, assumptions, unresolved choices |
-| [Design brief schema](schemas/design-brief.schema.json) | Machine-readable shared state |
-| [Agent prompts](prompts/README.md) | Versioned behavioural contracts |
-| [Demo brief](examples/project-haven.design-brief.json) | Schema-valid sample state for UI/tests |
-| [Asset register](docs/14-data-and-asset-register.md) | Rights, consent, provenance, retention |
+## Competition delivery
 
-## Agent runtime and cloud tooling
+- Shortlisting: **28 September 2026, 09:00 SGT**, in `#submission`.
+- Required: Team Code, Project Name, judge-accessible GitHub URL, video URL, PDF write-up, deployment evidence/URL.
+- Do not upload the video directly into the submission channel. Briefing says 30 minutes; precise interpretation remains unconfirmed.
+- Finalists: **10 October 2026, 08:30 SGT**, face-to-face demo; use `#final-submission` for finalist artifacts.
+- AWS allocation is approximately USD 100 per team, shared across Lightsail and inference. Use a single medium instance; do not copy the starter kit's second-instance example.
+- Kiro redemption deadline was 11 September; redeemed credits are valid through 31 October.
 
-These tools operate at different layers and are alternatives where noted:
+See [official context](docs/00-official-context.md) and [submission checklist](docs/12-submission-checklist.md). Reconcile later organiser notices before submission.
 
-| Tool | Role in AlignSpace |
-|---|---|
-| [OpenClaw](https://github.com/openclaw/openclaw) | Optional self-hosted gateway for a fast WhatsApp, Telegram, or WebChat demo. AWS provides a preconfigured [Lightsail deployment](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-quick-start-guide-openclaw.html) that can call Amazon Bedrock. It should remain a channel adapter rather than own multi-user project state. |
-| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) | Alternative general-purpose agent runtime with persistent memory, skills, specialist bots, MCP, and delegation. Useful for experimenting with interview and alignment strategies. |
-| [NanoClaw](https://github.com/nanocoai/nanoclaw) | Alternative lightweight runtime that isolates agent groups in containers. Useful when prototype security, limited filesystem access, and code auditability are the priority. |
-| AWS competition resources | Required assessment target: the organiser-provided Lightsail environment and JSON LLM API. Keep the integration behind an adapter so local development can use other services without changing the agent contracts. Broader AWS services remain a post-hackathon production option, not an assumed competition entitlement. |
-| [Kiro](https://kiro.dev/docs/) | Development environment for specs, repository guidance, hooks, tests, and implementation; it is not part of the end-user runtime. |
+## Scope and remaining evidence
 
-Recommended hackathon MVP: use **Kiro or the team's preferred local tools for development**, keep the LLM behind a provider adapter, and deploy the assessed build to the organiser's Lightsail environment. Add OpenClaw only if a messaging-channel demo materially improves the business case. OpenClaw, Hermes Agent, and NanoClaw are competing runtime choices and should not all be introduced into the first version.
+The current release is a trial prototype. No licensed room reference set, external designer evaluation, measured time-saving study, account recovery, deletion/retention automation or production-grade identity verification has been completed. Critical professional constraints stay blocked; the application cannot certify professional safety. See the [user trial worksheet](docs/17-user-trial.md) to collect evidence without representing hypotheses as outcomes.
 
-## Prototype definition of done
-
-- A living-room project completes the full happy path with sample data.
-- Image observations show confidence and source evidence.
-- The next question comes from unresolved high-impact attributes, not a fixed chatbot script.
-- Designer constraints can produce a visible conflict and homeowner decision.
-- The final brief validates against `schemas/design-brief.schema.json`.
-- Approval is explicit, attributable, versioned, and reversible.
-- Unsupported structural, electrical, regulatory, quotation, or availability claims are blocked or escalated.
-- Evaluation reports task completion, agreement, correction rate, latency, cost, and safety results.
-
-## Evidence status and open checks
-
-This package is implementation-ready but not evidence-complete. Product metrics remain hypotheses until user tests establish baselines. The organiser has now published the submission fields and rubric categories, but exact scoring weights, the final video-duration interpretation, proposal-edit mechanics, and any later packaging changes still require confirmation in Slack.
-
-## Source
-
-- [NUS-ISS Show Me Your Agents Hackathon](https://www.iss.nus.edu.sg/show-me-your-agents)
-- [`#all-showmeyouragent` organiser channel](https://app.slack.com/client/T0BS91620SK/C0BSLD28J85)
+Architecture and research documents under `docs/` include future design plans. Use this README and the verification report as the current implementation record.

@@ -78,6 +78,7 @@
         "rationale": { "type": "string" },
         "severity": { "enum": ["advisory", "important", "critical"] },
         "verificationStatus": { "enum": ["unverified", "designer_asserted", "professional_review_required", "verified"] },
+        "waived": { "type": "boolean" },
         "owner": { "enum": ["designer", "qualified_professional", "homeowner"] }
       }
     },
@@ -108,4 +109,3 @@
     }
   }
 }
-

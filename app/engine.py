@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
@@ -192,6 +193,8 @@ def _compatible_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
 
     compatible = []
     for candidate in CATALOG:
+        if _candidate_exclusions(state, candidate):
+            continue
         if any(candidate.get(dimension) != value for dimension, value in confirmed.items()):
             continue
         if any(candidate.get(dimension) in values for dimension, values in excluded.items()):
@@ -203,7 +206,7 @@ def _compatible_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
 def _ranked_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
     confirmed = _confirmed_map(state)
     compatible = _compatible_candidates(state)
-    pool = compatible or [candidate for candidate in CATALOG if not any(
+    pool = compatible or [candidate for candidate in CATALOG if not _candidate_exclusions(state, candidate) and not any(
         c.get('affectedDimension') and c.get('incompatibleValue') == candidate.get(c['affectedDimension'])
         for c in state['constraints'] if not c.get('waived')
     )]
@@ -211,8 +214,13 @@ def _ranked_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
     for candidate in pool:
         matches = sum(candidate.get(key) == value for key, value in confirmed.items())
         score = matches / max(1, len(confirmed))
-        ranked.append({**candidate, "matchScore": round(score, 3)})
-    return sorted(ranked, key=lambda item: (-item["matchScore"], item["title"]))
+        bands = ['under_15k_sgd', '15k_to_30k_sgd', '30k_to_50k_sgd', 'over_50k_sgd']
+        over_budget = state['budgetBand'] in bands and bands.index(candidate['budget']) > bands.index(state['budgetBand'])
+        ranked.append({**candidate, "matchScore": round(score, 3),
+                       "overBudget": over_budget, "budgetLabel": "Illustrative budget, not a quotation",
+                       "matches": [key for key, value in confirmed.items() if candidate.get(key) == value],
+                       "tradeoffs": [key for key, value in confirmed.items() if candidate.get(key) != value]})
+    return sorted(ranked, key=lambda item: (item['overBudget'], -item["matchScore"], item["title"]))
 
 
 def _entropy(values: list[str]) -> float:
@@ -223,11 +231,11 @@ def _entropy(values: list[str]) -> float:
     return -sum((count / total) * math.log2(count / total) for count in counts.values())
 
 
-def next_question(state: dict[str, Any]) -> dict[str, Any] | None:
+def next_question(state: dict[str, Any], role: str | None = None) -> dict[str, Any] | None:
     if state["questionCount"] >= state["maxQuestions"]:
         return None
     answered = {answer["questionId"] for answer in state["answers"]}
-    candidates = _compatible_candidates(state) or CATALOG
+    candidates = _compatible_candidates(state) or [c for c in CATALOG if not _candidate_exclusions(state, c)]
     scored: list[tuple[float, dict[str, Any]]] = []
     open_conflict_dimensions = {
         conflict.get("dimension")
@@ -235,6 +243,8 @@ def next_question(state: dict[str, Any]) -> dict[str, Any] | None:
         if conflict["status"] == "open" and conflict.get("dimension")
     }
     for question in QUESTION_BANK:
+        if role and question['target'] != role:
+            continue
         if question["id"] in answered or question['dimension'] in _confirmed_map(state):
             continue
         values = [candidate[question["dimension"]] for candidate in candidates]
@@ -253,7 +263,8 @@ def next_question(state: dict[str, Any]) -> dict[str, Any] | None:
     return {
         **deepcopy(selected),
         "options": options + ["not_sure"],
-        "informationGain": round(score, 3),
+        "informationGain": round(_entropy([c[selected['dimension']] for c in candidates]), 3),
+        "selectionScore": round(score, 3),
         "sequence": state["questionCount"] + 1,
         "remainingCandidateCount": len(_compatible_candidates(state)),
     }
@@ -271,8 +282,8 @@ def answer_question(state: dict[str, Any], question_id: str, role: str, value: s
         raise ValueError("Question has already been answered")
     if value not in [*question["options"], "not_sure"]:
         raise ValueError("Answer is not one of the allowed options")
-    if any(c.get('affectedDimension') == question['dimension'] and c.get('incompatibleValue') == value and not c.get('waived') for c in state['constraints']):
-        raise ValueError('This value conflicts with an active designer constraint. Choose a compatible value.')
+    if value != 'not_sure':
+        validate_preference(state, question['dimension'], value)
 
     answer_id = new_id("answer")
     state["answers"].append(
@@ -288,8 +299,11 @@ def answer_question(state: dict[str, Any], question_id: str, role: str, value: s
     state["questionCount"] += 1
     if value != "not_sure":
         state["attributes"] = [
-            item for item in state["attributes"] if item["dimension"] != question["dimension"]
+            item for item in state["attributes"]
         ]
+        for item in state['attributes']:
+            if item['dimension'] == question['dimension'] and item['status'] == 'confirmed':
+                item['status'] = 'rejected'
         state["attributes"].append(
             {
                 "id": new_id("attribute"),
@@ -383,6 +397,43 @@ REFERENCE_KEYWORDS: dict[str, dict[str, tuple[str, ...]]] = {
 }
 
 
+def _candidate_exclusions(state: dict[str, Any], candidate: dict[str, Any]) -> list[str]:
+    excluded = []
+    for dimension in DIMENSIONS:
+        value = candidate.get(dimension, '')
+        keywords = (value.replace('_', ' '), *REFERENCE_KEYWORDS.get(dimension, {}).get(value, ()))
+        if any(re.search(r'(?<!\w)' + re.escape(k) + r'(?!\w)', text.lower())
+               for text in state['antiPreferences'] for k in keywords if k):
+            excluded.append(dimension)
+    return excluded
+
+
+def validate_preference(state: dict[str, Any], dimension: str, value: str) -> None:
+    question = next((q for q in QUESTION_BANK if q['dimension'] == dimension), None)
+    if not question or value not in question['options']:
+        raise ValueError(f'Unsupported {dimension} value')
+    if _candidate_exclusions(state, {dimension: value}):
+        raise ValueError(f'{dimension}: {value} conflicts with a stated must-avoid preference')
+    if any(c.get('affectedDimension') == dimension and c.get('incompatibleValue') == value and not c.get('waived') for c in state['constraints']):
+        raise ValueError(f'{dimension}: {value} conflicts with an active designer constraint')
+
+
+def apply_model_proposals(state: dict[str, Any], proposals: list[dict[str, Any]]) -> dict[str, Any]:
+    existing = {(a['dimension'], a['value'], a['evidence'][0]['sourceId']) for a in state['attributes'] if a['evidence']}
+    for proposal in proposals:
+        key = (proposal['dimension'], proposal['value'], proposal['sourceId'])
+        if key in existing:
+            continue
+        existing.add(key)
+        state['attributes'].append({'id': new_id('attribute'), 'dimension': proposal['dimension'],
+            'value': proposal['value'], 'status': 'proposed', 'confidence': proposal['confidence'],
+            'evidence': [{'sourceType': proposal['sourceType'], 'sourceId': proposal['sourceId'],
+                          'description': proposal['description']}], 'actor': 'vision_agent', 'updatedAt': now_iso()})
+    add_agent_message(state, 'vision_agent', 'homeowner',
+        'Model observations are suggestions, not confirmed preferences. Confirm only the elements you want in your room.', 'analysis')
+    return bump_and_recompute(state)
+
+
 def analyse_references(state: dict[str, Any]) -> dict[str, Any]:
     if not state["references"]:
         raise ValueError("Upload at least one reference before running analysis")
@@ -393,10 +444,13 @@ def analyse_references(state: dict[str, Any]) -> dict[str, Any]:
     }
     proposals = 0
     for reference in state["references"]:
-        evidence_text = f"{reference.get('filename', '')} {reference.get('note', '')}".lower()
+        evidence_text = reference.get('note', '').lower()
+        # Offline fallback is conservative: ambiguous/negative clauses never become likes.
+        positive_clauses = [part for part in re.split(r'[.!?;]|\bbut\b', evidence_text)
+                            if not re.search(r"\b(no|not|never|avoid|dislike|without|unsure|uncertain)\b|n't|不|讨厌|避免", part)]
         for dimension, values in REFERENCE_KEYWORDS.items():
             for value, keywords in values.items():
-                if not any(keyword in evidence_text for keyword in keywords):
+                if not any(keyword in part for keyword in keywords for part in positive_clauses):
                     continue
                 if (dimension, value, reference["id"]) in existing:
                     continue
@@ -406,10 +460,10 @@ def analyse_references(state: dict[str, Any]) -> dict[str, Any]:
                         "dimension": dimension,
                         "value": value,
                         "status": "proposed",
-                        "confidence": 0.72,
+                        "confidence": 0.0,
                         "evidence": [
                             {
-                                "sourceType": "image",
+                                "sourceType": "homeowner_answer",
                                 "sourceId": reference["id"],
                                 "description": f"Proposed from the homeowner's reference note: {reference.get('note') or reference['filename']}",
                             }
@@ -420,7 +474,7 @@ def analyse_references(state: dict[str, Any]) -> dict[str, Any]:
                 )
                 proposals += 1
     if proposals:
-        message = f"I found {proposals} tentative visual attribute{'s' if proposals != 1 else ''}. The homeowner must confirm or reject each one."
+        message = f"Offline note rules proposed {proposals} attributes; image pixels were not analysed. Confidence is uncalibrated (0). Confirm or reject each proposal."
     else:
         message = "The references do not contain enough explicit evidence for a safe proposal, so I will clarify with questions instead."
     add_agent_message(state, "vision_agent", "homeowner", message, "analysis")
@@ -437,6 +491,12 @@ def review_attribute(
         raise ValueError("Only proposed attributes can be reviewed")
     if decision not in {"confirm", "reject", "edit"}:
         raise ValueError("Decision must be confirm, reject, or edit")
+    if decision in {'confirm', 'edit'}:
+        next_value = value.strip() if decision == 'edit' and value else attribute['value']
+        validate_preference(state, attribute['dimension'], next_value)
+        for previous in state['attributes']:
+            if previous['id'] != attribute_id and previous['dimension'] == attribute['dimension'] and previous['status'] == 'confirmed':
+                previous['status'] = 'rejected'
     if decision == "edit":
         if not value or not value.strip():
             raise ValueError("An edited value is required")
@@ -549,6 +609,16 @@ def _readiness(state: dict[str, Any]) -> dict[str, Any]:
         stage = "Focus"
     else:
         stage = "Commit"
+    blockers = []
+    for dimension in DIMENSIONS:
+        values = [a['value'] for a in state['attributes'] if a['dimension'] == dimension and a['status'] == 'confirmed']
+        if len(values) > 1:
+            blockers.append(f'Reconcile multiple confirmed {dimension} values')
+        for value in values:
+            try:
+                validate_preference(state, dimension, value)
+            except ValueError as error:
+                blockers.append(str(error))
     return {
         "score": round(score, 3),
         "coverage": round(coverage, 3),
@@ -556,7 +626,8 @@ def _readiness(state: dict[str, Any]) -> dict[str, Any]:
         "agreement": round(agreement, 3),
         "riskClearance": round(risk_clearance, 3),
         "stage": stage,
-        "readyForApproval": coverage == 1 and not open_conflicts and not critical,
+        "readyForApproval": coverage == 1 and not open_conflicts and not critical and not blockers,
+        "blockers": blockers,
         "missingDimensions": [dimension for dimension in DIMENSIONS if dimension not in confirmed],
         "exactCandidateCount": len(candidates),
     }
@@ -612,7 +683,7 @@ def build_brief(state: dict[str, Any]) -> dict[str, Any]:
             {
                 key: value
                 for key, value in item.items()
-                if key in {"id", "category", "statement", "rationale", "severity", "verificationStatus", "owner"}
+                if key in {"id", "category", "statement", "rationale", "severity", "verificationStatus", "owner", "waived"}
             }
         )
     brief = {
@@ -629,7 +700,7 @@ def build_brief(state: dict[str, Any]) -> dict[str, Any]:
         "attributes": attributes,
         "constraints": constraints,
         "conflicts": conflicts,
-        "unresolvedDecisions": [item["summary"] for item in state["conflicts"] if item["status"] in {'open', 'escalated'}] + [f"Choose {d}" for d in state['readiness']['missingDimensions']],
+        "unresolvedDecisions": [item["summary"] for item in state["conflicts"] if item["status"] in {'open', 'escalated'}] + [f"Choose {d}" for d in state['readiness']['missingDimensions']] + state['readiness'].get('blockers', []),
         "completeness": state["readiness"]["coverage"],
         "version": state["briefVersion"],
         "approvals": state["approvals"],

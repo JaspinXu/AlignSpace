@@ -1,6 +1,18 @@
 # Submission and Readiness Checklist
 
-Exact upload formats, pitch duration, and scoring weights are not on the public page as of 6 September 2026. **Confirm** items against kickoff/organiser guidance.
+Updated 13 September 2026. Initial submission is due **28 September, 09:00 SGT** in `#submission`. Required fields are now known; scoring weights and the exact interpretation of the 30-minute video remain open.
+
+## Submission package
+
+- [x] Team: Four Wolf Kings — 8QFDUS2I.
+- [x] Project: AlignSpace — Design Inspiration Agents.
+- [ ] Judge-accessible GitHub repository URL and release identifier.
+- [ ] Video viewing/download URL (do not upload the video to Slack).
+- [ ] PDF write-up with problem, value, implementation and measured evidence.
+- [ ] Public Lightsail deployment URL verified in a signed-out browser.
+- [ ] Formal topic-selection record checked by the team.
+- [ ] Owner trial results collected; external user/SME validation clearly distinguished.
+
 
 ## Official alignment
 
@@ -15,7 +27,7 @@ Exact upload formats, pitch duration, and scoring weights are not on the public 
 ## Confirm
 
 - [ ] Form URL/owner; repository visibility/license.
-- [ ] Mandatory fields/file limits.
+- [x] Mandatory fields recorded above; any file-size limits remain to be confirmed.
 - [ ] Video/deck format, duration, accessibility.
 - [ ] Pitch/Q&A timing and live-demo rules.
 - [ ] Criteria/weights.

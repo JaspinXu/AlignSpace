@@ -1,0 +1,13 @@
+# Trial fallback when the managed Lightsail account cannot open TCP 443.
+# Certificate was first issued over HTTP-01 on port 80. See runbook before renewal.
+{
+    http_port 8080
+    https_port 80
+    auto_https disable_redirects
+}
+
+https://54-255-93-19.sslip.io:80 {
+    encode gzip
+    reverse_proxy 127.0.0.1:8010
+    header Strict-Transport-Security "max-age=86400"
+}

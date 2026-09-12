@@ -6,9 +6,6 @@
   <meta name="description" content="AlignSpace turns homeowner inspiration and designer constraints into an approved design brief.">
   <title>AlignSpace · Design alignment workspace</title>
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/styles.css">
   <script src="/assets/app.js" defer></script>
 </head>
@@ -29,7 +26,7 @@
       <div class="welcome-copy">
         <p class="eyebrow">From inspiration to shared intent</p>
         <h1>Make “I like this” <em>clear enough to design.</em></h1>
-        <p class="lead">Two specialised agents help homeowners and designers ask better questions, narrow the design space, and approve the same evidence-backed brief.</p>
+        <p class="lead">Collect what you like, work through practical trade-offs with your designer, and leave with one clear living-room brief. You stay in control of every decision.</p>
         <div class="idea-strip" aria-label="How AlignSpace works">
           <div><strong>01</strong><span>Share references</span></div>
           <div><strong>02</strong><span>Clarify both sides</span></div>
@@ -42,6 +39,8 @@
           <p class="eyebrow">Start a living-room project</p>
           <h2>Set the practical frame</h2>
         </div>
+        <p class="muted">About 10 minutes. No design vocabulary needed. You can change your answers later.</p>
+        <div id="saved-projects"></div>
         <form id="project-form">
           <label>Project name<input name="name" value="My living room" required minlength="2" maxlength="80"></label>
           <label>Housing type<input name="housingType" placeholder="e.g. HDB 4-room"></label>
@@ -55,10 +54,10 @@
             </select>
           </label>
           <label class="consent"><input type="checkbox" required> I have the right to use uploaded references and consent to AI-assisted analysis for this project.</label>
-          <button class="button primary" type="submit">Create alignment workspace <span>→</span></button>
-          <button class="button ghost" id="demo-button" type="button">Open completed demo</button>
-          <button class="button secondary" id="guided-button" type="button">Start guided demo from scratch</button>
-          <p class="muted">Offline demo: rule-based questions and reference-note extraction. Both roles are operated on this device; no account authentication.</p>
+          <button class="button primary" type="submit">Start my room brief <span>→</span></button>
+          <button class="button ghost" id="demo-button" type="button">Explore a filled-in example</button>
+          <button class="button secondary" id="guided-button" type="button">Try a guided sample</button>
+          <p class="muted">Start as the homeowner. Invite your designer with a private link when ready. To try both roles yourself, open the invitation in a separate browser profile or private window.</p>
         </form>
       </div>
     </section>
@@ -66,7 +65,7 @@
     <section id="workspace" class="workspace" hidden>
       <div class="workspace-topline">
         <div>
-          <button id="back-button" class="text-button" type="button">← All projects</button>
+          <button id="back-button" class="text-button" type="button">← My projects</button>
           <h1 id="project-name">Project</h1>
           <p id="project-meta" class="muted"></p>
         </div>
@@ -77,10 +76,11 @@
         </div>
       </div>
 
+      <section class="onboarding-strip" aria-label="Your next step"><div><span id="viewer-role" class="eyebrow"></span><h2 id="next-step-title"></h2><p id="next-step-help" class="muted"></p></div><div><button id="invite-button" class="button ghost" type="button">Invite my designer</button><button id="refresh-button" class="button ghost" type="button">Refresh shared changes</button></div><input id="invite-link" readonly hidden aria-label="Private designer invitation link"></section>
       <nav class="tabs" aria-label="Workspace views">
-        <button class="tab active" data-tab="alignment" type="button">Alignment room</button>
+        <button class="tab active" data-tab="alignment" type="button">Build your brief</button>
         <button class="tab" data-tab="brief" type="button">Shared brief</button>
-        <button class="tab" data-tab="activity" type="button">Activity</button>
+        <button class="tab" data-tab="activity" type="button">History & usage</button>
       </nav>
 
       <div id="notice" class="notice" role="status" hidden></div>
@@ -92,7 +92,7 @@
 
             <article class="panel">
               <div class="panel-heading">
-                <div><p class="eyebrow">AQ-Agent-QA bridge</p><h2>What both sides understand</h2></div>
+                <div><p class="eyebrow">Shared understanding bridge</p><h2>What both sides understand</h2></div>
                 <span class="muted">Latest exchanges</span>
               </div>
               <div id="agent-messages" class="message-list"></div>
@@ -122,7 +122,7 @@
 
           <aside class="side-column">
             <article class="panel compact">
-              <div class="panel-heading"><div><p class="eyebrow">Candidate space</p><h2>Closest directions</h2></div><span id="candidate-count" class="count-badge"></span></div>
+              <div class="panel-heading"><div><p class="eyebrow">Candidate space</p><h2>Directions to discuss</h2></div><span id="candidate-count" class="count-badge"></span></div>
               <div id="shortlist" class="shortlist"></div>
             </article>
 
@@ -135,12 +135,12 @@
               </form>
               <hr>
               <form id="reference-form" class="stack-form">
-                <label>Inspiration image<input name="file" type="file" accept="image/jpeg,image/png,image/webp" required></label>
-                <label>What caught your eye?<input name="note" placeholder="e.g. the soft layered lighting"></label>
-                <button class="button ghost" type="submit">Add reference</button>
+                <p class="muted">Start with a note, or add a reference image. Tell us which part you like or dislike. You can save up to 10 references.</p><label>Inspiration image (optional)<input name="file" type="file" accept="image/jpeg,image/png,image/webp"></label>
+                <label>What do you like or dislike?<input name="note" maxlength="500" placeholder="e.g. I like light oak, but not marble"></label>
+                <label class="consent"><input name="consent" value="true" type="checkbox" required> I have permission to use this reference or note for AI-assisted analysis.</label><button class="button ghost" type="submit">Add reference</button>
               </form>
               <div id="reference-list" class="reference-list"></div>
-              <button id="analyse-button" class="button secondary analyse-button" type="button">Analyse reference notes</button>
+              <button id="analyse-button" class="button secondary analyse-button" type="button">Suggest preferences from notes</button><p id="analysis-help" class="muted"></p><button id="offline-button" type="button" class="text-button">Use offline note rules instead</button>
               <div id="proposal-list" class="proposal-list"></div>
             </article>
 
@@ -180,12 +180,14 @@
       <section id="activity-panel" class="tab-panel" hidden>
         <article class="panel">
           <div class="panel-heading"><div><p class="eyebrow">Append-only record</p><h2>Project activity</h2></div></div>
+          <p class="muted">Workflow entries record state changes. Model runs below show actual inference; other messages are rule-based coordination.</p><div id="usage-list"></div>
           <div id="audit-list" class="audit-list"></div>
         </article>
       </section>
     </section>
   </main>
 
+  <div id="request-status" role="status" aria-live="polite" hidden></div>
   <footer>AlignSpace is a requirements-alignment aid, not construction, structural, electrical, regulatory, pricing, or availability advice.</footer>
 </body>
 </html>

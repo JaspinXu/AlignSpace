@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
+import io
+import re
 from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
@@ -11,9 +14,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel, Field, field_validator
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app import engine
 from app.store import ProjectNotFoundError, ProjectStore, StaleStateError
+from app.access import AccessStore, digest
+from app.gateway import Gateway, load_local_config
+
+load_local_config()
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +54,13 @@ class PreferencesUpdate(BaseModel):
     antiPreferences: list[str] = Field(default_factory=list, max_length=10)
     expectedStateVersion: int | None = None
 
+    @field_validator('goals','antiPreferences')
+    @classmethod
+    def bounded_notes(cls, values):
+        if any(len(value)>500 for value in values):
+            raise ValueError('Each goal or must-avoid note must be at most 500 characters')
+        return values
+
 
 class AnswerCreate(BaseModel):
     role: Literal["homeowner", "designer"]
@@ -77,11 +92,27 @@ class ConflictResolution(BaseModel):
 class ApprovalCreate(BaseModel):
     role: Literal["homeowner", "designer"]
     actorId: str = Field(min_length=2, max_length=80)
+    expectedStateVersion: int = Field(ge=1)
+
+
+class InviteClaim(BaseModel):
+    token: str = Field(min_length=20, max_length=100)
+
+
+class AnalysisCreate(BaseModel):
+    mode: Literal['configured', 'offline'] = 'configured'
+    expectedStateVersion: int | None = None
+
+
+class ReferenceNoteCreate(BaseModel):
+    note: str = Field(min_length=3, max_length=500)
+    consent: bool = False
     expectedStateVersion: int | None = None
 
 
 def _present(state: dict[str, Any]) -> dict[str, Any]:
-    return {**state, "nextQuestion": engine.next_question(state), "brief": engine.build_brief(state)}
+    return {**state, "nextQuestion": engine.next_question(state), "brief": engine.build_brief(state),
+            'questionsByRole':{role:engine.next_question(state,role) for role in ['homeowner','designer']}}
 
 
 def _has_valid_image_signature(content: bytes, content_type: str) -> bool:
@@ -100,9 +131,49 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
         description="Two-sided, evidence-backed design requirements alignment.",
     )
     application.state.store = ProjectStore(database_path)
+    application.state.access = AccessStore(application.state.store.database_path)
+    application.state.gateway = Gateway()
     configured_uploads = upload_dir or os.getenv("ALIGNSPACE_UPLOAD_DIR", "data/uploads")
     application.state.upload_dir = Path(configured_uploads)
     application.state.upload_dir.mkdir(parents=True, exist_ok=True)
+
+    @application.middleware('http')
+    async def session_access(request: Request, call_next):
+        token = request.cookies.get('alignspace_session')
+        new_session = not token or not re.fullmatch(r'[A-Za-z0-9_-]{43}', token)
+        if new_session:
+            token = secrets.token_urlsafe(32)
+        request.state.session = token
+        request.state.actor = digest(token)[:20]
+        request.state.role = None
+        if request.method not in {'GET','HEAD','OPTIONS'}:
+            origin = request.headers.get('origin')
+            if origin and origin.rstrip('/') != str(request.base_url).rstrip('/'):
+                return JSONResponse({'detail':'Cross-origin writes are not allowed'}, status_code=403)
+        match = re.match(r'^/api/projects/([^/]+)(?:/|$)', request.url.path)
+        if match:
+            try:
+                request.state.role = application.state.access.role(match[1], token)
+            except HTTPException as error:
+                return JSONResponse({'detail':error.detail}, status_code=error.status_code)
+        response = await call_next(request)
+        response.headers['Referrer-Policy'] = 'no-referrer'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        if request.url.path.startswith('/api/'):
+            response.headers['Cache-Control'] = 'no-store'
+        if new_session:
+            response.set_cookie('alignspace_session', token, httponly=True, samesite='strict',
+                secure=os.getenv('ALIGNSPACE_SECURE_COOKIES','false').lower() == 'true', max_age=604800)
+        return response
+
+    def require_role(request, *roles):
+        if request.state.role not in roles:
+            raise HTTPException(403, 'This action requires the '+ ' or '.join(roles)+' session')
+
+    def created(state, request):
+        application.state.access.register(state['id'], request.state.session)
+        return {**_present(store(request).create(state, request.state.actor)), 'viewerRole':'homeowner'}
 
     @application.exception_handler(ProjectNotFoundError)
     async def not_found(_: Request, exc: ProjectNotFoundError) -> JSONResponse:
@@ -134,6 +205,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.get("/api/projects")
     def list_projects(request: Request) -> list[dict[str, Any]]:
+        allowed = set(application.state.access.projects(request.state.session))
         return [
             {
                 "id": item["id"],
@@ -143,12 +215,13 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
                 "readiness": item["readiness"],
             }
             for item in store(request).list()
+            if item['id'] in allowed
         ]
 
     @application.post("/api/projects", status_code=201)
     def create_project(data: ProjectCreate, request: Request) -> dict[str, Any]:
         state = engine.create_project(data.name, data.budgetBand, data.housingType)
-        return _present(store(request).create(state, "homeowner"))
+        return created(state, request)
 
     @application.post("/api/demo", status_code=201)
     def create_demo(request: Request) -> dict[str, Any]:
@@ -160,21 +233,32 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
         )
         for question_id, role, value in engine.demo_answers():
             state = engine.answer_question(state, question_id, role, value)
-        return _present(store(request).create(state, "demo_seed"))
+        return created(state, request)
 
     @application.get("/api/projects/{project_id}")
     def get_project(project_id: str, request: Request) -> dict[str, Any]:
-        return _present(store(request).get(project_id))
+        return {**_present(store(request).get(project_id)), 'viewerRole':request.state.role}
+
+    @application.post('/api/projects/{project_id}/invitations')
+    def invite_designer(project_id: str, request: Request):
+        token = application.state.access.invite(project_id, request.state.session)
+        return {'invitationFragment':'#invite='+token, 'expiresInHours':24}
+
+    @application.post('/api/invitations/claim')
+    def claim_invitation(data: InviteClaim, request: Request):
+        project_id = application.state.access.claim(data.token, request.state.session)
+        return {'projectId':project_id}
 
     @application.post('/api/demo/start', status_code=201)
     def start_demo(request: Request) -> dict[str, Any]:
         state = engine.create_project('Project Haven — guided demo', '15k_to_30k_sgd', 'HDB 4-room')
         state = engine.add_preferences(state, ['Comfortable family evenings', 'A calm, warm living room'], ['Cold grey surfaces'])
         state = engine.add_reference(state, {'id': engine.new_id('reference'), 'filename': 'Sample inspiration note', 'note': 'I like warm modern style and soft textiles', 'status': 'demo_note'})
-        return _present(store(request).create(state, 'demo_seed'))
+        return created(state, request)
 
     @application.put('/api/projects/{project_id}/decisions/{question_id}')
     def revise_decision(project_id: str, question_id: str, data: AnswerCreate, request: Request):
+        require_role(request, data.role)
         def change(current):
             # Manual revision is not another automated interview question.
             count = current['questionCount']
@@ -191,6 +275,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.put("/api/projects/{project_id}/preferences")
     def update_preferences(project_id: str, data: PreferencesUpdate, request: Request) -> dict[str, Any]:
+        require_role(request, 'homeowner')
         state = store(request).mutate(
             project_id,
             "preferences_updated",
@@ -202,6 +287,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.post("/api/projects/{project_id}/questions/{question_id}/answer")
     def submit_answer(project_id: str, question_id: str, data: AnswerCreate, request: Request) -> dict[str, Any]:
+        require_role(request, data.role)
         state = store(request).mutate(
             project_id,
             "question_answered",
@@ -212,17 +298,43 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
         return _present(state)
 
     @application.post("/api/projects/{project_id}/analysis-runs")
-    def run_analysis(project_id: str, request: Request) -> dict[str, Any]:
-        state = store(request).mutate(
-            project_id,
-            "reference_analysis_completed",
-            "vision_agent",
-            engine.analyse_references,
-        )
-        return _present(state)
+    def run_analysis(project_id: str, request: Request, data: AnalysisCreate = AnalysisCreate()) -> dict[str, Any]:
+        require_role(request, 'homeowner')
+        snapshot = store(request).get(project_id)
+        if data.expectedStateVersion is not None and snapshot['stateVersion'] != data.expectedStateVersion:
+            raise StaleStateError('Project changed; refresh before analysing')
+        gateway = application.state.gateway
+        offline = data.mode == 'offline' or gateway.mode == 'offline'
+        if not snapshot['references']:
+            raise ValueError('Upload at least one reference')
+        run_id = store(request).reserve_analysis(project_id)
+        usage = {'mode':'offline_notes' if offline else 'gateway', 'promptVersion':gateway.prompt_version}
+        try:
+            if offline:
+                mutation = engine.analyse_references
+            else:
+                proposals, usage = gateway.analyse(snapshot, application.state.upload_dir)
+                mutation = lambda current: engine.apply_model_proposals(current, proposals)
+            result = store(request).mutate(project_id, 'reference_analysis_completed', 'analysis_service', mutation, snapshot['stateVersion'])
+            store(request).finish_analysis(run_id,'completed',usage)
+            return {**_present(result), 'analysisSummary':usage}
+        except Exception as error:
+            store(request).finish_analysis(run_id,'failed', {**usage, 'errorType':type(error).__name__})
+            raise
+
+    @application.get('/api/projects/{project_id}/analysis-runs')
+    def analysis_history(project_id: str, request: Request):
+        return store(request).analysis_runs(project_id)
+
+    @application.get('/api/runtime')
+    def runtime():
+        gateway = application.state.gateway
+        return {'analysisMode':gateway.mode, 'imageAnalysisEnabled':gateway.images,
+                'projectRunLimit':int(os.getenv('ALIGNSPACE_PROJECT_RUN_LIMIT','20'))}
 
     @application.post("/api/projects/{project_id}/attributes/{attribute_id}/review")
     def review_attribute(project_id: str, attribute_id: str, data: AttributeReview, request: Request) -> dict[str, Any]:
+        require_role(request, 'homeowner')
         state = store(request).mutate(
             project_id,
             "attribute_reviewed",
@@ -234,6 +346,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.post("/api/projects/{project_id}/constraints", status_code=201)
     def create_constraint(project_id: str, data: ConstraintCreate, request: Request) -> dict[str, Any]:
+        require_role(request, 'designer')
         state = store(request).mutate(
             project_id,
             "designer_constraint_added",
@@ -245,10 +358,11 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.post("/api/projects/{project_id}/conflicts/{conflict_id}/resolve")
     def resolve_conflict(project_id: str, conflict_id: str, data: ConflictResolution, request: Request) -> dict[str, Any]:
+        require_role(request, 'designer')
         state = store(request).mutate(
             project_id,
             "conflict_resolved",
-            "homeowner_and_designer",
+            request.state.actor,
             lambda current: engine.resolve_conflict(current, conflict_id, data.resolution),
             data.expectedStateVersion,
         )
@@ -256,11 +370,12 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.post("/api/projects/{project_id}/approvals")
     def approve_brief(project_id: str, data: ApprovalCreate, request: Request) -> dict[str, Any]:
+        require_role(request, data.role)
         state = store(request).mutate(
             project_id,
             "brief_approved",
             data.role,
-            lambda current: engine.approve(current, data.role, data.actorId),
+            lambda current: engine.approve(current, request.state.role, request.state.actor),
             data.expectedStateVersion,
         )
         return _present(state)
@@ -288,7 +403,14 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
         file: UploadFile = File(...),
         note: str = Form(default=""),
         source_url: str = Form(default=""),
+        consent: bool = Form(default=False),
     ) -> dict[str, Any]:
+        require_role(request, 'homeowner')
+        project = store(request).get(project_id)
+        if not consent:
+            raise HTTPException(422, 'Confirm permission to upload and analyse this image')
+        if len(project['references']) >= 10:
+            raise HTTPException(422, 'Maximum 10 reference images per project')
         allowed = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
         if file.content_type not in allowed:
             raise HTTPException(status_code=415, detail="Only JPG, PNG, and WebP images are supported")
@@ -299,30 +421,68 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
             raise HTTPException(status_code=422, detail="The uploaded image is empty")
         if not _has_valid_image_signature(content, file.content_type):
             raise HTTPException(status_code=422, detail="The file content does not match its declared image type")
+        try:
+            with Image.open(io.BytesIO(content)) as picture:
+                if picture.width * picture.height > 20_000_000:
+                    raise ValueError('Image exceeds 20 megapixels')
+                picture.load()
+                clean = ImageOps.exif_transpose(picture).convert('RGB')
+                clean.thumbnail((1280,1280))
+                output = io.BytesIO()
+                clean.save(output,format='JPEG',quality=85)
+                content = output.getvalue()
+        except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+            raise HTTPException(422, 'Image must be decodable and no larger than 20 megapixels')
         reference_id = f"reference_{uuid4().hex[:12]}"
         project_dir = request.app.state.upload_dir / project_id
         project_dir.mkdir(parents=True, exist_ok=True)
-        path = project_dir / f"{reference_id}{allowed[file.content_type]}"
+        path = project_dir / f"{reference_id}.jpg"
         path.write_bytes(content)
         reference = {
             "id": reference_id,
             "filename": Path(file.filename or "reference").name,
-            "contentType": file.content_type,
+            "contentType": 'image/jpeg',
             "size": len(content),
             "storageKey": str(path.relative_to(request.app.state.upload_dir)),
             "note": note.strip()[:500],
             "sourceUrl": source_url.strip()[:1000] or None,
             "status": "uploaded",
             "consentConfirmed": True,
+            "consentActor": request.state.actor,
             "createdAt": engine.now_iso(),
         }
-        state = store(request).mutate(
-            project_id,
-            "reference_uploaded",
-            "homeowner",
-            lambda current: engine.add_reference(current, reference),
-        )
+        try:
+            state = store(request).mutate(project_id,'reference_uploaded',request.state.actor,
+                lambda current: engine.add_reference(current, reference), project['stateVersion'])
+        except Exception:
+            path.unlink(missing_ok=True)
+            raise
         return _present(state)
+
+    @application.post('/api/projects/{project_id}/reference-notes', status_code=201)
+    def reference_note(project_id: str, data: ReferenceNoteCreate, request: Request):
+        require_role(request,'homeowner')
+        if not data.consent:
+            raise HTTPException(422,'Confirm permission to analyse this note')
+        def mutation(current):
+            if len(current['references']) >= 10:
+                raise ValueError('Maximum 10 references per project')
+            return engine.add_reference(current, {'id':engine.new_id('reference'),'filename':'Preference note',
+                'note':data.note.strip(),'status':'note','consentConfirmed':True,'consentActor':request.state.actor,
+                'createdAt':engine.now_iso()})
+        return _present(store(request).mutate(project_id,'reference_note_added',request.state.actor,mutation,data.expectedStateVersion))
+
+    @application.get('/api/projects/{project_id}/references/{reference_id}/image')
+    def reference_image(project_id: str, reference_id: str, request: Request):
+        project = store(request).get(project_id)
+        reference = next((r for r in project['references'] if r['id']==reference_id and r.get('storageKey')), None)
+        if not reference:
+            raise HTTPException(404, 'Image not found')
+        root = application.state.upload_dir.resolve()
+        path = (root / reference['storageKey']).resolve()
+        if not path.is_relative_to(root):
+            raise HTTPException(404, 'Image not found')
+        return FileResponse(path, media_type='image/jpeg')
 
     application.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
 

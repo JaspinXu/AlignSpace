@@ -16,3 +16,6 @@ coverage/
 coverage.xml
 htmlcov/
 .DS_Store
+tmp/
+**/.ipynb_checkpoints/
+.ruff_cache/

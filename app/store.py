@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -59,6 +60,9 @@ class ProjectStore:
                 );
                 CREATE INDEX IF NOT EXISTS audit_project_sequence
                     ON audit_events(project_id, sequence DESC);
+                CREATE TABLE IF NOT EXISTS analysis_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT,
+                    created REAL, status TEXT, metrics_json TEXT);
                 """
             )
 
@@ -160,3 +164,26 @@ class ProjectStore:
                 (project_id, min(max(limit, 1), 200)),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def reserve_analysis(self, project_id: str) -> int:
+        """Persist reservations before network I/O; failures also consume the cap."""
+        with self._lock, self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if db.execute('SELECT 1 FROM analysis_runs WHERE project_id=? AND created>?', (project_id, time.time()-10)).fetchone():
+                raise ValueError('Wait 10 seconds between analysis requests')
+            per_project = db.execute('SELECT COUNT(*) FROM analysis_runs WHERE project_id=?', (project_id,)).fetchone()[0]
+            daily = db.execute('SELECT COUNT(*) FROM analysis_runs WHERE created>?', (time.time()-86400,)).fetchone()[0]
+            if per_project >= int(os.getenv('ALIGNSPACE_PROJECT_RUN_LIMIT','20')) or daily >= int(os.getenv('ALIGNSPACE_DAILY_RUN_LIMIT','100')):
+                raise ValueError('Analysis request budget reached. Manual decisions remain available.')
+            row = db.execute('INSERT INTO analysis_runs(project_id,created,status,metrics_json) VALUES (?,?,?,?)',
+                             (project_id,time.time(),'reserved','{}'))
+            return row.lastrowid
+
+    def finish_analysis(self, run_id, status, metrics):
+        with self._connect() as db:
+            db.execute('UPDATE analysis_runs SET status=?,metrics_json=? WHERE id=?', (status,json.dumps(metrics),run_id))
+
+    def analysis_runs(self, project_id):
+        with self._connect() as db:
+            rows = db.execute('SELECT id,created,status,metrics_json FROM analysis_runs WHERE project_id=? ORDER BY id DESC LIMIT 50', (project_id,)).fetchall()
+        return [{'id':r['id'],'created':r['created'],'status':r['status'],**json.loads(r['metrics_json'])} for r in rows]

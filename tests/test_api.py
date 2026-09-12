@@ -1,4 +1,18 @@
 from fastapi.testclient import TestClient
+from PIL import Image
+import io
+
+def png():
+    stream = io.BytesIO()
+    Image.new("RGB", (10,10), "beige").save(stream,format="PNG")
+    return stream.getvalue()
+
+def designer_client(client, project_id):
+    token = client.post(f"/api/projects/{project_id}/invitations").json()["invitationFragment"].split("=",1)[1]
+    designer = TestClient(client.app)
+    assert designer.post("/api/invitations/claim",json={"token":token}).status_code == 200
+    return designer
+
 
 from app.main import create_app
 
@@ -57,8 +71,8 @@ def test_reference_upload_and_conservative_analysis(tmp_path):
     ).json()
     upload = client.post(
         f"/api/projects/{project['id']}/references",
-        files={"file": ("inspiration.png", b"\x89PNG\r\n\x1a\nexample", "image/png")},
-        data={"note": "I like the Japandi feeling and light oak"},
+        files={"file": ("inspiration.png", png(), "image/png")},
+        data={"note": "I like the Japandi feeling and light oak", "consent":"true"},
     )
     assert upload.status_code == 201
 
@@ -80,6 +94,7 @@ def test_upload_rejects_mismatched_image_content(tmp_path):
     response = client.post(
         f"/api/projects/{project['id']}/references",
         files={"file": ("fake.png", b"not an image", "image/png")},
+        data={"consent":"true"},
     )
     assert response.status_code == 422
 
@@ -88,15 +103,18 @@ def test_guided_demo_manual_recovery_and_approval_revision(tmp_path):
     client = make_client(tmp_path)
     p = client.post('/api/demo/start').json()
     base = f"/api/projects/{p['id']}"
+    designer = designer_client(client,p['id'])
     p = client.post(base + '/analysis-runs').json()
     for proposal in list(p['attributes']):
         p = client.post(base + f"/attributes/{proposal['id']}/review", json={'decision':'confirm'}).json()
     assert all(a['status'] == 'confirmed' for a in p['attributes'])
     for q in client.get('/api/decision-options').json():
-        p = client.put(base + f"/decisions/{q['id']}", json={'role':q['target'], 'value':q['options'][0], 'expectedStateVersion':p['stateVersion']}).json()
+        participant = client if q['target']=='homeowner' else designer
+        p = participant.put(base + f"/decisions/{q['id']}", json={'role':q['target'], 'value':q['options'][0], 'expectedStateVersion':p['stateVersion']}).json()
     assert p['readiness']['readyForApproval']
     for role in ['homeowner', 'designer']:
-        p = client.post(base + '/approvals', json={'role':role,'actorId':role,'expectedStateVersion':p['stateVersion']}).json()
+        participant = client if role=='homeowner' else designer
+        p = participant.post(base + '/approvals', json={'role':role,'actorId':role,'expectedStateVersion':p['stateVersion']}).json()
     assert p['status'] == 'approved'
     brief = client.get(base + '/brief').json()
     assert all(a['contentHash'] == brief['contentHash'] for a in brief['approvals'])

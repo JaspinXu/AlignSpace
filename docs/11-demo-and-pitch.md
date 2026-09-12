@@ -1,5 +1,11 @@
 # Demo and Pitch
 
+## Current release boundaries (13 September)
+
+The deployed flow uses model-backed reference-note understanding and a deterministic interview/state engine. The current competition gateway failed an image-input probe; do not demonstrate notes as if they were pixel analysis. Use uploaded permitted images for human review and source display. The vision adapter is available but disabled. Separate browser sessions are required for the two roles. Owner-operated testing is not independent user validation.
+
+The five-minute pitch below is a narrative draft, not the official video length. The submission briefing says 30 minutes, with interpretation still pending.
+
 ## Core story
 
 **Before:** ten beautiful images, three ambiguous adjectives, two people who think they agree.  
@@ -29,11 +35,11 @@ Adapt when organiser rules are confirmed.
 
 ### 2:50–3:35 Why agents
 
-Vision proposes evidence; interview chooses high-information questions; designer agent structures constraints; alignment manages conflicts; review blocks unsupported certainty. Orchestrator owns state/stopping rules.
+The model proposes note-derived evidence; the deterministic interview chooses questions; designers enter constraints; the state engine checks conflicts and approvals. Distinguish real model runs from rule-based coordination messages.
 
 ### 3:35–4:20 Readiness
 
-Show AWS boundaries, private storage, deletion, kill switch, manual fallback, professional escalation.
+Show Lightsail deployment, project-scoped image access, request budgets, manual fallback and professional-review blockers. Deletion automation and a dedicated kill-switch UI are not implemented.
 
 ### 4:20–4:50 Evidence
 
@@ -61,7 +67,7 @@ Pre-warm and check quota; backup read-only video; deterministic cached run label
 
 **Training data?** Foundation models plus orchestration. No general training on project data by default. Lawful evaluation assets.
 
-**SME readiness?** Serverless, observable, private, manual fallback, narrow pilot, no deep integration.
+**SME readiness?** Single-instance Lightsail, project-scoped sessions, observable model calls, manual fallback, narrow pilot, no deep integration.
 
 **Disagreement?** Preserve both positions; humans decide; unresolved items stay visible.
 

@@ -4,4 +4,8 @@ __pycache__
 .pytest_cache
 data
 docs/references
-
+.env
+.env.*
+tmp
+output
+**/.ipynb_checkpoints
