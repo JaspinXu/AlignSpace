@@ -28,6 +28,24 @@ def test_analysis_returns_pending_homeowner_question(client, analysis_ready_proj
     assert pending.json()["id"] == response.json()["pendingQuestion"]["id"]
 
 
+def test_designer_cannot_start_analysis(client, analysis_ready_project) -> None:
+    current = client.get(
+        f"/v1/projects/{analysis_ready_project}", headers=_headers()
+    ).json()
+    response = client.post(
+        f"/v1/projects/{analysis_ready_project}/analysis-runs",
+        headers=_headers("designer-1", "designer"),
+        json={
+            "idempotencyKey": "designer-run",
+            "expectedStateVersion": current["stateVersion"],
+            "data": {},
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
 def test_analysis_requires_three_reference_assets(client, ready_project) -> None:
     response = client.post(
         f"/v1/projects/{ready_project}/analysis-runs",

@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -11,8 +12,12 @@ from alignspace.api.errors import install_error_handlers
 from alignspace.api.routes.briefs import router as briefs_router
 from alignspace.api.routes.projects import router as projects_router
 from alignspace.api.routes.workflow import router as workflow_router
+from alignspace.application.membership import MembershipService
 from alignspace.application.resources import ProjectResourceService
 from alignspace.application.service import WorkflowService
+from alignspace.auth.config import AuthConfig
+from alignspace.auth.routes import router as auth_router
+from alignspace.auth.service import AuthService
 from alignspace.persistence.database import create_engine_and_session
 from alignspace.providers.mock import build_mock_agents
 from alignspace.workflow.runtime import sqlite_graph
@@ -25,14 +30,23 @@ class Container:
     graph: Any
     resources: ProjectResourceService
     workflow: WorkflowService
+    membership: MembershipService
+    auth: AuthService
 
 
 def create_app(
-    database_url: str = "sqlite:///alignspace.db",
-    checkpoint_path: str = "alignspace-checkpoints.db",
+    database_url: str | None = None,
+    checkpoint_path: str | None = None,
     *,
     agents: AgentBundle | None = None,
+    auth_config: AuthConfig | None = None,
 ) -> FastAPI:
+    database_url = database_url or os.getenv(
+        "ALIGNSPACE_DATABASE_URL", "sqlite:///alignspace-accounts.db"
+    )
+    checkpoint_path = checkpoint_path or os.getenv(
+        "ALIGNSPACE_CHECKPOINT_PATH", "alignspace-accounts-checkpoints.db"
+    )
     engine, session_factory = create_engine_and_session(database_url)
     graph = sqlite_graph(agents or build_mock_agents(), checkpoint_path)
     resources = ProjectResourceService(
@@ -44,19 +58,28 @@ def create_app(
         graph=graph,
         membership_check=resources.is_member,
     )
+    membership = MembershipService(
+        session_factory=session_factory,
+        resources=resources,
+    )
     container = Container(
         engine=engine,
         session_factory=session_factory,
         graph=graph,
         resources=resources,
         workflow=workflow,
+        membership=membership,
+        auth=AuthService(session_factory, auth_config or AuthConfig.from_env()),
     )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        yield
-        graph.checkpointer.conn.close()
-        engine.dispose()
+        try:
+            container.auth.config.validate()
+            yield
+        finally:
+            graph.checkpointer.conn.close()
+            engine.dispose()
 
     app = FastAPI(title="AlignSpace API", version="0.1.0", lifespan=lifespan)
     app.state.container = container
@@ -69,6 +92,7 @@ def create_app(
         return response
 
     install_error_handlers(app)
+    app.include_router(auth_router)
     app.include_router(projects_router)
     app.include_router(workflow_router)
     app.include_router(briefs_router)

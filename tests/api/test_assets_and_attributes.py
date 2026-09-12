@@ -14,6 +14,34 @@ def _asset_envelope(key: str, version: int) -> dict[str, object]:
     }
 
 
+def test_designer_cannot_manage_reference_assets(client, ready_project) -> None:
+    project_id = ready_project
+    created = client.post(
+        f"/v1/projects/{project_id}/assets",
+        headers=_headers(),
+        json=_asset_envelope("homeowner-asset", 0),
+    )
+    assert created.status_code == 201
+    add_attempt = client.post(
+        f"/v1/projects/{project_id}/assets",
+        headers=_headers("designer-1", "designer"),
+        json=_asset_envelope("designer-asset", 1),
+    )
+    assert add_attempt.status_code == 403
+    assert add_attempt.json()["error"]["code"] == "FORBIDDEN"
+    remove_attempt = client.request(
+        "DELETE",
+        f"/v1/projects/{project_id}/assets/{created.json()['id']}",
+        headers=_headers("designer-1", "designer"),
+        json={
+            "idempotencyKey": "designer-delete",
+            "expectedStateVersion": 1,
+            "data": {},
+        },
+    )
+    assert remove_attempt.status_code == 403
+
+
 def test_asset_registration_requires_consent(client, project_without_consent) -> None:
     response = client.post(
         f"/v1/projects/{project_without_consent}/assets",

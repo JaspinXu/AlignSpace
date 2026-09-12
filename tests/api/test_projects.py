@@ -10,7 +10,6 @@ def test_create_and_read_project(client) -> None:
             "roomType": "living_room",
             "budgetBand": "15k_to_30k_sgd",
             "consent": True,
-            "designerId": "designer-1",
         },
     )
 
@@ -27,10 +26,12 @@ def test_create_and_read_project(client) -> None:
         "status": "draft",
         "stateVersion": 0,
         "assets": [],
+        "role": "homeowner",
+        "designerJoined": False,
     }
 
 
-def test_designer_member_can_read_but_outsider_cannot(client) -> None:
+def test_designer_member_can_read_but_outsider_cannot(client, add_member) -> None:
     created = client.post(
         "/v1/projects",
         headers=_headers(),
@@ -38,9 +39,9 @@ def test_designer_member_can_read_but_outsider_cannot(client) -> None:
             "roomType": "living_room",
             "budgetBand": "under_15k_sgd",
             "consent": True,
-            "designerId": "designer-1",
         },
     ).json()
+    add_member(created["id"])
 
     designer = client.get(
         f"/v1/projects/{created['id']}",
@@ -52,6 +53,8 @@ def test_designer_member_can_read_but_outsider_cannot(client) -> None:
     )
 
     assert designer.status_code == 200
+    assert designer.json()["role"] == "designer"
+    assert designer.json()["designerJoined"] is True
     assert outsider.status_code == 403
     assert outsider.json()["error"]["code"] == "FORBIDDEN"
     assert outsider.json()["error"]["correlationId"]
@@ -65,7 +68,6 @@ def test_delete_project_removes_active_record_and_checkpoint(client, monkeypatch
             "roomType": "bedroom",
             "budgetBand": "under_15k_sgd",
             "consent": False,
-            "designerId": "designer-1",
         },
     ).json()["id"]
 
@@ -85,20 +87,19 @@ def test_delete_project_removes_active_record_and_checkpoint(client, monkeypatch
     assert loaded.json()["error"]["code"] == "PROJECT_NOT_FOUND"
 
 
-def test_project_requires_distinct_homeowner_and_designer(client) -> None:
+def test_only_a_homeowner_can_create_a_project(client) -> None:
     response = client.post(
         "/v1/projects",
-        headers=_headers(),
+        headers=_headers("designer-1", "designer"),
         json={
             "roomType": "living_room",
             "budgetBand": "under_15k_sgd",
             "consent": True,
-            "designerId": "homeowner-1",
         },
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == "INVALID_REQUEST"
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
 
 
 def test_missing_actor_headers_use_stable_validation_error(client) -> None:
@@ -109,7 +110,7 @@ def test_missing_actor_headers_use_stable_validation_error(client) -> None:
     assert response.json()["error"]["recoverable"] is True
 
 
-def test_designer_cannot_delete_project(client) -> None:
+def test_designer_cannot_delete_project(client, add_member) -> None:
     project_id = client.post(
         "/v1/projects",
         headers=_headers(),
@@ -117,9 +118,9 @@ def test_designer_cannot_delete_project(client) -> None:
             "roomType": "living_room",
             "budgetBand": "under_15k_sgd",
             "consent": True,
-            "designerId": "designer-1",
         },
     ).json()["id"]
+    add_member(project_id)
 
     response = client.delete(
         f"/v1/projects/{project_id}",

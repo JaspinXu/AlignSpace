@@ -110,6 +110,8 @@ class WorkflowService:
         envelope: WriteEnvelope[dict[str, object]],
     ) -> WorkflowResponse:
         self._authorize(project_id, actor)
+        if actor.role != Role.HOMEOWNER:
+            raise AuthorizationError("only the homeowner can start analysis")
         return self._run_graph(project_id, actor, envelope, action="start_analysis")
 
     def resume(

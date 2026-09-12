@@ -1,11 +1,16 @@
 import json
 from pathlib import Path
+from typing import Annotated
 
 import pytest
+from fastapi import Header
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
+from alignspace.api.dependencies import get_actor
+from alignspace.application.commands import ActorContext
 from alignspace.application.service import WorkflowService
+from alignspace.auth.config import AuthConfig
 from alignspace.domain.enums import (
     ActorKind,
     AttributeStatus,
@@ -25,6 +30,7 @@ from alignspace.domain.models import (
     calculate_brief_content_hash,
 )
 from alignspace.persistence.database import create_engine_and_session
+from alignspace.persistence.tables import ProjectMemberRow
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
 from alignspace.providers.mock import build_mock_agents
 from alignspace.workflow.runtime import memory_graph
@@ -76,6 +82,17 @@ def service(tmp_path):
     engine.dispose()
 
 
+TEST_AUTH_SECRET = "test-only-auth-secret-that-is-long-enough"
+
+
+def test_actor(
+    x_actor_id: Annotated[str, Header()],
+    x_actor_role: Annotated[str, Header()],
+) -> ActorContext:
+    """Test-only identity injection. Production never trusts these headers."""
+    return ActorContext(actor_id=x_actor_id, role=Role(x_actor_role))
+
+
 @pytest.fixture
 def client(tmp_path):
     from alignspace.main import create_app
@@ -83,7 +100,10 @@ def client(tmp_path):
     app = create_app(
         database_url=f"sqlite:///{tmp_path / 'api.db'}",
         checkpoint_path=str(tmp_path / "checkpoints.db"),
+        auth_config=AuthConfig(secret=TEST_AUTH_SECRET, secure_cookie=False),
     )
+    # Override only inside tests: the real get_actor keeps validating Bearer tokens.
+    app.dependency_overrides[get_actor] = test_actor
     with TestClient(app) as test_client:
         yield test_client
 
@@ -96,11 +116,40 @@ def _create_project(client: TestClient, *, consent: bool) -> str:
             "roomType": "living_room",
             "budgetBand": "15k_to_30k_sgd",
             "consent": consent,
-            "designerId": "designer-1",
         },
     )
     assert response.status_code == 201
-    return response.json()["id"]
+    project_id = response.json()["id"]
+    # The public API no longer accepts a designerId, so tests seed the second
+    # member directly instead of inventing a production shortcut.
+    _add_member(client, project_id, "designer-1", Role.DESIGNER)
+    return project_id
+
+
+def _add_member(client: TestClient, project_id: str, member_id: str, role: Role) -> None:
+    container = client.app.state.container
+    with SqlAlchemyUnitOfWork(container.session_factory) as uow:
+        uow.session.add(
+            ProjectMemberRow(
+                project_id=project_id,
+                member_id=member_id,
+                role=role.value,
+                payload={},
+            )
+        )
+        uow.commit()
+
+
+@pytest.fixture
+def add_member(client: TestClient):
+    def _add(
+        project_id: str,
+        member_id: str = "designer-1",
+        role: Role = Role.DESIGNER,
+    ) -> None:
+        _add_member(client, project_id, member_id, role)
+
+    return _add
 
 
 @pytest.fixture
@@ -278,18 +327,7 @@ class WorkflowDriver:
         return response.json()
 
     def complete(self) -> dict[str, object]:
-        created = self.client.post(
-            "/v1/projects",
-            headers=self.homeowner_headers,
-            json={
-                "roomType": "living_room",
-                "budgetBand": "15k_to_30k_sgd",
-                "consent": True,
-                "designerId": "designer-1",
-            },
-        )
-        assert created.status_code == 201, created.text
-        project_id = created.json()["id"]
+        project_id = _create_project(self.client, consent=True)
 
         for index in range(3):
             self._write(

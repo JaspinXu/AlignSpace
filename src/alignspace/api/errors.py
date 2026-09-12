@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from alignspace.application.membership import JoinCodeError
 from alignspace.application.resources import AssetCountError, AssetLimitError, ConsentRequiredError
 from alignspace.application.service import (
     ApprovalNotAllowedError,
@@ -12,6 +13,7 @@ from alignspace.application.service import (
     BriefReviewError,
     BriefSchemaError,
 )
+from alignspace.auth.service import AuthError
 from alignspace.domain.policies import PolicyViolationError, StaleStateError
 from alignspace.persistence.repository import IdempotencyConflictError
 
@@ -42,6 +44,29 @@ def _response(
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(AuthError)
+    async def auth_handler(request: Request, exc: AuthError) -> JSONResponse:
+        response = _response(
+            request, status_code=exc.status, code=exc.code, message=exc.message,
+            recoverable=exc.status in {401, 409, 429},
+        )
+        response.headers["Cache-Control"] = "no-store"
+        if exc.status == 401:
+            response.headers["WWW-Authenticate"] = "Bearer"
+        if exc.status == 429:
+            response.headers["Retry-After"] = "60"
+        return response
+
+    @app.exception_handler(JoinCodeError)
+    async def join_code_handler(request: Request, exc: JoinCodeError) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="JOIN_CODE_INVALID",
+            message=str(exc),
+            recoverable=True,
+        )
+
     @app.exception_handler(AuthorizationError)
     async def authorization_handler(request: Request, exc: AuthorizationError) -> JSONResponse:
         return _response(

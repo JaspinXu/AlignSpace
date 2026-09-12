@@ -11,6 +11,9 @@ dependencies = [
   "pydantic>=2.11,<3",
   "sqlalchemy>=2.0,<3",
   "uvicorn>=0.35,<1",
+  "argon2-cffi>=23.1,<26",
+  "pyjwt>=2.10,<3",
+  "email-validator>=2.2,<3",
 ]
 
 [project.optional-dependencies]

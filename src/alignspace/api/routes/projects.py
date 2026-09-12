@@ -1,14 +1,16 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from alignspace.api.dependencies import get_actor, get_container
 from alignspace.application.commands import ActorContext, WriteEnvelope
+from alignspace.application.membership import JoinCodeView, JoinRequest
 from alignspace.application.resources import (
     AssetDeleteView,
     AssetInput,
     AssetWriteView,
     CreateProjectCommand,
+    ProjectSnapshot,
     ProjectView,
 )
 from alignspace.application.service import WorkflowResponse
@@ -25,6 +27,41 @@ def create_project(
     container: Container,
 ) -> ProjectView:
     return container.resources.create(actor, command)
+
+
+@router.get("", response_model=list[ProjectView])
+def list_projects(actor: Actor, container: Container) -> list[ProjectView]:
+    return container.resources.list_for_member(actor)
+
+
+@router.post("/join", response_model=ProjectView)
+def join_project(
+    command: JoinRequest,
+    request: Request,
+    actor: Actor,
+    container: Container,
+) -> ProjectView:
+    container.auth.throttle("join-user", actor.actor_id, limit=10, window=60)
+    container.auth.throttle("join-ip", request.client.host, limit=30, window=60)
+    return container.membership.join(actor, command)
+
+
+@router.get("/{project_id}/state", response_model=ProjectSnapshot)
+def get_project_state(
+    project_id: str,
+    actor: Actor,
+    container: Container,
+) -> ProjectSnapshot:
+    return container.resources.snapshot(project_id, actor)
+
+
+@router.post("/{project_id}/join-code", response_model=JoinCodeView)
+def generate_join_code(
+    project_id: str,
+    actor: Actor,
+    container: Container,
+) -> JoinCodeView:
+    return container.membership.generate_code(project_id, actor)
 
 
 @router.get("/{project_id}", response_model=ProjectView)
