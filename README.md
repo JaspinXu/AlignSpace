@@ -111,6 +111,8 @@ The local backend now implements the shared-state and approval workflow with Fas
 
 ## Repository guide
 
+For contributors and other coding models, start with the [Chinese project handoff](docs/15-project-handoff.zh-CN.md). It distinguishes the tested backend from the unfinished authentication/frontend worktree and records the current tasks and API contracts.
+
 | File | Purpose |
 |---|---|
 | [Backend runbook](README.backend.md) | Implemented local FastAPI/LangGraph backend, API usage, tests, and current limitations |
