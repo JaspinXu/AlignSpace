@@ -1,13 +1,13 @@
 # AlignSpace 后端
 
-这是 AlignSpace 第一阶段的可运行后端。它把屋主的样本图片偏好、设计师约束、双方问答和冲突处理组织成一个版本化的共享状态，最终生成需要屋主与设计师分别确认的设计规格。当前版本使用确定性样本数据，不上传或存储真实图片，也不包含装修效果图生成。
+这是 AlignSpace 第一阶段的可运行后端。它把屋主的样本图片偏好、设计师约束、双方问答和冲突处理组织成一个版本化的共享状态，最终生成需要屋主与设计师分别确认的设计规格。参考图片是真实上传并保存在本地 `ALIGNSPACE_ASSET_DIR`（默认 `var/assets/`）下的；视觉分析仍为确定性模拟，直到第 2 步接入真实模型，也不包含装修效果图生成。
 
 ## 当前能力
 
 - FastAPI 版本化接口和 OpenAPI 文档。
 - SQLite 领域数据、审计事件、幂等记录和 LangGraph 检查点。
 - Vision Analyst、Homeowner Interview、Designer、Alignment、Review 五个逻辑 Agent。
-- 3–10 个本地图片样本记录、图片处理同意门槛和删除流程。
+- 3–10 张真实参考图片的本地存储（JPEG / PNG / WebP，单张不超过 10MB）、图片处理同意门槛和删除流程。
 - 稀疏偏好记录：系统不会因为属性未被提及就预先创建空数据；人工明确补充的偏好才会新增。
 - 广泛提问后再细化、最多 10 个屋主问题、设计约束冲突和人工解决。
 - JSON Schema 方案校验、内容哈希、版本化编辑和同版本双人审批。
@@ -22,10 +22,14 @@ uv sync --extra dev
 export ALIGNSPACE_AUTH_SECRET="$(openssl rand -hex 32)"
 export ALIGNSPACE_DEV=1
 export ALIGNSPACE_ORIGINS="http://localhost:5173,http://127.0.0.1:5173"
+# 可选：真实参考图片的本地存储目录（默认 var/assets/）
+# export ALIGNSPACE_ASSET_DIR="var/assets"
 uv run uvicorn alignspace.main:app --reload
 ```
 
 服务默认监听 `http://127.0.0.1:8000`，交互式 OpenAPI 位于 `http://127.0.0.1:8000/docs`。真实账户版本默认数据文件为 `alignspace-accounts.db` 和 `alignspace-accounts-checkpoints.db`，两者已被 Git 忽略。认证密钥不得打印或提交；缺少密钥时服务拒绝启动，换密钥会使已有访问令牌失效。
+
+上传的参考图片按内容寻址保存在 `ALIGNSPACE_ASSET_DIR`（默认 `var/assets/`）下。要重置图片目录，停止服务后删除该目录（或把 `ALIGNSPACE_ASSET_DIR` 指向新路径）再启动即可；仍引用旧图片的项目在重新上传前无法预览这些图片。
 
 业务接口使用真实 Bearer 身份，屋主创建项目后通过一次性项目码邀请设计师。前端启动及双账户浏览器验收见 [前端运行说明](README.frontend.md)。
 
@@ -40,7 +44,7 @@ uv run ruff check src tests
 
 ```text
 创建项目与成员
-  → 登记 3 张合法样本图
+  → 上传 3 张真实参考图片
   → 视觉观察与屋主广泛提问
   → 细化偏好并确认共享状态
   → 设计师预算约束与冲突

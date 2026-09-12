@@ -2,6 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 
 const password = 'local browser acceptance password';
 
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
 async function register(page: Page, email: string) {
   await page.goto('/');
   await page.getByRole('tab', { name: '注册' }).click();
@@ -21,6 +26,18 @@ async function write(page: Page, button: string, suffix: string, status = 200) {
   await expect.poll(async () => {
     const body = await result.json();
     return page.locator('.meta').innerText().then((text) => text.includes(`v${body.stateVersion ?? body.projectState?.stateVersion}`));
+  }).toBe(true);
+}
+
+async function uploadAsset(page: Page, name: string) {
+  const response = page.waitForResponse((r) => r.url().endsWith('/assets') && r.request().method() !== 'GET');
+  await page.getByLabel('上传参考图片').setInputFiles({ name, mimeType: 'image/png', buffer: ONE_PIXEL_PNG });
+  const result = await response;
+  expect(result.status(), await result.text()).toBe(201);
+  const body = await result.json();
+  // Every successful upload is followed by a fresh state read.
+  await expect.poll(async () => {
+    return page.locator('.meta').innerText().then((text) => text.includes(`v${body.stateVersion}`));
   }).toBe(true);
 }
 
@@ -61,17 +78,22 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     expect(owner.url()).toBe(projectUrl);
     expect(refreshes).toBe(2); // initial anonymous restore + explicit reload
 
-    for (let i = 0; i < 3; i++) await write(owner, '登记演示样本', '/assets', 201);
+    for (let i = 0; i < 3; i++) await uploadAsset(owner, `room-${i}.png`);
     await write(owner, '启动分析', '/analysis-runs', 202);
     await owner.getByRole('checkbox', { name: '暖色灯光' }).check();
     await write(owner, '提交回答', '/answer', 202);
     await expect(owner.getByLabel('您的回答')).toBeVisible();
 
     for (const value of ['warm beige', 'natural oak', 'pale oak', 'warm ambient']) {
-      const response = owner.waitForResponse((r) => r.request().method() === 'PATCH');
-      await owner.getByRole('button', { name: `确认 ${value}`, exact: true }).click();
-      expect((await response).status()).toBe(200);
-      await expect(owner.getByRole('button', { name: `确认 ${value}`, exact: true })).toHaveCount(0);
+      const confirm = owner.getByRole('button', { name: `确认 ${value}`, exact: true });
+      while (await confirm.count()) {
+        const before = await confirm.count();
+        const response = owner.waitForResponse((r) => r.request().method() === 'PATCH');
+        await confirm.first().click();
+        expect((await response).status()).toBe(200);
+        await expect.poll(async () => confirm.count()).toBeLessThan(before);
+      }
+      await expect(confirm).toHaveCount(0);
     }
     for (const [dimension, value] of [
       ['style', 'warm modern'], ['layout', 'clear conversational seating'],

@@ -4,9 +4,17 @@ React + TypeScript + Vite client for the authenticated AlignSpace backend. It
 talks to the FastAPI service over the same origin (`/v1`), keeps the access
 token in memory only, and refreshes the session through an HttpOnly cookie.
 
-> **Demo status:** reference images are fixture records (`fixtureId`), not real
-> uploads. Vision observations are deterministic mock output. The UI labels this
-> as "演示样本 · 模拟分析" and does not claim real image understanding.
+> **Demo status:** reference images are real uploads stored locally under
+> `ALIGNSPACE_ASSET_DIR` (default `var/assets/`). Vision observations are still
+> deterministic mock output — analysis remains simulated until step 2. The UI
+> labels this as "真实图片 · 分析为模拟" and does not claim real image
+> understanding.
+>
+> Accepted formats are JPEG, PNG and WebP, each up to 10MB and at most 10 per
+> project. To reset the stored images, stop the server and delete
+> `ALIGNSPACE_ASSET_DIR` (or point the variable at a fresh path) before
+> restarting; projects that still reference the removed files will not preview
+> them until they are uploaded again.
 
 ## Prerequisites
 
@@ -89,7 +97,7 @@ uv run ruff check src tests
   and retries revocation before any cookie-based restore; tokens remain memory-only.
 - Project list, project creation, and joining with a 12-character one-time code.
 - Reloadable `?project=<id>` navigation and browser back/forward support.
-- Role-aware workspace: demo sample registration, analysis start, broad
+- Role-aware workspace: reference image upload, analysis start, broad
   question, explicit preferences, confirm/reject of proposed observations,
   conflict decisions, designer review notes, brief edit and dual approval.
 - Versioned writes keep `idempotencyKey` + `expectedStateVersion`; a 409 keeps
@@ -103,7 +111,8 @@ uv run ruff check src tests
 
 ## Known boundaries
 
-- Fixture-based analysis only; no real image upload, object storage, or LLM.
+- Vision analysis remains simulated mock output; no object storage or LLM yet.
+  Uploaded images are real and stored locally (see the demo status above).
 - Broad answers use a fixed mapping from Chinese sample options to supported
   English keywords. Arbitrary Chinese free text is not parsed.
 - Brief editing exposes the goals list; other schema fields are not editable

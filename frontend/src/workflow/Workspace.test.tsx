@@ -390,6 +390,7 @@ describe('designer review and brief approval', () => {
     await env.client.restore();
     render(<Workspace client={env.client} projectId="p1" />);
     const field = await screen.findByRole('textbox', { name: /方案目标/ });
+    await waitFor(() => expect(field).toHaveValue('warm modern'));
     await userEvent.clear(field);
     await userEvent.type(field, 'warm modern{enter}calm lighting');
     await userEvent.click(screen.getByRole('button', { name: '保存方案修改' }));

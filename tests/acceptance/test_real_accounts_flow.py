@@ -21,6 +21,12 @@ PASSWORD = "a sufficiently long password"
 SECRET = "real-accounts-acceptance-secret-long-enough"
 
 
+def image_bytes() -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), "red").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 @pytest.fixture
 def api(tmp_path):
     from alignspace.main import create_app
@@ -72,17 +78,17 @@ class TwoAccountDriver:
 
     def run(self):
         version = self._version(self.owner)
+        asset_ids: list[str] = []
         for index in range(3):
-            buffer = BytesIO()
-            Image.new("RGB", (8, 8), "red").save(buffer, format="PNG")
             asset = self.api.post(
                 f"/v1/projects/{self.project_id}/assets",
                 headers=self.owner,
                 data={"expectedStateVersion": str(version), "idempotencyKey": f"asset-{index}"},
-                files={"file": (f"room-{index}.png", buffer.getvalue(), "image/png")},
+                files={"file": (f"room-{index}.png", image_bytes(), "image/png")},
             )
             assert asset.status_code == 201, asset.text
             version = asset.json()["stateVersion"]
+            asset_ids.append(asset.json()["id"])
 
         started = self.write(
             "POST",
@@ -92,6 +98,15 @@ class TwoAccountDriver:
             headers=self.owner,
             expected=202,
         )
+        proposed_image_sources = {
+            evidence["sourceId"]
+            for attribute in started["projectState"]["attributes"]
+            if attribute["status"] == "proposed"
+            for evidence in attribute["evidence"]
+            if evidence["sourceType"] == "image"
+        }
+        assert proposed_image_sources == set(asset_ids)
+
         broad = self.write(
             "POST",
             f"/v1/projects/{self.project_id}/questions/{started['pendingQuestion']['id']}/answer",
