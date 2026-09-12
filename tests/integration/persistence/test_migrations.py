@@ -64,3 +64,25 @@ def test_unique_role_index_blocks_a_second_member_in_the_same_role(tmp_path):
             session.rollback()
     finally:
         engine.dispose()
+
+
+def test_migration_adds_soft_delete_column_and_is_repeatable(tmp_path):
+    url = f"sqlite:///{tmp_path / 'soft-delete.db'}"
+    first_engine, _ = create_engine_and_session(url)
+    first_engine.dispose()
+
+    engine, _ = create_engine_and_session(url)
+    try:
+        columns = {
+            row[1] for row in engine.connect().exec_driver_sql("PRAGMA table_info(image_assets)")
+        }
+        assert "deleted_at" in columns
+        versions = {
+            row[0]
+            for row in engine.connect().exec_driver_sql(
+                "SELECT version FROM schema_migrations"
+            )
+        }
+        assert versions == {1, 2}
+    finally:
+        engine.dispose()
