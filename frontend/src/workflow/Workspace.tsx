@@ -44,6 +44,9 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   const [value, setValue] = useState('');
   const [dimension, setDimension] = useState('style');
   const [showForm, setShowForm] = useState(true);
+  const [conflictResolution, setConflictResolution] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
+  const [goalsDraft, setGoalsDraft] = useState('');
   const attributeId = useRef(`manual-${Math.random().toString(36).slice(2)}`);
 
   const load = useCallback(async () => {
@@ -77,6 +80,19 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     return () => window.clearInterval(timer);
   }, [pending, load]);
 
+  const latestBrief =
+    snapshot && snapshot.projectState.briefVersions.length > 0
+      ? snapshot.projectState.briefVersions.reduce((latest, brief) =>
+          brief.version > latest.version ? brief : latest,
+        )
+      : null;
+
+  useEffect(() => {
+    if (!latestBrief) return;
+    const goals = Array.isArray(latestBrief.payload.goals) ? latestBrief.payload.goals : [];
+    setGoalsDraft(goals.map((goal) => String(goal)).join('\n'));
+  }, [latestBrief?.version, latestBrief?.contentHash]);
+
   if (loadError && !snapshot) {
     return (
       <div className="workspace">
@@ -100,6 +116,8 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
 
   const { project, projectState } = snapshot;
   const isHomeowner = project.role === 'homeowner';
+  const openConflict =
+    projectState.conflicts.find((conflict) => conflict.status === 'open') ?? null;
 
   const handleWriteError = async (error: unknown) => {
     if (error instanceof ApiError && error.status === 409) {
@@ -187,6 +205,102 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     }
   };
 
+  const setAttributeStatus = async (attribute: Attribute, status: 'confirmed' | 'rejected') => {
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/attributes/${attribute.id}`,
+          'PATCH',
+          project.stateVersion,
+          { status, value: attribute.value },
+        ),
+      );
+      setNotice(status === 'confirmed' ? '已确认该偏好。' : '已拒绝该偏好。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const resolveConflict = async (conflict: Conflict) => {
+    if (!conflictResolution.trim()) {
+      setNotice('请填写冲突解决说明。');
+      return;
+    }
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/conflicts/${conflict.id}/resolve`,
+          'POST',
+          project.stateVersion,
+          { status: 'resolved', resolution: conflictResolution },
+        ),
+      );
+      setConflictResolution('');
+      setNotice('冲突决定已提交。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const submitDesignerReview = async () => {
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/designer-reviews`,
+          'POST',
+          project.stateVersion,
+          { note: reviewNote },
+        ),
+      );
+      setReviewNote('');
+      setNotice('设计师反馈已提交。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const approveBrief = async (version: number, contentHash: string) => {
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/briefs/${version}/approvals`,
+          'POST',
+          project.stateVersion,
+          { contentHash },
+        ),
+      );
+      setNotice('已批准当前版本。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const saveBriefEdit = async () => {
+    if (!latestBrief) return;
+    const goals = goalsDraft
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/briefs/${latestBrief.version}`,
+          'PATCH',
+          project.stateVersion,
+          { payload: { ...latestBrief.payload, goals } },
+        ),
+      );
+      setNotice('已保存方案修改，旧审批已失效。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
   return (
     <div className="workspace">
       <header className="workspace-head">
@@ -248,7 +362,13 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
           {pending && pending.targetRole === 'designer' && !isHomeowner && (
             <section aria-label="设计师反馈">
               <p className="question-text">请提交当前支持的约束反馈。</p>
-              <button type="button" onClick={() => setNotice('设计师反馈功能将在后续迭代完善。')}>
+              <label htmlFor="designer-review">设计师反馈</label>
+              <textarea
+                id="designer-review"
+                value={reviewNote}
+                onChange={(event) => setReviewNote(event.target.value)}
+              />
+              <button type="button" onClick={() => void submitDesignerReview()}>
                 提交设计师反馈
               </button>
             </section>
@@ -309,6 +429,34 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
               )}
             </section>
           )}
+
+          {latestBrief && (
+            <section aria-label="设计方案">
+              <h3>设计方案</h3>
+              <p>
+                方案版本 v{latestBrief.version} · 完整度{' '}
+                {Math.round(latestBrief.completeness * 100)}%
+              </p>
+              <p className="hash">内容哈希 {latestBrief.contentHash.slice(0, 12)}…</p>
+              <label htmlFor="brief-goals">方案目标</label>
+              <textarea
+                id="brief-goals"
+                value={goalsDraft}
+                onChange={(event) => setGoalsDraft(event.target.value)}
+              />
+              <div className="actions">
+                <button type="button" onClick={() => void saveBriefEdit()}>
+                  保存方案修改
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void approveBrief(latestBrief.version, latestBrief.contentHash)}
+                >
+                  批准此版本
+                </button>
+              </div>
+            </section>
+          )}
         </main>
 
         <aside className="sidebar">
@@ -318,7 +466,27 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
             <ul>
               {projectState.attributes.map((attribute: Attribute) => (
                 <li key={attribute.id}>
-                  {attribute.dimension}：{attribute.value}（{attribute.status}）
+                  <span>
+                    {attribute.dimension}：{attribute.value}（{attribute.status}）
+                  </span>
+                  {isHomeowner && attribute.status === 'proposed' && (
+                    <span className="actions">
+                      <button
+                        type="button"
+                        aria-label={`确认 ${attribute.value}`}
+                        onClick={() => void setAttributeStatus(attribute, 'confirmed')}
+                      >
+                        确认
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`拒绝 ${attribute.value}`}
+                        onClick={() => void setAttributeStatus(attribute, 'rejected')}
+                      >
+                        拒绝
+                      </button>
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -340,13 +508,26 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                 </li>
               ))}
             </ul>
+            {openConflict && (
+              <div className="resolve">
+                <label htmlFor="conflict-resolution">冲突解决说明</label>
+                <textarea
+                  id="conflict-resolution"
+                  value={conflictResolution}
+                  onChange={(event) => setConflictResolution(event.target.value)}
+                />
+                <button type="button" onClick={() => void resolveConflict(openConflict)}>
+                  提交冲突决定
+                </button>
+              </div>
+            )}
           </section>
           <section>
             <h3>审批</h3>
             <ul>
               {projectState.approvals.map((approval) => (
                 <li key={`${approval.role}-${approval.briefVersion}`}>
-                  {ROLE_LABEL[approval.role] ?? approval.role} 已批准 v{approval.briefVersion}
+                  {ROLE_LABEL[approval.role] ?? approval.role}已批准 v{approval.briefVersion}
                 </li>
               ))}
             </ul>

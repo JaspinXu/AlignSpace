@@ -89,6 +89,39 @@ select {
   color: var(--ink);
 }
 
+textarea {
+  font: inherit;
+  width: 100%;
+  min-height: 4.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.actions {
+  display: inline-flex;
+  gap: 0.4rem;
+  margin-left: 0.5rem;
+}
+
+.actions button {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.85rem;
+}
+
+.resolve {
+  margin-top: 0.6rem;
+}
+
+.hash {
+  color: var(--muted);
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
 form {
   display: flex;
   flex-direction: column;
