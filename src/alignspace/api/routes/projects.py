@@ -1,13 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
 
 from alignspace.api.dependencies import get_actor, get_container
 from alignspace.application.commands import ActorContext, WriteEnvelope
 from alignspace.application.membership import JoinCodeView, JoinRequest
 from alignspace.application.resources import (
     AssetDeleteView,
-    AssetInput,
     AssetWriteView,
     CreateProjectCommand,
     ProjectSnapshot,
@@ -82,11 +81,20 @@ def delete_project(project_id: str, actor: Actor, container: Container) -> Respo
 )
 def register_asset(
     project_id: str,
-    envelope: WriteEnvelope[AssetInput],
+    file: Annotated[UploadFile, File()],
+    expected_state_version: Annotated[int, Form(alias="expectedStateVersion")],
+    idempotency_key: Annotated[str, Form(alias="idempotencyKey")],
     actor: Actor,
     container: Container,
 ) -> AssetWriteView:
-    return container.resources.register_asset(project_id, actor, envelope)
+    return container.resources.register_asset(
+        project_id,
+        actor,
+        expected_state_version=expected_state_version,
+        idempotency_key=idempotency_key,
+        filename=file.filename or "upload",
+        raw=file.file.read(),
+    )
 
 
 @router.delete("/{project_id}/assets/{asset_id}", response_model=AssetDeleteView)

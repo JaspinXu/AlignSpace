@@ -2,7 +2,6 @@ from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
-from pydantic import Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,6 +14,8 @@ from alignspace.persistence.database import read_transaction
 from alignspace.persistence.repository import ProjectRepository, canonical_request_hash
 from alignspace.persistence.tables import ImageAssetRow, ProjectMemberRow, ProjectRow
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
+from alignspace.storage.base import Storage
+from alignspace.storage.images import prepare_image
 
 
 class ConsentRequiredError(ValueError):
@@ -35,17 +36,14 @@ class CreateProjectCommand(DomainModel):
     consent: bool
 
 
-class AssetInput(DomainModel):
-    fixture_id: NonBlankString
-    media_type: str = Field(pattern=r"^image/(jpeg|png|webp)$")
-    size_bytes: int = Field(gt=0, le=10 * 1024 * 1024)
-
-
 class AssetView(DomainModel):
     id: str
-    fixture_id: str
+    original_filename: str
     media_type: str
     size_bytes: int
+    sha256: str
+    deleted: bool
+    deleted_at: int | None = None
 
 
 class AssetWriteView(AssetView):
@@ -84,9 +82,11 @@ class ProjectResourceService:
         *,
         session_factory: sessionmaker[Session],
         checkpoint_delete: CheckpointDelete,
+        storage: Storage,
     ) -> None:
         self._session_factory = session_factory
         self._checkpoint_delete = checkpoint_delete
+        self._storage = storage
 
     def create(self, actor: ActorContext, command: CreateProjectCommand) -> ProjectView:
         if actor.role != Role.HOMEOWNER:
@@ -153,51 +153,90 @@ class ProjectResourceService:
         self,
         project_id: str,
         actor: ActorContext,
-        envelope: WriteEnvelope[AssetInput],
+        *,
+        expected_state_version: int,
+        idempotency_key: str,
+        filename: str,
+        raw: bytes,
     ) -> AssetWriteView:
-        request_hash = self._request_hash("register_asset", project_id, actor, envelope)
+        self._authorize_homeowner(project_id, actor)
+        prepared = prepare_image(raw)
+        request_hash = canonical_request_hash(
+            {
+                "action": "upload_asset",
+                "projectId": project_id,
+                "actor": actor.model_dump(mode="json", by_alias=True),
+                "expectedStateVersion": expected_state_version,
+                "idempotencyKey": idempotency_key,
+                "sha256": prepared.sha256,
+                "mediaType": prepared.media_type,
+                "sizeBytes": len(prepared.data),
+            }
+        )
         with SqlAlchemyUnitOfWork(self._session_factory) as uow:
             self._authorize_in_session(uow.session, project_id, actor)
             if actor.role != Role.HOMEOWNER:
                 raise AuthorizationError("only the homeowner can manage reference assets")
-            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            replay = uow.idempotency.lookup(project_id, idempotency_key, request_hash)
             if replay is not None:
                 return AssetWriteView.model_validate(replay.response_payload)
             state = uow.projects.load(project_id)
-            self._check_version(state, envelope.expected_state_version)
+            self._check_version(state, expected_state_version)
             project = self._project(uow.session, project_id)
             if not project.consent:
                 raise ConsentRequiredError("image consent is required before registering an asset")
-            asset_count = uow.session.scalar(
+            active = uow.session.scalar(
                 select(func.count()).select_from(ImageAssetRow).where(
-                    ImageAssetRow.project_id == project_id
+                    ImageAssetRow.project_id == project_id,
+                    ImageAssetRow.deleted_at.is_(None),
                 )
             )
-            if asset_count >= 10:
+            if active >= 10:
                 raise AssetLimitError("a project can contain at most ten reference assets")
+            storage_key = self._storage.save(prepared.data, prepared.extension)
             asset = AssetWriteView(
                 id=str(uuid4()),
-                fixture_id=envelope.data.fixture_id,
-                media_type=envelope.data.media_type,
-                size_bytes=envelope.data.size_bytes,
+                original_filename=filename,
+                media_type=prepared.media_type,
+                size_bytes=len(prepared.data),
+                sha256=prepared.sha256,
+                deleted=False,
+                deleted_at=None,
                 state_version=state.state_version + 1,
             )
             uow.session.add(
                 ImageAssetRow(
                     project_id=project_id,
                     id=asset.id,
-                    payload=asset.model_dump(
-                        mode="json",
-                        by_alias=True,
-                        exclude={"state_version"},
-                    ),
+                    payload={
+                        "original_filename": filename,
+                        "media_type": prepared.media_type,
+                        "size_bytes": len(prepared.data),
+                        "sha256": prepared.sha256,
+                        "storage_key": storage_key,
+                        "width": prepared.width,
+                        "height": prepared.height,
+                    },
                 )
             )
             updated = state.model_copy(update={"state_version": state.state_version + 1})
             uow.projects.save(updated, expected_version=state.state_version)
-            self._record_replay(uow, project_id, envelope, request_hash, asset)
+            uow.idempotency.record(
+                project_id=project_id,
+                key=idempotency_key,
+                request_hash=request_hash,
+                response_payload=asset.model_dump(mode="json", by_alias=True),
+                resulting_version=asset.state_version,
+            )
             uow.commit()
             return asset
+
+    def _authorize_homeowner(self, project_id: str, actor: ActorContext) -> None:
+        with self._session_factory() as session:
+            self._project(session, project_id)
+            self._authorize_in_session(session, project_id, actor)
+            if actor.role != Role.HOMEOWNER:
+                raise AuthorizationError("only the homeowner can manage reference assets")
 
     def delete_asset(
         self,
@@ -304,7 +343,18 @@ class ProjectResourceService:
             consent=project.consent,
             status=project.status,
             state_version=project.state_version,
-            assets=[AssetView.model_validate(item.payload | {"id": item.id}) for item in assets],
+            assets=[
+                AssetView(
+                    id=item.id,
+                    original_filename=item.payload["original_filename"],
+                    media_type=item.payload["media_type"],
+                    size_bytes=item.payload["size_bytes"],
+                    sha256=item.payload["sha256"],
+                    deleted=item.deleted_at is not None,
+                    deleted_at=item.deleted_at,
+                )
+                for item in assets
+            ],
             role=role,
             designer_joined=designer_joined,
         )

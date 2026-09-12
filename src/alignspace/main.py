@@ -20,6 +20,7 @@ from alignspace.auth.routes import router as auth_router
 from alignspace.auth.service import AuthService
 from alignspace.persistence.database import create_engine_and_session
 from alignspace.providers.mock import build_mock_agents
+from alignspace.storage.local import LocalStorage
 from alignspace.workflow.runtime import sqlite_graph
 
 
@@ -49,9 +50,11 @@ def create_app(
     )
     engine, session_factory = create_engine_and_session(database_url)
     graph = sqlite_graph(agents or build_mock_agents(), checkpoint_path)
+    storage = LocalStorage(os.getenv("ALIGNSPACE_ASSET_DIR", "var/assets"))
     resources = ProjectResourceService(
         session_factory=session_factory,
         checkpoint_delete=graph.checkpointer.delete_thread,
+        storage=storage,
     )
     workflow = WorkflowService(
         session_factory=session_factory,
