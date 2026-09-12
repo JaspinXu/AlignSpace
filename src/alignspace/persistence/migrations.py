@@ -8,8 +8,9 @@ def migrate(engine):
     """Additive migrations. Re-running is safe.
 
     Version 1 adds auth tables and one member per role. Version 2 adds the
-    image soft-delete column. Existing development databases are never assigned
-    to real users by email/ID heuristics.
+    image soft-delete column. Version 3 tombstones legacy fixture assets that
+    cannot be read from content-addressed storage. Existing development
+    databases are never assigned to real users by email/ID heuristics.
     """
     with engine.begin() as connection:
         Base.metadata.create_all(connection)
@@ -30,5 +31,16 @@ def migrate(engine):
         connection.execute(
             text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
             {"version": 2},
+        )
+        connection.execute(
+            text(
+                "UPDATE image_assets SET deleted_at = 0 "
+                "WHERE json_extract(payload, '$.storage_key') IS NULL "
+                "AND deleted_at IS NULL"
+            )
+        )
+        connection.execute(
+            text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
+            {"version": 3},
         )
     assert MigrationRow.__tablename__ in Base.metadata.tables

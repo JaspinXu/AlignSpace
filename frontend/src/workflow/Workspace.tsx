@@ -468,9 +468,9 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
             </section>
           )}
 
-          {isHomeowner && (
-            <section aria-label="参考图片">
-              <h3>参考图片</h3>
+          <section aria-label="参考图片">
+            <h3>参考图片</h3>
+            {isHomeowner && <>
               <label htmlFor="asset-upload">上传参考图片</label>
               <input
                 id="asset-upload"
@@ -485,30 +485,30 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
               <p className="question-hint">
                 支持 JPEG / PNG / WebP，单张不超过 10MB，最多 10 张。
               </p>
-              <ul className="assets">
-                {project.assets.map((asset: Asset) => (
-                  <li key={asset.id}>
-                    <AssetThumb client={client} projectId={projectId} asset={asset} />
-                    <span>
-                      {asset.originalFilename}（{asset.mediaType}）
-                    </span>
-                    {isHomeowner && !asset.deleted && (
-                      <button
-                        type="button"
-                        aria-label={`删除 ${asset.originalFilename}`}
-                        onClick={() => void deleteAsset(asset)}
-                      >
-                        删除
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <button type="button" onClick={() => void startAnalysis()}>
-                启动分析
-              </button>
-            </section>
-          )}
+            </>}
+            <ul className="assets">
+              {project.assets.map((asset: Asset) => (
+                <li key={asset.id}>
+                  <AssetThumb client={client} projectId={projectId} asset={asset} />
+                  <span>
+                    {asset.originalFilename}（{asset.mediaType}）
+                  </span>
+                  {isHomeowner && !asset.deleted && (
+                    <button
+                      type="button"
+                      aria-label={`删除 ${asset.originalFilename}`}
+                      onClick={() => void deleteAsset(asset)}
+                    >
+                      删除
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {isHomeowner && <button type="button" onClick={() => void startAnalysis()}>
+              启动分析
+            </button>}
+          </section>
 
           {isHomeowner && (
             <section aria-label="显式偏好">

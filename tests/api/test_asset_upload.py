@@ -50,13 +50,30 @@ def create_project(api, owner, consent=True):
     return response.json()
 
 
-def upload(api, owner, project_id, *, key="upload-1", version=0, fmt="PNG", data=None):
+def upload(
+    api,
+    owner,
+    project_id,
+    *,
+    key="upload-1",
+    version=0,
+    fmt="PNG",
+    data=None,
+    filename=None,
+    content_type=None,
+):
     raw = data if data is not None else image_bytes(fmt)
     return api.post(
         f"/v1/projects/{project_id}/assets",
         headers=auth(owner),
         data={"expectedStateVersion": str(version), "idempotencyKey": key},
-        files={"file": (f"room.{fmt.lower()}", raw, f"image/{fmt.lower()}")},
+        files={
+            "file": (
+                filename or f"room.{fmt.lower()}",
+                raw,
+                content_type or f"image/{fmt.lower()}",
+            )
+        },
     )
 
 
@@ -163,6 +180,74 @@ def test_soft_delete_removes_bytes_but_keeps_a_tombstone(api):
         headers=auth(owner),
     )
     assert content.status_code == 404
+
+
+def test_upload_rejects_declared_type_and_filename_mismatches(api):
+    owner = register(api, "owner@example.com")
+    project = create_project(api, owner)
+    png = image_bytes("PNG")
+
+    assert upload(
+        api, owner, project["id"], data=png, content_type="text/plain"
+    ).status_code == 415
+    assert upload(
+        api,
+        owner,
+        project["id"],
+        data=png,
+        filename="photo.jpg",
+        content_type="image/jpeg",
+    ).status_code == 415
+
+
+def test_upload_is_rate_limited_per_account(api):
+    owner = register(api, "owner@example.com")
+    project = create_project(api, owner)
+
+    for _ in range(20):
+        assert upload(api, owner, project["id"], key="replay").status_code == 201
+    limited = upload(api, owner, project["id"], key="replay")
+    assert limited.status_code == 429
+    assert limited.headers["retry-after"] == "60"
+
+
+def test_deleting_shared_asset_keeps_bytes_until_last_reference_is_deleted(api):
+    owner = register(api, "owner@example.com")
+    project = create_project(api, owner)
+    data = image_bytes()
+    first = upload(api, owner, project["id"], key="dup-1", data=data).json()
+    second = upload(api, owner, project["id"], key="dup-2", version=1, data=data).json()
+    storage_key = f"{first['sha256']}.png"
+    storage = api.app.state.container.resources._storage
+
+    assert storage.exists(storage_key)
+    assert api.request(
+        "DELETE",
+        f"/v1/projects/{project['id']}/assets/{first['id']}",
+        headers=auth(owner),
+        json={"idempotencyKey": "delete-1", "expectedStateVersion": 2, "data": {}},
+    ).status_code == 200
+    assert api.get(
+        f"/v1/projects/{project['id']}/assets/{second['id']}/content", headers=auth(owner)
+    ).status_code == 200
+    assert api.request(
+        "DELETE",
+        f"/v1/projects/{project['id']}/assets/{second['id']}",
+        headers=auth(owner),
+        json={"idempotencyKey": "delete-2", "expectedStateVersion": 3, "data": {}},
+    ).status_code == 200
+    assert not storage.exists(storage_key)
+
+
+def test_deleting_project_garbage_collects_its_asset_bytes(api):
+    owner = register(api, "owner@example.com")
+    project = create_project(api, owner)
+    asset = upload(api, owner, project["id"]).json()
+    storage = api.app.state.container.resources._storage
+    storage_key = f"{asset['sha256']}.png"
+
+    assert api.delete(f"/v1/projects/{project['id']}", headers=auth(owner)).status_code == 204
+    assert not storage.exists(storage_key)
 
 
 def test_analysis_readiness_ignores_deleted_assets(api):

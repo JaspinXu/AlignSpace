@@ -49,6 +49,24 @@ def test_unsupported_format_is_rejected():
     assert error.value.code == "UNSUPPORTED_MEDIA_TYPE"
 
 
+def test_declared_media_type_must_match_image_bytes():
+    with pytest.raises(ImageValidationError) as error:
+        prepare_image(
+            encode(Image.new("RGB", (4, 4), "red"), "PNG"),
+            declared_type="text/plain",
+        )
+    assert error.value.code == "UNSUPPORTED_MEDIA_TYPE"
+
+
+def test_filename_extension_must_match_image_bytes():
+    with pytest.raises(ImageValidationError) as error:
+        prepare_image(
+            encode(Image.new("RGB", (4, 4), "red"), "PNG"),
+            filename="photo.jpg",
+        )
+    assert error.value.code == "UNSUPPORTED_MEDIA_TYPE"
+
+
 def test_exif_and_gps_are_stripped():
     source = Image.new("RGB", (8, 8), "blue")
     exif = Image.Exif()

@@ -526,8 +526,8 @@ class WorkflowService:
             return [
                 {
                     "id": row.id,
-                    "media_type": row.payload["media_type"],
-                    "sha256": row.payload["sha256"],
+                    "media_type": row.payload.get("media_type", "image/unknown"),
+                    "sha256": row.payload.get("sha256", ""),
                 }
                 for row in rows
             ]

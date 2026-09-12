@@ -198,6 +198,16 @@ describe('role-aware work area', () => {
     expect(screen.queryByRole('button', { name: '新增偏好' })).not.toBeInTheDocument();
   });
 
+  it('lets a designer view reference images without upload or delete controls', async () => {
+    const env = setup('designer');
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await screen.findByRole('heading', { name: '参考图片' });
+    expect(screen.getByText(/room\.png/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('上传参考图片')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /删除 room\.png/ })).not.toBeInTheDocument();
+  });
+
   it('preserves an edited attribute on 409, refetches and uses a new key/version on deliberate resubmit', async () => {
     const env = setup();
     await env.client.restore();

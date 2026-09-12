@@ -94,9 +94,12 @@ def register_asset(
     file: Annotated[UploadFile, File()],
     expected_state_version: Annotated[int, Form(alias="expectedStateVersion")],
     idempotency_key: Annotated[str, Form(alias="idempotencyKey")],
+    request: Request,
     actor: Actor,
     container: Container,
 ) -> AssetWriteView:
+    container.auth.throttle("upload-user", actor.actor_id, limit=20, window=60)
+    container.auth.throttle("upload-ip", request.client.host, limit=60, window=60)
     return container.resources.register_asset(
         project_id,
         actor,
@@ -104,6 +107,7 @@ def register_asset(
         idempotency_key=idempotency_key,
         filename=file.filename or "upload",
         raw=file.file.read(),
+        declared_type=file.content_type,
     )
 
 

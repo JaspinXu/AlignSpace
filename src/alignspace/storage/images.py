@@ -29,7 +29,12 @@ class PreparedImage:
     height: int
 
 
-def prepare_image(raw: bytes) -> PreparedImage:
+def prepare_image(
+    raw: bytes,
+    *,
+    declared_type: str | None = None,
+    filename: str | None = None,
+) -> PreparedImage:
     if len(raw) > MAX_BYTES:
         raise ImageValidationError("ASSET_TOO_LARGE", "图片不得超过 10MB。")
     try:
@@ -41,6 +46,13 @@ def prepare_image(raw: bytes) -> PreparedImage:
             if image_format not in FORMATS:
                 raise ImageValidationError("UNSUPPORTED_MEDIA_TYPE", "仅支持 JPEG、PNG、WebP。")
             media_type, extension = FORMATS[image_format]
+            if declared_type not in {None, "", "application/octet-stream", media_type}:
+                raise ImageValidationError("UNSUPPORTED_MEDIA_TYPE", "文件类型与图片内容不匹配。")
+            if filename:
+                suffix = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+                declared_extension = {"jpg": "jpg", "jpeg": "jpg", "png": "png", "webp": "webp"}.get(suffix)
+                if declared_extension is not None and declared_extension != extension:
+                    raise ImageValidationError("UNSUPPORTED_MEDIA_TYPE", "文件扩展名与图片内容不匹配。")
             width, height = image.size
             buffer = BytesIO()
             # Re-encoding without passing exif= drops EXIF/GPS metadata.

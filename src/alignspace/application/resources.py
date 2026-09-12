@@ -146,8 +146,17 @@ class ProjectResourceService:
             self._authorize_in_session(session, project_id, actor)
             if actor.role != Role.HOMEOWNER:
                 raise AuthorizationError("only the homeowner can delete a project")
+            storage_keys = [
+                key
+                for asset in session.scalars(
+                    select(ImageAssetRow).where(ImageAssetRow.project_id == project_id)
+                )
+                if (key := asset.payload.get("storage_key")) is not None
+            ]
             session.delete(project)
             session.commit()
+        for storage_key in storage_keys:
+            self._gc_storage_key(storage_key)
         self._checkpoint_delete(project_id)
 
     def register_asset(
@@ -159,9 +168,10 @@ class ProjectResourceService:
         idempotency_key: str,
         filename: str,
         raw: bytes,
+        declared_type: str | None = None,
     ) -> AssetWriteView:
         self._authorize_homeowner(project_id, actor)
-        prepared = prepare_image(raw)
+        prepared = prepare_image(raw, declared_type=declared_type, filename=filename)
         request_hash = canonical_request_hash(
             {
                 "action": "upload_asset",
@@ -274,14 +284,26 @@ class ProjectResourceService:
             asset = uow.session.get(ImageAssetRow, (project_id, asset_id))
             if asset is None or asset.deleted_at is not None:
                 raise KeyError(f"asset {asset_id} not found")
-            self._storage.delete(asset.payload["storage_key"])
+            storage_key = asset.payload["storage_key"]
+            asset.payload = {**asset.payload, "storage_key": None}
             asset.deleted_at = int(time.time())
             updated = state.model_copy(update={"state_version": state.state_version + 1})
             uow.projects.save(updated, expected_version=state.state_version)
             response = AssetDeleteView(id=asset_id, state_version=updated.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)
             uow.commit()
+        self._gc_storage_key(storage_key)
         return response
+
+    def _gc_storage_key(self, storage_key: str) -> None:
+        with self._session_factory() as session:
+            references = session.scalar(
+                select(func.count()).select_from(ImageAssetRow).where(
+                    ImageAssetRow.payload["storage_key"].as_string() == storage_key
+                )
+            )
+        if references == 0:
+            self._storage.delete(storage_key)
 
     def is_member(self, project_id: str, actor: ActorContext) -> bool:
         with self._session_factory() as session:
@@ -357,10 +379,10 @@ class ProjectResourceService:
             assets=[
                 AssetView(
                     id=item.id,
-                    original_filename=item.payload["original_filename"],
-                    media_type=item.payload["media_type"],
-                    size_bytes=item.payload["size_bytes"],
-                    sha256=item.payload["sha256"],
+                    original_filename=item.payload.get("original_filename", "legacy-asset"),
+                    media_type=item.payload.get("media_type", "image/unknown"),
+                    size_bytes=item.payload.get("size_bytes", 0),
+                    sha256=item.payload.get("sha256", ""),
                     deleted=item.deleted_at is not None,
                     deleted_at=item.deleted_at,
                 )
