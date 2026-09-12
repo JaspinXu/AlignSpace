@@ -912,7 +912,7 @@ def test_soft_delete_removes_bytes_but_keeps_a_tombstone(api):
 
     listed = api.get(f"/v1/projects/{project['id']}", headers=auth(owner)).json()
     assert listed["assets"][0]["deleted"] is True
-    assert listed["assets"][0]["deletedAt"] == 1  # frozen test clock is not used; see note
+    assert listed["assets"][0]["deletedAt"] is not None
 
     content = api.get(
         f"/v1/projects/{project['id']}/assets/{asset['id']}/content",
@@ -939,8 +939,6 @@ def test_analysis_readiness_ignores_deleted_assets(api):
     assert started.status_code == 409
     assert started.json()["error"]["code"] == "ASSET_COUNT_INVALID"
 ```
-
-Note: the `deletedAt` assertion must not depend on wall-clock. Replace that line with `assert listed["assets"][0]["deletedAt"] is not None` when implementing.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1323,6 +1321,29 @@ def upload_asset(
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+@pytest.fixture
+def upload_image(client: TestClient):
+    def _upload(
+        project_id: str,
+        *,
+        headers: dict[str, str],
+        key: str,
+        version: int,
+        fmt: str = "PNG",
+        color: str = "red",
+    ):
+        return client.post(
+            f"/v1/projects/{project_id}/assets",
+            headers=headers,
+            data={"expectedStateVersion": str(version), "idempotencyKey": key},
+            files={
+                "file": (f"room.{fmt.lower()}", image_bytes(fmt, color), f"image/{fmt.lower()}")
+            },
+        )
+
+    return _upload
 ```
 
 Change `_create_project`'s asset seeding block in `analysis_ready_project` so it uploads three images and tracks the version returned by each call (the envelope version must advance). Replace the loop with:
@@ -1341,23 +1362,11 @@ Change `_create_project`'s asset seeding block in `analysis_ready_project` so it
 Delete `_asset_envelope` and rewrite the asset tests to upload. Replace the file's asset tests with:
 
 ```python
-def _upload(client, project_id, *, headers, key, version, fmt="PNG"):
-    from tests.conftest import image_bytes  # or import at module top
-
-    response = client.post(
-        f"/v1/projects/{project_id}/assets",
-        headers=headers,
-        data={"expectedStateVersion": str(version), "idempotencyKey": key},
-        files={"file": (f"room.{fmt.lower()}", image_bytes(fmt), f"image/{fmt.lower()}")},
-    )
-    return response
-
-
-def test_designer_cannot_manage_reference_assets(client, ready_project) -> None:
-    created = _upload(client, ready_project, headers=_headers(), key="homeowner-asset", version=0)
+def test_designer_cannot_manage_reference_assets(client, ready_project, upload_image) -> None:
+    created = upload_image(ready_project, headers=_headers(), key="homeowner-asset", version=0)
     assert created.status_code == 201
-    add_attempt = _upload(
-        client, ready_project, headers=_headers("designer-1", "designer"),
+    add_attempt = upload_image(
+        ready_project, headers=_headers("designer-1", "designer"),
         key="designer-asset", version=1,
     )
     assert add_attempt.status_code == 403
@@ -1370,17 +1379,19 @@ def test_designer_cannot_manage_reference_assets(client, ready_project) -> None:
     assert remove_attempt.status_code == 403
 
 
-def test_asset_registration_requires_consent(client, project_without_consent) -> None:
-    response = _upload(
-        client, project_without_consent, headers=_headers(), key="asset-1", version=0
+def test_asset_registration_requires_consent(client, project_without_consent, upload_image) -> None:
+    response = upload_image(
+        project_without_consent, headers=_headers(), key="asset-1", version=0
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "CONSENT_REQUIRED"
 
 
-def test_register_and_soft_delete_are_versioned_and_idempotent(client, ready_project) -> None:
-    first = _upload(client, ready_project, headers=_headers(), key="asset-create", version=0)
-    replay = _upload(client, ready_project, headers=_headers(), key="asset-create", version=0)
+def test_register_and_soft_delete_are_versioned_and_idempotent(
+    client, ready_project, upload_image
+) -> None:
+    first = upload_image(ready_project, headers=_headers(), key="asset-create", version=0)
+    replay = upload_image(ready_project, headers=_headers(), key="asset-create", version=0)
     assert first.status_code == 201
     assert replay.json() == first.json()
 
@@ -1401,30 +1412,23 @@ def test_register_and_soft_delete_are_versioned_and_idempotent(client, ready_pro
     assert after[0]["deleted"] is True
 
 
-def test_asset_conflicting_replay_returns_stable_error(client, ready_project) -> None:
-    from tests.conftest import image_bytes
-
-    first = _upload(client, ready_project, headers=_headers(), key="asset-create", version=0)
-    conflict = client.post(
-        f"/v1/projects/{ready_project}/assets",
-        headers=_headers(),
-        data={"expectedStateVersion": "0", "idempotencyKey": "asset-create"},
-        files={"file": ("room.png", image_bytes(color="blue"), "image/png")},
+def test_asset_conflicting_replay_returns_stable_error(client, ready_project, upload_image) -> None:
+    first = upload_image(ready_project, headers=_headers(), key="asset-create", version=0)
+    conflict = upload_image(
+        ready_project, headers=_headers(), key="asset-create", version=0, color="blue"
     )
     assert first.status_code == 201
     assert conflict.status_code == 409
     assert conflict.json()["error"]["code"] == "IDEMPOTENCY_KEY_CONFLICT"
 
 
-def test_project_accepts_at_most_ten_reference_assets(client, ready_project) -> None:
+def test_project_accepts_at_most_ten_reference_assets(client, ready_project, upload_image) -> None:
     for index in range(10):
-        response = _upload(
-            client, ready_project, headers=_headers(), key=f"asset-{index}", version=index
+        response = upload_image(
+            ready_project, headers=_headers(), key=f"asset-{index}", version=index
         )
         assert response.status_code == 201
-    rejected = _upload(
-        client, ready_project, headers=_headers(), key="asset-11", version=10
-    )
+    rejected = upload_image(ready_project, headers=_headers(), key="asset-11", version=10)
     assert rejected.status_code == 409
     assert rejected.json()["error"]["code"] == "ASSET_LIMIT_REACHED"
 ```
