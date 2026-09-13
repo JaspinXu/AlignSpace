@@ -122,6 +122,20 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     }
     await owner.getByLabel('您的回答').fill('Warm ambient lighting around 2700K');
     await write(owner, '提交回答', '/answer', 202);
+    await expect(owner.getByText('等待设计师反馈')).toBeVisible();
+
+    // Designer enters a real constraint linked to a confirmed preference.
+    await designer.reload();
+    await designer.getByLabel('作用对象').fill('worktop');
+    const linkedOption = designer.getByLabel('关联偏好').locator('option').nth(1);
+    await designer.getByLabel('关联偏好').selectOption((await linkedOption.getAttribute('value')) ?? '');
+    await designer.getByLabel('约束内容').fill('天然石材工作台超出当前预算档位');
+    await designer.getByLabel('约束理由').fill('改用石材效果饰面');
+    await write(designer, '保存约束', '/constraints', 200);
+    await write(designer, '提交设计师反馈', '/designer-reviews', 202);
+    await expect(designer.getByText('等待屋主回答')).toBeVisible();
+
+    await owner.reload();
     await expect(owner.locator('.question-text')).toContainText('trade-off');
     await owner.getByLabel('您的回答').fill('Use the lower-cost stone-effect finish.');
     await write(owner, '提交回答', '/answer');

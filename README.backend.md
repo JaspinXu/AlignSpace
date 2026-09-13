@@ -10,6 +10,7 @@
 - 3–10 张真实参考图片的本地存储（JPEG / PNG / WebP，单张不超过 10MB）、图片处理同意门槛和删除流程。
 - 稀疏偏好记录：系统不会因为属性未被提及就预先创建空数据；人工明确补充的偏好才会新增。
 - 广泛提问后再细化、最多 10 个屋主问题、设计约束冲突和人工解决。
+- 设计师真实约束录入：新增、修改、撤销与查询；`important`/`critical` 且关联已确认偏好的约束按规则派生 `preference_vs_constraint` 冲突；属性/约束/冲突变化会使过时方案审批失效，未解决冲突不会被自动标记为已解决。
 - JSON Schema 方案校验、内容哈希、版本化编辑和同版本双人审批。
 - 结构、电气、法规、安全、精确价格和实时库存声明的专业复核门槛。
 
@@ -47,8 +48,8 @@ uv run ruff check src tests
   → 上传 3 张真实参考图片
   → 视觉观察与屋主广泛提问
   → 细化偏好并确认共享状态
-  → 设计师预算约束与冲突
-  → 屋主选择低成本替代方案
+  → 设计师录入真实约束（可关联已确认偏好）并派生冲突
+  → 屋主回应冲突并选择低成本替代方案
   → 生成并校验设计规格
   → 屋主与设计师审批同一版本
 ```
@@ -88,6 +89,10 @@ DELETE /v1/projects/{projectId}
 POST   /v1/projects/{projectId}/assets
 GET    /v1/projects/{projectId}/assets/{assetId}/content
 DELETE /v1/projects/{projectId}/assets/{assetId}
+POST   /v1/projects/{projectId}/constraints
+PATCH  /v1/projects/{projectId}/constraints/{constraintId}
+POST   /v1/projects/{projectId}/constraints/{constraintId}/withdraw
+GET    /v1/projects/{projectId}/constraints
 POST   /v1/projects/{projectId}/analysis-runs
 PATCH  /v1/projects/{projectId}/attributes/{attributeId}
 GET    /v1/projects/{projectId}/questions/next

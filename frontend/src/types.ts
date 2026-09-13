@@ -66,6 +66,10 @@ export type Constraint = {
   severity: string;
   verificationStatus: string;
   owner: string;
+  appliesTo?: string;
+  attributeId?: string | null;
+  proposedBy?: string;
+  withdrawn?: boolean;
 };
 
 export type Conflict = {
@@ -77,6 +81,7 @@ export type Conflict = {
   resolution?: string | null;
   severity: string;
   resolutionAttempts: number;
+  constraintId?: string | null;
 };
 
 export type Question = {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, newIdempotencyKey, prepareWrite } from '../api';
-import type { Asset, Attribute, Conflict, ProjectSnapshot } from '../types';
+import type { Asset, Attribute, Conflict, Constraint, ProjectSnapshot } from '../types';
 
 const BROAD_OPTIONS = [
   { label: '暖色灯光', keyword: 'lighting' },
@@ -20,6 +20,18 @@ const DIMENSIONS = [
   { value: 'furniture', label: '家具' },
   { value: 'mood', label: '氛围' },
   { value: 'function', label: '功能' },
+];
+
+const CONSTRAINT_CATEGORIES = [
+  { value: 'budget', label: '预算' },
+  { value: 'space', label: '空间' },
+  { value: 'function', label: '功能' },
+  { value: 'maintenance', label: '维护' },
+  { value: 'timeline', label: '工期' },
+  { value: 'safety', label: '安全' },
+  { value: 'regulatory', label: '法规' },
+  { value: 'availability', label: '供货' },
+  { value: 'other', label: '其他' },
 ];
 
 const ROLE_LABEL: Record<string, string> = { homeowner: '屋主', designer: '设计师' };
@@ -79,6 +91,12 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   const [conflictResolution, setConflictResolution] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [goalsDraft, setGoalsDraft] = useState('');
+  const [constraintCategory, setConstraintCategory] = useState('budget');
+  const [constraintStatement, setConstraintStatement] = useState('');
+  const [constraintRationale, setConstraintRationale] = useState('');
+  const [constraintSeverity, setConstraintSeverity] = useState('important');
+  const [constraintAppliesTo, setConstraintAppliesTo] = useState('');
+  const [constraintAttributeId, setConstraintAttributeId] = useState('');
   const goalsDirty = useRef(false);
   const goalsRevision = useRef(0);
   const attributeId = useRef(`manual-${Math.random().toString(36).slice(2)}`);
@@ -156,6 +174,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
 
   const { project, projectState } = snapshot;
   const isHomeowner = project.role === 'homeowner';
+  const isDesigner = project.role === 'designer';
   const openConflict =
     projectState.conflicts.find((conflict) => conflict.status === 'open') ?? null;
   const deletedAssetIds = new Set(project.assets.filter((asset) => asset.deleted).map((asset) => asset.id));
@@ -315,6 +334,48 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
       );
       setConflictResolution('');
       setNotice('冲突决定已提交。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const createConstraint = async () => {
+    if (!constraintStatement.trim()) {
+      setNotice('请填写约束内容。');
+      return;
+    }
+    try {
+      await client.execute(
+        prepareWrite(`/v1/projects/${projectId}/constraints`, 'POST', project.stateVersion, {
+          category: constraintCategory,
+          statement: constraintStatement,
+          rationale: constraintRationale,
+          severity: constraintSeverity,
+          appliesTo: constraintAppliesTo,
+          attributeId: constraintAttributeId || null,
+        }),
+      );
+      setConstraintStatement('');
+      setConstraintRationale('');
+      setNotice('约束已录入，冲突与方案审批已重新计算。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const withdrawConstraint = async (constraint: Constraint) => {
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/constraints/${constraint.id}/withdraw`,
+          'POST',
+          project.stateVersion,
+          {},
+        ),
+      );
+      setNotice('约束已撤销。');
       await load();
     } catch (error) {
       await handleWriteError(error);
@@ -628,10 +689,94 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
           <section>
             <h3>约束</h3>
             <ul>
-              {projectState.constraints.map((constraint) => (
-                <li key={constraint.id}>{constraint.statement}</li>
+              {projectState.constraints.map((constraint: Constraint) => (
+                <li key={constraint.id}>
+                  <strong>{constraint.statement}</strong>
+                  {constraint.withdrawn && <span className="asset-missing">已撤销</span>}
+                  <div className="hint">
+                    {constraint.category} · {constraint.severity}
+                    {constraint.appliesTo ? ` · 作用对象：${constraint.appliesTo}` : ''}
+                    {constraint.attributeId ? ` · 关联偏好：${constraint.attributeId}` : ''}
+                  </div>
+                  {constraint.rationale && <div className="hint">理由：{constraint.rationale}</div>}
+                  {isDesigner && !constraint.withdrawn && (
+                    <button
+                      type="button"
+                      aria-label={`撤销 ${constraint.statement}`}
+                      onClick={() => void withdrawConstraint(constraint)}
+                    >
+                      撤销
+                    </button>
+                  )}
+                </li>
               ))}
             </ul>
+            {isDesigner && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void createConstraint();
+                }}
+              >
+                <h4>新增约束</h4>
+                <label htmlFor="constraint-category">约束类别</label>
+                <select
+                  id="constraint-category"
+                  value={constraintCategory}
+                  onChange={(event) => setConstraintCategory(event.target.value)}
+                >
+                  {CONSTRAINT_CATEGORIES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <label htmlFor="constraint-severity">限制性质</label>
+                <select
+                  id="constraint-severity"
+                  value={constraintSeverity}
+                  onChange={(event) => setConstraintSeverity(event.target.value)}
+                >
+                  <option value="advisory">提示</option>
+                  <option value="important">重要</option>
+                  <option value="critical">关键</option>
+                </select>
+                <label htmlFor="constraint-applies-to">作用对象</label>
+                <input
+                  id="constraint-applies-to"
+                  value={constraintAppliesTo}
+                  onChange={(event) => setConstraintAppliesTo(event.target.value)}
+                />
+                <label htmlFor="constraint-attribute">关联偏好</label>
+                <select
+                  id="constraint-attribute"
+                  value={constraintAttributeId}
+                  onChange={(event) => setConstraintAttributeId(event.target.value)}
+                >
+                  <option value="">（不关联）</option>
+                  {projectState.attributes
+                    .filter((attribute) => attribute.status === 'confirmed')
+                    .map((attribute) => (
+                      <option key={attribute.id} value={attribute.id}>
+                        {attribute.dimension}：{attribute.value}
+                      </option>
+                    ))}
+                </select>
+                <label htmlFor="constraint-statement">约束内容</label>
+                <textarea
+                  id="constraint-statement"
+                  value={constraintStatement}
+                  onChange={(event) => setConstraintStatement(event.target.value)}
+                />
+                <label htmlFor="constraint-rationale">约束理由</label>
+                <textarea
+                  id="constraint-rationale"
+                  value={constraintRationale}
+                  onChange={(event) => setConstraintRationale(event.target.value)}
+                />
+                <button type="submit">保存约束</button>
+              </form>
+            )}
           </section>
           <section>
             <h3>冲突</h3>

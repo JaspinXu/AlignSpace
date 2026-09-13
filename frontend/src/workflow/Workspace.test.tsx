@@ -441,3 +441,46 @@ describe('real image uploads', () => {
     expect(await screen.findByText('来源图片已删除')).toBeInTheDocument();
   });
 });
+
+describe('designer constraints', () => {
+  it('lets the designer create a constraint and shows the rationale to everyone', async () => {
+    const env = setup('designer', conflictSnapshot('designer'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    expect(await screen.findByText(/理由：/)).toBeInTheDocument();
+
+    await userEvent.type(
+      await screen.findByLabelText('约束内容'),
+      '工作台石材需控制在当前预算档位',
+    );
+    await userEvent.type(screen.getByLabelText('约束理由'), '改用石材效果饰面');
+    await userEvent.click(screen.getByRole('button', { name: '保存约束' }));
+
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    const body = JSON.parse(String(env.writes[0].body));
+    expect(body.data.category).toBe('budget');
+    expect(body.data.statement).toBe('工作台石材需控制在当前预算档位');
+    expect(body.data.rationale).toBe('改用石材效果饰面');
+  });
+
+  it('hides constraint write controls from the homeowner', async () => {
+    const env = setup('homeowner', conflictSnapshot('homeowner'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    expect(await screen.findByText(/理由：/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '保存约束' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^撤销 / })).not.toBeInTheDocument();
+  });
+
+  it('lets the designer withdraw a constraint', async () => {
+    const env = setup('designer', conflictSnapshot('designer'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '撤销 天然石材超出预算' }),
+    );
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    expect(env.writes[0].method).toBe('POST');
+    expect(JSON.parse(String(env.writes[0].body)).data).toEqual({});
+  });
+});

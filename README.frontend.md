@@ -97,7 +97,8 @@ uv run ruff check src tests
 - Reloadable `?project=<id>` navigation and browser back/forward support.
 - Role-aware workspace: reference image upload, analysis start, broad
   question, explicit preferences, confirm/reject of proposed observations,
-  conflict decisions, designer review notes, brief edit and dual approval.
+  designer constraint create/withdraw with rationale, conflict decisions,
+  designer review notes, brief edit and dual approval.
 - Versioned writes keep `idempotencyKey` + `expectedStateVersion`; a 409 keeps
   the typed input, refetches state, and requires a deliberate resubmit with a
   new key. Unsaved brief goals survive newer server versions; save them before
@@ -127,8 +128,11 @@ uv run ruff check src tests
 - Active conflict questions are answered by the homeowner to resume the graph;
   the sidebar directs both parties to that task instead of offering a second
   resolution action that would leave the graph paused.
-- Designer constraints still come from deterministic fixtures. The designer
-  waiting form is component-tested against `waitReason=designer` with no
-  pending question; the default real-backend flow uses fixture constraints
-  and does not enter that form. Review notes are not free-text constraint extraction.
+- Designer constraints are entered as structured fields (category, applies-to,
+  optional linked preference, statement, rationale, severity) and can be
+  withdrawn. They are not free-text extraction; the system never estimates cost
+  or feasibility itself. An important/critical constraint linked to a confirmed
+  preference derives a conflict that a human resolves; changing attributes,
+  constraints or conflicts clears stale approvals and returns the project to
+  alignment.
 - The SQLite migrations are SQLite-specific.
