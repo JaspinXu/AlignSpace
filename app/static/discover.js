@@ -43,7 +43,7 @@
   }
   function renderHomes() {
     if (!data) return;
-    const query = el('home-search').value.trim().toLowerCase(), style = el('home-style').value;
+    const query = window.I18n.searchQuery(el('home-search').value).toLowerCase(), style = el('home-style').value;
     let homes = savedOnly ? saved.map(find).filter(Boolean) : live ? live.projects : data.projects;
     if (!live && !savedOnly) homes = homes.filter(h => (kind === 'All' || h.propertyType === kind) && (style === 'All' || h.style.toLowerCase().includes(style.toLowerCase())) && query.split(/\s+/).every(word => [h.title,h.town,h.style,h.flatType,h.designer,h.features.join(' '),h.styleCue].join(' ').toLowerCase().includes(word)));
     const visible = homes.slice(0,visibleCount);

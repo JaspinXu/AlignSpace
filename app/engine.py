@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from app import knowledge
+from app import knowledge, interview
 
 
 DIMENSIONS = (
@@ -201,25 +201,33 @@ def _entropy(values: list[str]) -> float:
 
 
 def next_question(state: dict[str, Any], role: str | None = None) -> dict[str, Any] | None:
-    if state["questionCount"] >= state["maxQuestions"]:
+    if state["questionCount"] >= state["maxQuestions"] or (role and state.get("interviewPaused", {}).get(role)):
         return None
-    answered = {answer["questionId"] for answer in state["answers"]}
+    answered = {a["questionId"] for a in state["answers"] if not a.get("detail") or a.get("basis") == _confirmed_map(state).get(a["dimension"])}
     scored: list[tuple[float, dict[str, Any]]] = []
     open_conflict_dimensions = {
         conflict.get("dimension")
         for conflict in state["conflicts"]
         if conflict["status"] == "open" and conflict.get("dimension")
     }
-    for question in QUESTION_BANK:
+    for question in [*QUESTION_BANK, *interview.DETAIL_QUESTIONS]:
+        if question.get("detail") and not interview.eligible(question, _confirmed_map(state), state["answers"]):
+            continue
         if role and question['target'] != role:
             continue
-        if question["id"] in answered or question['dimension'] in _confirmed_map(state):
+        if question["id"] in answered or (not question.get("detail") and question['dimension'] in _confirmed_map(state)):
             continue
         values = question["options"]
         information_gain = _entropy(values)
         conflict_bonus = 0.7 if question["dimension"] in open_conflict_dimensions else 0
         coverage_bonus = 0.25 if question["dimension"] not in _confirmed_map(state) else 0
         score = information_gain * question["impact"] + conflict_bonus + coverage_bonus
+        if not question.get("detail"):
+            score += 5  # Resolve missing shared vocabulary before optional details.
+        elif question.get("after"):
+            score += 2
+        elif "*" not in question["requires"]:
+            score += 1  # A conditional follow-up narrows an actual prior choice.
         scored.append((score, question))
     if not scored:
         return None
@@ -235,19 +243,23 @@ def next_question(state: dict[str, Any], role: str | None = None) -> dict[str, A
     }
 
 
-def answer_question(state: dict[str, Any], question_id: str, role: str, value: str) -> dict[str, Any]:
-    if state['questionCount'] >= state['maxQuestions']:
+def answer_question(state: dict[str, Any], question_id: str, role: str, value: str, *, revision: bool = False) -> dict[str, Any]:
+    if not revision and (state['questionCount'] >= state['maxQuestions'] or state.get("interviewPaused", {}).get(role)):
         raise ValueError('Question limit reached; edit the brief to complete remaining decisions')
-    question = next((item for item in QUESTION_BANK if item["id"] == question_id), None)
+    question = next((item for item in [*QUESTION_BANK, *interview.DETAIL_QUESTIONS] if item["id"] == question_id), None)
     if not question:
         raise ValueError("Unknown question")
     if question["target"] != role:
         raise ValueError(f"This question must be answered by the {question['target']}")
+    if question.get("detail") and not (revision and value == "not_sure") and not interview.eligible(question, _confirmed_map(state), state["answers"]):
+        raise ValueError("This follow-up does not apply to the current preferences")
+    if question.get("detail"):
+        state["answers"] = [a for a in state["answers"] if not (a["questionId"] == question_id and a.get("basis") != _confirmed_map(state).get(a["dimension"]))]
     if any(item["questionId"] == question_id for item in state["answers"]):
         raise ValueError("Question has already been answered")
     if value not in [*question["options"], "not_sure"]:
         raise ValueError("Answer is not one of the allowed options")
-    if value != 'not_sure':
+    if value != 'not_sure' and not question.get('detail'):
         validate_preference(state, question['dimension'], value)
 
     answer_id = new_id("answer")
@@ -255,6 +267,7 @@ def answer_question(state: dict[str, Any], question_id: str, role: str, value: s
         {
             "id": answer_id,
             "questionId": question_id,
+            **({"detail": True, "prompt": question["prompt"], "promptZh": question["promptZh"], "valueZh": question["optionsZh"].get(value, "暂不确定"), "basis": _confirmed_map(state).get(question["dimension"])} if question.get("detail") else {}),
             "target": role,
             "dimension": question["dimension"],
             "value": value,
@@ -262,7 +275,7 @@ def answer_question(state: dict[str, Any], question_id: str, role: str, value: s
         }
     )
     state["questionCount"] += 1
-    if value != "not_sure":
+    if value != "not_sure" and not question.get("detail"):
         state["attributes"] = [
             item for item in state["attributes"]
         ]
@@ -292,12 +305,12 @@ def answer_question(state: dict[str, Any], question_id: str, role: str, value: s
     other_role = "designer" if role == "homeowner" else "homeowner"
     other_agent = f"{other_role}_agent"
     readable = value.replace("_", " ")
-    add_agent_message(state, source_agent, other_agent, f"Confirmed {question['dimension']}: {readable}.", "qa_answer")
+    add_agent_message(state, source_agent, other_agent, f"{'Skipped' if value == 'not_sure' else 'Detail recorded' if question.get('detail') else 'Confirmed'} {question['dimension']}: {readable}.", "qa_answer")
     add_agent_message(
         state,
         other_agent,
         role,
-        f"I translated that into a shared {question['dimension']} requirement and will cross-check it against the other side's constraints.",
+        ('No preference was confirmed. You can revisit this decision in the shared brief.' if value == 'not_sure' else 'This optional detail is saved alongside the core decisions in the shared brief.' if question.get('detail') else f"I translated that into a shared {question['dimension']} requirement and will cross-check it against the other side's constraints."),
         "cross_check",
     )
     return bump_and_recompute(state)
@@ -362,12 +375,25 @@ REFERENCE_KEYWORDS: dict[str, dict[str, tuple[str, ...]]] = {
 }
 
 
+_ZH_ALIASES = {
+    'warm_modern': ('暖色现代', '温暖现代'), 'japandi': ('日式北欧', '日系', '日式'),
+    'contemporary_luxe': ('轻奢', '豪华'), 'industrial': ('工业风',), 'scandinavian': ('北欧',),
+    'warm_neutral': ('暖中性', '奶油色'), 'light_neutral': ('浅中性', '浅色'), 'earthy': ('大地色',),
+    'monochrome': ('黑白', '单色'), 'deep_tones': ('深色',), 'light_oak': ('浅橡木', '浅色橡木'),
+    'walnut': ('胡桃木',), 'stone': ('石材', '大理石'), 'metal': ('金属',), 'soft_textiles': ('布艺', '织物'),
+    'soft_layered': ('柔和灯光', '分层灯光'), 'natural_bright': ('自然光', '采光'),
+    'warm_ambient': ('暖光', '氛围灯'), 'statement': ('吊灯', '造型灯'), 'task_focused': ('阅读灯', '工作灯')}
+for _values in REFERENCE_KEYWORDS.values():
+    for _value in _values:
+        _values[_value] += _ZH_ALIASES.get(_value, ())
+
+
 def _candidate_exclusions(state: dict[str, Any], candidate: dict[str, Any]) -> list[str]:
     excluded = []
     for dimension in DIMENSIONS:
         value = candidate.get(dimension, '')
         keywords = (value.replace('_', ' '), *REFERENCE_KEYWORDS.get(dimension, {}).get(value, ()))
-        if any(re.search(r'(?<!\w)' + re.escape(k) + r'(?!\w)', text.lower())
+        if any(re.search((re.escape(k) if re.search(r'[\u4e00-\u9fff]', k) else r'(?<!\w)' + re.escape(k) + r'(?!\w)'), text.lower())
                for text in state['antiPreferences'] for k in keywords if k):
             excluded.append(dimension)
     return excluded
@@ -411,8 +437,8 @@ def analyse_references(state: dict[str, Any]) -> dict[str, Any]:
     for reference in state["references"]:
         evidence_text = reference.get('note', '').lower()
         # Offline fallback is conservative: ambiguous/negative clauses never become likes.
-        positive_clauses = [part for part in re.split(r'[.!?;]|\bbut\b', evidence_text)
-                            if not re.search(r"\b(no|not|never|avoid|dislike|without|unsure|uncertain)\b|n't|不|讨厌|避免", part)]
+        positive_clauses = [part for part in re.split(r'[.!?;。！？；]|\bbut\b|但是|不过|但', evidence_text)
+                            if not re.search(r"\b(no|not|never|avoid|dislike|without|unsure|uncertain)\b|n't|不|讨厌|避免|别用|拒绝|不要|没想好", part)]
         for dimension, values in REFERENCE_KEYWORDS.items():
             for value, keywords in values.items():
                 if not any(keyword in part for keyword in keywords for part in positive_clauses):
@@ -664,6 +690,7 @@ def build_brief(state: dict[str, Any]) -> dict[str, Any]:
         "antiPreferences": state["antiPreferences"],
         "attributes": attributes,
         "constraints": constraints,
+        **({"designDetails": interview.active_details(state)} if any(a.get("detail") for a in state["answers"]) else {}),
         "conflicts": conflicts,
         "unresolvedDecisions": [item["summary"] for item in state["conflicts"] if item["status"] in {'open', 'escalated'}] + [f"Choose {d}" for d in state['readiness']['missingDimensions']] + state['readiness'].get('blockers', []),
         **({"knowledgeReferences": [r for r in state.get("shortlist", []) if r.get("kind") == "knowledge_reference"],
@@ -715,3 +742,18 @@ def demo_answers() -> list[tuple[str, str, str]]:
         ("layout_strategy", "designer", "zoned"),
         ("maintenance_level", "designer", "balanced"),
     ]
+
+
+def set_interview(state, role, action):
+    if action not in {"continue", "pause"}:
+        raise ValueError("Unknown interview action")
+    if action == "continue":
+        if state['questionCount'] >= state['maxQuestions']:
+            state['maxQuestions'] = state['questionCount'] + 10
+        elif not state.get('interviewPaused', {}).get(role):
+            raise ValueError("Finish this round before starting another")
+    state.setdefault('interviewPaused', {})[role] = action == "pause"
+    # Workflow consent does not change the signed design content.
+    state['stateVersion'] += 1
+    state['updatedAt'] = now_iso()
+    return state

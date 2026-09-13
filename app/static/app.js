@@ -120,18 +120,36 @@ function render() {
   if (state.activeTab === "activity") loadAudit();
 }
 
+function bilingual(en, zh) {
+  return `<span data-en="${escapeHtml(en).replaceAll('"', '&quot;')}" data-zh="${escapeHtml(zh || en).replaceAll('"', '&quot;')}">${escapeHtml(en)}</span>`;
+}
+async function interviewAction(action) {
+  try {
+    state.project = await api(`/api/projects/${state.project.id}/interview`, {method:'POST', body:JSON.stringify({role:state.project.viewerRole, action, expectedStateVersion:state.project.stateVersion})});
+    render();
+  } catch(error) { notify(error.message, true); }
+}
 function renderQuestion(question) {
   const card = $("#question-card");
+  const project = state.project;
+  const paused = project.interviewPaused?.[project.viewerRole];
+  if (!question && (paused || project.questionCount >= project.maxQuestions)) {
+    card.innerHTML = `<p class="eyebrow">A moment to reflect</p><h2>${paused ? 'Your answers are saved. Come back whenever you like.' : 'Ten more decisions made. Would you like to go deeper?'}</h2><p class="question-why">Continue with up to 10 more questions shaped by your answers, or review your brief now. More detail is optional.</p><div class="round-actions"><button class="button primary" id="continue-interview">Continue exploring</button><button class="button ghost" id="review-round">Review my brief</button></div>`;
+    $('#continue-interview').addEventListener('click', () => interviewAction('continue'));
+    $('#review-round').addEventListener('click', async () => { if (!paused) await interviewAction('pause'); selectTab('brief'); });
+    return;
+  }
   if (!question) {
     card.innerHTML = `<p class="eyebrow">Interview complete</p><h2>${state.project.readiness.readyForApproval ? "The brief is ready for both people to review." : "Your answers are saved. Your designer may still have decisions to review."}</h2><p class="question-why">Open the shared brief, resolve any conflicts, and complete the human approval gate.</p>`;
     return;
   }
   card.innerHTML = `
-    <div class="question-meta"><span>Question ${question.sequence} of up to ${state.project.maxQuestions}</span><span>${human(question.target)} turn</span></div>
+    <div class="question-meta"><span>Round ${Math.floor((question.sequence-1)/10)+1} · Question ${(question.sequence-1)%10+1} / 10</span><span>${human(question.target)} turn</span></div>
     <p class="eyebrow">One decision at a time</p>
-    <h2>${question.prompt}</h2>
-    <p class="question-why">Why now: ${question.rationale}</p>
-    <div class="option-grid">${question.options.map(option => `<button class="option-button" type="button" data-answer="${option}">${paletteMarkup(option,'option-swatch')}${human(option)}</button>`).join("")}</div>`;
+    <h2>${question.promptZh ? bilingual(question.prompt, question.promptZh) : escapeHtml(question.prompt)}</h2>
+    <p class="question-why">Why now: ${question.rationaleZh ? bilingual(question.rationale, question.rationaleZh) : escapeHtml(question.rationale)}</p>
+    <div class="option-grid">${question.options.map(option => `<button class="option-button" type="button" data-answer="${option}">${paletteMarkup(option,'option-swatch')}${question.optionsZh?.[option] ? bilingual(option, question.optionsZh[option]) : human(option)}</button>`).join("")}</div><button class="text-button" id="pause-interview">Save and pause questions</button>`;
+  $("#pause-interview").addEventListener("click", () => interviewAction("pause"));
   $$('[data-answer]', card).forEach(button => button.addEventListener("click", () => answerQuestion(question, button.dataset.answer)));
 }
 
@@ -160,11 +178,10 @@ function knowledgeMarkup(items) {
       <p class="eyebrow">Design reference · secondary source</p>
       <h3>${escapeHtml(item.title)}</h3>
       <p class="muted">${escapeHtml(item.section)} · Related topics: ${item.relevantDimensions.map(human).join(', ') || 'General context'}</p>
-      <details><summary>Read the source excerpt</summary>
+      <details class="source-definition" open><summary>Read the definition & source excerpt</summary>
         <p class="source-excerpt">${escapeHtml(item.text)}</p>
         <p class="muted">${escapeHtml(item.verification)}</p>
       </details>
-      <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">View handbook source ↗</a>
       <p class="muted">Discuss how these ideas fit your activities, space and care preferences.</p>
     </article>`).join('');
 }
@@ -186,7 +203,7 @@ function renderPreferences() {
 
 function renderReferences() {
   $("#reference-list").innerHTML = state.project.references.map(reference => `
-    <div class="reference-item ${reference.status === 'catalogue_link' ? 'catalogue-reference' : ''}">${reference.status === 'catalogue_link' && /^https:\/\/d1hy6t2xeg0mdl\.cloudfront\.net\/image\//.test(reference.sourceDetails?.imageUrl || '') ? `<img class="reference-preview" src="${escapeHtml(reference.sourceDetails.imageUrl)}" alt="${escapeHtml(reference.filename)}" loading="lazy" referrerpolicy="no-referrer">` : reference.storageKey ? `<img class="reference-preview" src="/api/projects/${state.project.id}/references/${reference.id}/image" alt="Uploaded inspiration reference" loading="lazy">` : `<span class="sample-label">${reference.status === 'catalogue_link' ? 'Saved Singapore home' : reference.status === 'demo_note' ? 'Sample note' : 'Your note'}</span>`}<strong>${escapeHtml(reference.filename)}</strong><br><span class="muted">${escapeHtml(reference.note || "No note added")}</span>${reference.status === 'catalogue_link' && /^https:\/\/qanvast\.com\/sg\/[a-z0-9/-]+$/.test(reference.sourceUrl || '') ? `<br><a href="${reference.sourceUrl}" target="_blank" rel="noopener noreferrer">View original project on Qanvast ↗</a><br><small>${escapeHtml(reference.sourceDetails?.style || 'Choose the details you like')} · ${escapeHtml(reference.sourceDetails?.flatType || 'Home reference')}</small>` : ''}</div>`).join("");
+    <div class="reference-item ${reference.status === 'catalogue_link' ? 'catalogue-reference' : ''}">${reference.status === 'catalogue_link' && /^https:\/\/d1hy6t2xeg0mdl\.cloudfront\.net\/image\//.test(reference.sourceDetails?.imageUrl || '') ? `<img class="reference-preview" src="${escapeHtml(reference.sourceDetails.imageUrl)}" alt="${escapeHtml(reference.filename)}" loading="lazy" referrerpolicy="no-referrer">` : reference.storageKey ? `<img class="reference-preview" src="/api/projects/${state.project.id}/references/${reference.id}/image" alt="Uploaded inspiration reference" loading="lazy">` : `<span class="sample-label">${reference.status === 'catalogue_link' ? 'Saved Singapore home' : reference.status === 'demo_note' ? 'Sample note' : 'Your note'}</span>`}<strong>${escapeHtml(reference.filename)}</strong><br><span class="muted" translate="no">${escapeHtml(reference.note || "")}</span>${reference.status === 'catalogue_link' && /^https:\/\/qanvast\.com\/sg\/[a-z0-9/-]+$/.test(reference.sourceUrl || '') ? `<br><a href="${reference.sourceUrl}" target="_blank" rel="noopener noreferrer">View original project on Qanvast ↗</a><br><small>${escapeHtml(reference.sourceDetails?.style || 'Choose the details you like')} · ${escapeHtml(reference.sourceDetails?.flatType || 'Home reference')}</small>` : ''}</div>`).join("") || '<p class="reference-empty">Your inspiration board starts with one good detail.</p>';
 }
 
 function renderProposals() {
@@ -230,12 +247,13 @@ function renderBrief() {
   const brief = state.project.brief;
   const attributes = brief.attributes.filter(item => item.status === 'confirmed').map(item => `<div class="attribute"><span>${human(item.dimension)}</span><strong>${human(item.value)}</strong></div>`).join("") || '<p class="muted">Answer the adaptive questions to build the brief.</p>';
   $("#brief-content").innerHTML = `
-    <div class="brief-section"><h3>Project intent</h3><ul>${brief.goals.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>Not stated yet</li>"}</ul></div>
+    <div class="brief-section"><h3>Project intent</h3><ul>${brief.goals.map(item => `<li translate="no">${escapeHtml(item)}</li>`).join("") || "<li>Not stated yet</li>"}</ul></div>
     <div class="brief-section"><h3>Confirmed design language</h3><div class="attribute-grid">${attributes}</div></div>
-    <div class="brief-section"><h3>Must avoid</h3><ul>${brief.antiPreferences.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>None recorded</li>"}</ul></div>
-    <div class="brief-section"><h3>Designer constraints</h3><ul>${brief.constraints.map(item => `<li><strong>${human(item.category)}:</strong> ${escapeHtml(item.statement)} <span class="muted">(${item.waived ? "Withdrawn by designer" : human(item.severity)})</span></li>`).join("") || "<li>No constraints recorded</li>"}</ul></div>
+    <div class="brief-section"><h3>Design details</h3>${(brief.designDetails || []).map(d => `<div class="detail-answer"><strong>${bilingual(d.prompt, d.promptZh)}</strong><p>${bilingual(d.value, d.valueZh)}${d.needsReview ? " · Review after your preference changed" : ""}</p></div>`).join("") || "<p>Optional details will appear here.</p>"}</div>
+    <div class="brief-section"><h3>Must avoid</h3><ul>${brief.antiPreferences.map(item => `<li translate="no">${escapeHtml(item)}</li>`).join("") || "<li>None recorded</li>"}</ul></div>
+    <div class="brief-section"><h3>Designer constraints</h3><ul>${brief.constraints.map(item => `<li><strong>${human(item.category)}:</strong> <span translate="no">${escapeHtml(item.statement)}</span> <span class="muted">(${item.waived ? "Withdrawn by designer" : human(item.severity)})</span></li>`).join("") || "<li>No constraints recorded</li>"}</ul></div>
     <div class="brief-section"><h3>Supporting design references</h3>${knowledgeMarkup(brief.knowledgeReferences || []) || "<p>No supporting excerpts recorded.</p>"}</div>
-    <div class="brief-section"><h3>Open decisions</h3><ul>${brief.unresolvedDecisions.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>None</li>"}</ul></div>`;
+    <div class="brief-section"><h3>Open decisions</h3><ul>${brief.unresolvedDecisions.map(item => `<li translate="no">${escapeHtml(item)}</li>`).join("") || "<li>None</li>"}</ul></div>`;
 }
 
 function renderApprovals() {
@@ -266,7 +284,7 @@ function escapeHtml(value) {
 
 async function loadSavedProjects() {
   const projects = await api('/api/projects');
-  $('#saved-projects').innerHTML = projects.length ? '<h3>Continue a project</h3>' + projects.map(p => `<button class="button ghost" data-open-project="${p.id}">${escapeHtml(p.name)}</button>`).join('') : '';
+  $('#saved-projects').innerHTML = projects.length ? '<h3>Continue a project</h3>' + projects.map(p => `<button class="button ghost" data-open-project="${p.id}" translate="no">${escapeHtml(p.name)}</button>`).join('') : '';
   $$('[data-open-project]').forEach(b => b.addEventListener('click', () => loadProject(b.dataset.openProject)));
 }
 
@@ -293,8 +311,8 @@ function applyRoleControls() {
   $('#analyse-button').disabled = role !== 'homeowner' || !state.project.references.length;
   $('#offline-button').disabled = role !== 'homeowner' || !state.project.references.length;
   const selected = $('#decision-question').value;
-  const own = decisionOptions.filter(q => q.target === role);
-  $('#decision-question').innerHTML = own.map(q => `<option value="${q.id}">${human(q.dimension)}</option>`).join('');
+  const own = availableDecisions().filter(q => q.target === role);
+  $('#decision-question').innerHTML = own.map(q => `<option value="${q.id}">${q.detail ? escapeHtml(q.prompt) : human(q.dimension)}</option>`).join('');
   if (own.some(q => q.id === selected)) $('#decision-question').value = selected;
   updateDecisionValues();
 }
@@ -325,7 +343,7 @@ $("#project-form").addEventListener("submit", async event => {
     state.project = await api("/api/projects", { method: "POST", body: JSON.stringify({ name: form.get("name"), housingType: form.get("housingType") || null, inspirationIds, inspirationConsent: inspirationIds.length > 0 }) });
     localStorage.setItem("alignspaceProjectId", state.project.id);
     render();
-  } catch (error) { alert(error.message); }
+  } catch (error) { notify(error.message, true); }
 });
 
 $("#demo-button").addEventListener("click", async () => {
@@ -333,7 +351,7 @@ $("#demo-button").addEventListener("click", async () => {
     state.project = await api("/api/demo", { method: "POST", body: "{}" });
     localStorage.setItem("alignspaceProjectId", state.project.id);
     render();
-  } catch (error) { alert(error.message); }
+  } catch (error) { notify(error.message, true); }
 });
 
 function showHome() {
@@ -432,8 +450,8 @@ const savedProject = localStorage.getItem("alignspaceProjectId");
 if (location.hash.startsWith('#invite=')) {
   const token = location.hash.slice(8);
   history.replaceState(null, '', location.pathname);
-  api('/api/invitations/claim', {method:'POST',body:JSON.stringify({token})}).then(r => loadProject(r.projectId)).catch(e => alert(e.message));
-} else if (savedProject) loadProject(savedProject).catch(() => localStorage.removeItem("alignspaceProjectId"));
+  api('/api/invitations/claim', {method:'POST',body:JSON.stringify({token})}).then(r => loadProject(r.projectId)).catch(e => notify(e.message, true));
+} else if (savedProject && !location.hash) loadProject(savedProject).catch(() => localStorage.removeItem("alignspaceProjectId"));
 loadSavedProjects().catch(e => { $('#saved-projects').textContent = `Projects are unavailable: ${e.message}`; });
 
 $('#guided-button').addEventListener('click', async () => {
@@ -442,14 +460,15 @@ $('#guided-button').addEventListener('click', async () => {
     localStorage.setItem('alignspaceProjectId', state.project.id);
     render();
     notify('Review the sample note, suggest preferences, then answer a few questions. Invite a designer to finish the practical decisions.');
-  } catch (error) { alert(error.message); }
+  } catch (error) { notify(error.message, true); }
 });
 $('#print-button').addEventListener('click', () => window.print());
 let decisionOptions = [];
+function availableDecisions() { return [...decisionOptions, ...(state.project?.detailQuestions || [])]; }
 function updateDecisionValues() {
-  const question = decisionOptions.find(q => q.id === $('#decision-question').value);
+  const question = availableDecisions().find(q => q.id === $('#decision-question').value);
   if (!question) return;
-  $('#decision-value').innerHTML = question.options.map(v => `<option value="${v}">${human(v)}</option>`).join('');
+  $('#decision-value').innerHTML = [...question.options, ...(question.detail ? ['not_sure'] : [])].map(v => `<option value="${v}">${question.detail && v === 'not_sure' ? 'Remove this detail' : human(v)}</option>`).join('');
 }
 api('/api/decision-options').then(options => {
   decisionOptions = options;
@@ -459,7 +478,7 @@ api('/api/decision-options').then(options => {
 $('#decision-question').addEventListener('change', updateDecisionValues);
 $('#decision-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const q = decisionOptions.find(q => q.id === $('#decision-question').value);
+  const q = availableDecisions().find(q => q.id === $('#decision-question').value);
   try {
     state.project = await api(`/api/projects/${state.project.id}/decisions/${q.id}`, {method:'PUT', body: JSON.stringify({role:q.target, value:$('#decision-value').value, expectedStateVersion:state.project.stateVersion})});
     render(); notify('Decision revised. Both approvals must be renewed.');

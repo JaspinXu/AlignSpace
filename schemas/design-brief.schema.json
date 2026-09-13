@@ -21,6 +21,7 @@
     "goals": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
     "antiPreferences": { "type": "array", "items": { "type": "string", "minLength": 1 }, "default": [] },
     "attributes": { "type": "array", "items": { "$ref": "#/$defs/attribute" } },
+    "designDetails": { "type": "array", "items": { "type": "object", "required": ["questionId", "target", "dimension", "value", "basis", "needsReview"] } },
     "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } },
     "conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" } },
     "unresolvedDecisions": { "type": "array", "items": { "type": "string" }, "default": [] },

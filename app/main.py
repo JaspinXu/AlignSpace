@@ -58,6 +58,12 @@ class AnswerCreate(BaseModel):
     expectedStateVersion: int | None = None
 
 
+class InterviewAction(BaseModel):
+    role: Literal["homeowner", "designer"]
+    action: Literal["continue", "pause"]
+    expectedStateVersion: int = Field(ge=1)
+
+
 class ConstraintCreate(BaseModel):
     category: Literal["space", "function", "maintenance", "timeline", "safety", "regulatory", "availability", "other"]
     statement: str = Field(min_length=3, max_length=500)
@@ -102,7 +108,8 @@ class ReferenceNoteCreate(BaseModel):
 
 def _present(state: dict[str, Any]) -> dict[str, Any]:
     return {**state, "nextQuestion": engine.next_question(state), "brief": engine.build_brief(state),
-            'questionsByRole':{role:engine.next_question(state,role) for role in ['homeowner','designer']}}
+            'questionsByRole':{role:engine.next_question(state,role) for role in ['homeowner','designer']},
+            'detailQuestions': [q for q in engine.interview.DETAIL_QUESTIONS if any(a['questionId'] == q['id'] for a in state['answers'])]}
 
 
 def _has_valid_image_signature(content: bytes, content_type: str) -> bool:
@@ -285,7 +292,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
             count = current['questionCount']
             current['answers'] = [a for a in current['answers'] if a['questionId'] != question_id]
             current['questionCount'] = 0
-            engine.answer_question(current, question_id, data.role, data.value)
+            engine.answer_question(current, question_id, data.role, data.value, revision=True)
             current['questionCount'] = count
             return current
         return _present(store(request).mutate(project_id, 'decision_revised', data.role, change, data.expectedStateVersion))
@@ -305,6 +312,12 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
             data.expectedStateVersion,
         )
         return _present(state)
+
+    @application.post('/api/projects/{project_id}/interview')
+    def update_interview(project_id: str, data: InterviewAction, request: Request):
+        require_role(request, data.role)
+        return _present(store(request).mutate(project_id, 'interview_' + data.action, data.role,
+            lambda current: engine.set_interview(current, data.role, data.action), data.expectedStateVersion))
 
     @application.post("/api/projects/{project_id}/questions/{question_id}/answer")
     def submit_answer(project_id: str, question_id: str, data: AnswerCreate, request: Request) -> dict[str, Any]:

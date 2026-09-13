@@ -396,7 +396,7 @@ dialog::backdrop { background:#1c173575; backdrop-filter:blur(5px); }
 .message { background:#eeebff; border-left:3px solid #ac93f8; }.message.designer_agent { border-left:3px solid #ffac91; }
 .message-head { flex-wrap:wrap; font-size:10px; }
 .designer-panel > p { font-size:12px; line-height:1.7; }
-.reference-list:empty::before { content:"Your inspiration board starts with one good detail."; display:block; padding:25px; border:1px dashed #c4b4f5; border-radius:12px; background:#f8f5ff; font-size:13px; line-height:1.7; color:var(--muted); }
+.reference-empty { display:block; padding:25px; border:1px dashed #c4b4f5; border-radius:12px; background:#f8f5ff; font-size:13px; line-height:1.7; color:var(--muted); }
 .reference-item { overflow-wrap:anywhere; line-height:1.7; }.reference-item a { font-size:11px; }
 .catalogue-reference { background:#f2edff; border:1px solid #e0d4ff; border-radius:12px; padding:15px; }
 .reference-preview { border-radius:12px; }
@@ -440,3 +440,16 @@ footer p { max-width:380px; margin:0; font-size:10px; line-height:1.8; }.footer-
 @media(max-width:700px) { #search-source { width:100%; align-self:end; min-height:46px; }.home-cue { min-height:0; } }
 .knowledge-reference a { overflow-wrap: anywhere; }
 @media print { .knowledge-reference details > * { display: block; } }
+.language-toggle { border: 1px solid var(--ink, #294f40); border-radius: 24px; padding: 9px 15px; background: transparent; font: inherit; cursor: pointer; white-space: nowrap; }
+.source-definition { background: #f1f5ea; border: 1px solid #90a58b; border-radius: 14px; padding: 16px 18px; margin: 16px 0; }
+.source-definition summary { cursor: pointer; font-size: 1.04rem; font-weight: 700; color: #244c37; padding: 4px 0; }
+.source-definition .source-excerpt { font-size: .98rem; line-height: 1.8; }
+.round-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+.detail-answer { border-bottom: 1px solid #ddd; padding: 14px 0; }
+html[lang="zh-CN"] { line-height: 1.7; }
+html[lang="zh-CN"] .eyebrow { letter-spacing: .09em; }
+html[lang="zh-CN"] h1, html[lang="zh-CN"] h2 { line-height: 1.25; }
+@media(max-width:700px) { .language-toggle { margin-left: auto; padding: 7px 11px; } .site-header { gap: 10px; } }
+.source-definition .source-excerpt { max-height: 22rem; overflow: auto; scrollbar-width: thin; }
+html[lang="zh-CN"] .welcome-copy h1 { font-size: clamp(32px, 4.2vw, 60px); letter-spacing: -.035em; text-wrap: balance; }
+html[lang="zh-CN"] .welcome-copy h1 em { display: block; }

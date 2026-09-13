@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 import httpx
+from app.language import normalize_search
 
 BASE = 'https://qanvast.com/sg/interior-design-singapore'
 STYLES = ('All', 'Contemporary', 'Modern', 'Scandinavian', 'Minimalist', 'Industrial', 'Eclectic', 'Japandi', 'Wabi-Sabi')
@@ -36,7 +37,7 @@ def source_url(query='', style='All', kind='All'):
         raise ValueError('Choose a supported style and home type')
     params = {}
     if query.strip():
-        params['search'] = query.strip()[:100]
+        params['search'] = normalize_search(query)[:100]
     if style != 'All':
         params['style'] = style
     if kind != 'All':
@@ -197,7 +198,7 @@ class Discovery:
             self.slots.release()
 
     def fallback(self, query, style, kind, url):
-        words = query.casefold().split()
+        words = normalize_search(query).casefold().split()
         projects = [p for p in self.seed['projects'] if (style == 'All' or style.casefold() in p['style'].casefold())
             and (kind == 'All' or p['propertyType'] == kind)
             and all(w in json.dumps(p, ensure_ascii=False).casefold() for w in words)]

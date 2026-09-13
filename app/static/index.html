@@ -7,6 +7,8 @@
   <title>AlignSpace · Design alignment workspace</title>
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/locale-data.js" defer></script>
+  <script src="/assets/i18n.js" defer></script>
   <script src="/assets/app.js" defer></script>
   <script src="/assets/discover.js" defer></script>
 </head>
@@ -18,6 +20,7 @@
       <span>AlignSpace</span>
     </a>
     <nav class="header-nav" aria-label="Main navigation"><a href="/#discover" data-home-anchor="discover">Explore homes</a><a href="/#how-it-works" data-home-anchor="how-it-works">How we align</a><a href="/#local-guide" data-home-anchor="local-guide">SG essentials</a></nav>
+    <button id="language-toggle" class="language-toggle" type="button" translate="no" aria-label="Switch language / 切换语言">中文</button>
     <a class="header-project-link" href="/#start-project" data-home-anchor="start-project">My room brief <span aria-hidden="true">↗</span></a>
   </header>
 
@@ -74,11 +77,11 @@
           <p class="eyebrow">Start a living-room project</p>
           <h2 id="start-title">Let’s make it clear.</h2>
         </div>
-        <p class="muted">About 10 minutes. No design vocabulary needed. You can change your answers later.</p>
+        <p class="muted">Start with up to 10 questions, then choose whether to go deeper. No design vocabulary needed. You can revise answers later.</p>
         <div id="saved-projects"></div>
         <form id="project-form">
           <label>Project name<input name="name" value="My living room" required minlength="2" maxlength="80"></label>
-          <label>Housing type<select name="housingType"><option>HDB 4-room</option><option>HDB 2-room Flexi</option><option>HDB 3-room</option><option>HDB 5-room</option><option>HDB Executive / Maisonette</option><option>Condo / EC</option><option>Landed</option><option>Not sure yet</option></select></label>
+          <label>Housing type<select name="housingType"><option value="HDB 4-room">HDB 4-room</option><option value="HDB 2-room Flexi">HDB 2-room Flexi</option><option value="HDB 3-room">HDB 3-room</option><option value="HDB 5-room">HDB 5-room</option><option value="HDB Executive Apartment">HDB Executive Apartment</option><option value="HDB Executive / Maisonette">HDB Executive / Maisonette</option><option value="HDB 3Gen">HDB 3Gen</option><option value="HDB Jumbo">HDB Jumbo</option><option value="Condo / EC">Condo / EC</option><option value="Condo studio">Condo studio</option><option value="Condo 1-bedroom">Condo 1-bedroom</option><option value="Condo 2-bedroom">Condo 2-bedroom</option><option value="Condo 3-bedroom">Condo 3-bedroom</option><option value="Condo 4+ bedrooms">Condo 4+ bedrooms</option><option value="Executive Condominium">Executive Condominium</option><option value="Penthouse">Penthouse</option><option value="Duplex apartment">Duplex apartment</option><option value="Loft apartment">Loft apartment</option><option value="Walk-up apartment">Walk-up apartment</option><option value="Landed">Landed</option><option value="Terrace house">Terrace house</option><option value="Corner terrace">Corner terrace</option><option value="Semi-detached house">Semi-detached house</option><option value="Detached house / Bungalow">Detached house / Bungalow</option><option value="Cluster house">Cluster house</option><option value="Shophouse residence">Shophouse residence</option><option value="Other housing type">Other housing type</option><option value="Not sure yet">Not sure yet</option></select></label>
 <div id="inspiration-import" class="inspiration-import" hidden><label class="consent"><input name="importInspiration" type="checkbox" checked><span>Add my <strong id="import-count">0</strong> saved home links to this brief</span></label><p>Links are starting points for discussion. You’ll choose which details you actually like.</p></div>
           <label class="consent"><input type="checkbox" required> I have the right to use uploaded references and consent to AI-assisted analysis for this project.</label>
           <button class="button primary" type="submit">Start my room brief <span>→</span></button>
@@ -93,7 +96,7 @@
       <div class="workspace-topline">
         <div>
           <button id="back-button" class="text-button" type="button">← My projects</button>
-          <h1 id="project-name">Project</h1>
+          <h1 id="project-name" translate="no">Project</h1>
           <p id="project-meta" class="muted"></p>
         </div>
         <div class="stage-block">

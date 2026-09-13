@@ -9,7 +9,7 @@ The homepage centres on visual inspiration: browse 57 attributed Singapore home 
 Run the app locally using the setup below, then open http://127.0.0.1:8010.
 
 1. Choose **Start my room brief**, or **Try a guided sample** for labelled sample notes.
-2. Answer a few homeowner questions. Optionally upload an image you have permission to use and explain which elements you like.
+2. Answer up to ten questions per shared round, then choose whether to continue or review. Later questions refine your earlier answers. Optionally upload an image you have permission to use and explain which elements you like.
 3. Choose **Suggest preferences from notes**, then accept or reject each suggestion. Confirming a new value replaces the previous confirmed value for that dimension, retaining its history.
 4. Select **Invite my designer** and share the private, single-use link. For solo testing, open it in another browser profile or private window. The same session cannot claim both roles.
 5. The designer reviews layout, maintenance and constraints. Use **Refresh shared changes** after the other person edits.
@@ -24,8 +24,9 @@ Invitations expire after 24 hours. Browser sessions are possession-based access,
 | Reference images | Decoded, resized, metadata removed, stored privately and displayed only to project members |
 | Reference understanding | Real model-backed **note** analysis through the competition gateway; every result stays proposed until human confirmation |
 | Image understanding | Adapter implemented, **disabled** pending a working vision endpoint; current competition gateway image probe returned `NO_IMAGE` |
-| Interview | Option-entropy heuristic with role filtering; includes no-fixed-style choice |
-| Design references | Local BM25 retrieval over 22 attributed excerpts from 9 Atelier handbook chapters; confirmed needs, exclusion filtering, source links and discussion prompts |
+| Interview | 8 core decisions plus 55 conditional detail prompts, including second-level branches; ten-question checkpoints and pause/resume; details can be revised or removed |
+| Languages | Persistent English / Chinese interface switch, 28 housing choices, bilingual keyword search and note understanding |
+| Design references | Local BM25 retrieval over 22 attributed excerpts from 9 Atelier handbook chapters; confirmed needs, exclusion filtering, expanded on-page definitions and discussion prompts |
 | Alignment | Controlled preference replacement, constraint checks, unresolved-risk blockers and versioned approvals |
 | Collaboration | Separate homeowner/designer browser sessions, project isolation, single-use invitations |
 | Reliability | SQLite transactions, stale-version rejection, per-project and global request caps, limited retry, explicit offline fallback |
@@ -34,6 +35,8 @@ Invitations expire after 24 hours. Browser sessions are possession-based access,
 Workflow messages are deterministic coordination messages, not autonomous LLM-to-LLM conversations. Confidence is an uncalibrated model estimate; offline rules use 0 to indicate no calibrated estimate. There is no verified business ROI yet.
 
 See [grounded design knowledge notes](docs/20-grounded-design-knowledge.md) for source selection, attribution, retrieval limits and update instructions. The handbook is secondary reference material, not validated Singapore compliance guidance; Getty integration currently covers one verified broader material concept.
+
+See [adaptive interviews and language support](docs/21-adaptive-interviews-and-languages.md) for behavior, translation maintenance and validation.
 
 ## Local setup
 
