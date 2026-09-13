@@ -4,11 +4,9 @@
 
 Initial customer: Singapore interior-design SME with 3–20 client-facing designers. Initial workflow: living-room lead qualification and pre-concept alignment.
 
-## Value hypothesis
+## Alignment hypothesis
 
-`value = preparation time saved + avoided rework + faster decision value - software/review cost`
-
-Illustrative estimate only: 1.5 hours avoided × S$50 loaded hourly cost = S$75/project; 40 briefs/month = S$3,000 gross operational value before software/change costs. Replace assumptions with pilot data; never present as achieved ROI.
+A shared, evidence-backed brief can reduce repeated clarification and help both participants explain the same design intent. Measure review time, avoidable revisions and agreement against a baseline; do not represent these hypotheses as achieved outcomes.
 
 ## Adoption
 
@@ -19,14 +17,6 @@ Illustrative estimate only: 1.5 hours avoided × S$50 loaded hourly cost = S$75/
 5. Designer exports to current workflow.
 
 No CRM integration in the first pilot.
-
-## Pricing hypotheses
-
-- S$20–40 per active brief.
-- S$199–399/month small-studio plan.
-- Later white-label/admin controls.
-
-Test value and procurement first. Avoid freemium before cost/support/conversion are understood.
 
 ## Six-week pilot
 
@@ -50,5 +40,5 @@ Reduces vocabulary barriers, makes rationale/limits transparent, supports future
 
 ## Commercial risks
 
-Designers protect relationship work; homeowners avoid pre-work; costs exceed willingness; liability perception; unexpected integration need. Mitigate with optional narrow pilot and measured impact.
+Designers protect relationship work; homeowners avoid pre-work; liability perception; unexpected integration need. Mitigate with optional narrow pilot and measured impact.
 

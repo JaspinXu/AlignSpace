@@ -12,13 +12,13 @@ Proposes controlled-vocabulary attributes and evidence regions. Cannot infer per
 
 ### Homeowner Interview Agent
 
-Chooses the lowest-effort, highest-value question. Cannot exceed the budget, repeat substantially equivalent questions, pressure users, or reinterpret answers silently.
+Chooses the lowest-effort, highest-value question. Cannot exceed the question allowance, repeat substantially equivalent questions, pressure users, or reinterpret answers silently.
 
 Candidate score: `0.35 uncertainty + 0.30 impact + 0.20 conflict relevance + 0.10 coverage gap - 0.05 effort - repetition penalty`. Initial hypothesis; tune with data.
 
 ### Designer Agent
 
-Structures explicit constraints and explains trade-offs plainly. Cannot invent site facts, exact costs, compliance, availability, or professional approval.
+Structures explicit constraints and explains trade-offs plainly. Cannot invent site facts, compliance, availability, or professional approval.
 
 ### Alignment Agent
 
@@ -73,5 +73,5 @@ Prompts are versioned in `/prompts`; provider is configurable; every release rec
 
 ## Failure containment
 
-Maximum 10 questions, 2 retries per model step, and 2 loops per conflict before human escalation. Circuit-break on errors/cost. Manual tagging and editing remain available.
+Maximum 10 questions, 2 retries per model step, and 2 loops per conflict before human escalation. Circuit-break on errors/excessive requests. Manual tagging and editing remain available.
 

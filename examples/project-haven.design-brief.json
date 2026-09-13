@@ -1,10 +1,9 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "project": {
     "id": "demo-project-haven",
     "roomType": "living_room",
     "housingType": "hdb_4_room",
-    "budgetBand": "15k_to_30k_sgd",
     "status": "alignment"
   },
   "goals": [

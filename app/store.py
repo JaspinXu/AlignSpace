@@ -174,7 +174,7 @@ class ProjectStore:
             per_project = db.execute('SELECT COUNT(*) FROM analysis_runs WHERE project_id=?', (project_id,)).fetchone()[0]
             daily = db.execute('SELECT COUNT(*) FROM analysis_runs WHERE created>?', (time.time()-86400,)).fetchone()[0]
             if per_project >= int(os.getenv('ALIGNSPACE_PROJECT_RUN_LIMIT','20')) or daily >= int(os.getenv('ALIGNSPACE_DAILY_RUN_LIMIT','100')):
-                raise ValueError('Analysis request budget reached. Manual decisions remain available.')
+                raise ValueError('Analysis request limit reached. Manual decisions remain available.')
             row = db.execute('INSERT INTO analysis_runs(project_id,created,status,metrics_json) VALUES (?,?,?,?)',
                              (project_id,time.time(),'reserved','{}'))
             return row.lastrowid

@@ -9,17 +9,18 @@ from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jsonschema import Draft202012Validator
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app import engine
 from app.store import ProjectNotFoundError, ProjectStore, StaleStateError
 from app.access import AccessStore, digest
 from app.gateway import Gateway, load_local_config
+from app.discovery import Discovery
 
 load_local_config()
 
@@ -27,28 +28,15 @@ load_local_config()
 ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = ROOT / "app" / "static"
 SCHEMA_PATH = ROOT / "schemas" / "design-brief.schema.json"
-BUDGET_BANDS = {
-    "under_15k_sgd",
-    "15k_to_30k_sgd",
-    "30k_to_50k_sgd",
-    "over_50k_sgd",
-    "prefer_not_to_say",
-}
-
-
 class ProjectCreate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     name: str = Field(min_length=2, max_length=80)
-    budgetBand: str
     housingType: str | None = Field(default=None, max_length=80)
     inspirationIds: list[str] = Field(default_factory=list, max_length=6)
     inspirationConsent: bool = False
 
-    @field_validator("budgetBand")
-    @classmethod
-    def valid_budget(cls, value: str) -> str:
-        if value not in BUDGET_BANDS:
-            raise ValueError("Unsupported budget band")
-        return value
+class InspirationResolve(BaseModel):
+    ids: list[str] = Field(default_factory=list, max_length=6)
 
 
 class PreferencesUpdate(BaseModel):
@@ -71,7 +59,7 @@ class AnswerCreate(BaseModel):
 
 
 class ConstraintCreate(BaseModel):
-    category: Literal["budget", "space", "function", "maintenance", "timeline", "safety", "regulatory", "availability", "other"]
+    category: Literal["space", "function", "maintenance", "timeline", "safety", "regulatory", "availability", "other"]
     statement: str = Field(min_length=3, max_length=500)
     rationale: str = Field(default="", max_length=500)
     severity: Literal["advisory", "important", "critical"] = "important"
@@ -133,6 +121,11 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
         description="Two-sided, evidence-backed design requirements alignment.",
     )
     application.state.store = ProjectStore(database_path)
+    for previous in application.state.store.list():
+        if previous.get('schemaVersion') != '1.1.0':
+            application.state.store.mutate(previous['id'], 'alignment_schema_updated', 'system',
+                                           engine.migrate_project, previous['stateVersion'])
+    application.state.discovery = Discovery(application.state.store.database_path)
     application.state.access = AccessStore(application.state.store.database_path)
     application.state.gateway = Gateway()
     configured_uploads = upload_dir or os.getenv("ALIGNSPACE_UPLOAD_DIR", "data/uploads")
@@ -161,7 +154,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
         response = await call_next(request)
         response.headers['Referrer-Policy'] = 'no-referrer'
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: https://d1hy6t2xeg0mdl.cloudfront.net; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: https://d1hy6t2xeg0mdl.cloudfront.net https://api-neo.qanvast.com; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         if request.url.path.startswith('/api/'):
             response.headers['Cache-Control'] = 'no-store'
         if new_session:
@@ -205,6 +198,16 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "alignspace"}
 
+    @application.get('/api/inspiration/search')
+    def search_inspiration(q: str = Query(default='', max_length=100),
+                          style: Literal['All', 'Contemporary', 'Modern', 'Scandinavian', 'Minimalist', 'Industrial', 'Eclectic', 'Japandi', 'Wabi-Sabi'] = 'All',
+                          kind: Literal['All', 'HDB', 'Condo', 'Landed'] = 'All'):
+        return application.state.discovery.search(q, style, kind)
+
+    @application.post('/api/inspiration/resolve')
+    def resolve_inspiration(data: InspirationResolve):
+        return {'projects': list(application.state.discovery.find(data.ids).values())}
+
     @application.get("/api/projects")
     def list_projects(request: Request) -> list[dict[str, Any]]:
         allowed = set(application.state.access.projects(request.state.session))
@@ -222,21 +225,20 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.post("/api/projects", status_code=201)
     def create_project(data: ProjectCreate, request: Request) -> dict[str, Any]:
-        catalogue = json.loads((STATIC_DIR / 'singapore.json').read_text(encoding='utf-8'))
-        homes = {home['id']: home for home in catalogue['projects']}
+        homes = application.state.discovery.find(data.inspirationIds)
         if any(item not in homes for item in data.inspirationIds):
             raise HTTPException(422, 'Choose inspiration from the available Singapore collection')
         if data.inspirationIds and not data.inspirationConsent:
             raise HTTPException(422, 'Confirm that you want to add saved inspiration links to this project')
-        state = engine.create_project(data.name, data.budgetBand, data.housingType)
+        state = engine.create_project(data.name, data.housingType)
         for item in dict.fromkeys(data.inspirationIds):
             home = homes[item]
             state = engine.add_reference(state, {
                 'id': engine.new_id('reference'), 'filename': home['title'],
-                'note': 'Saved for discussion. Tell your designer which details you like; saving a home does not confirm its style or budget.',
+                'note': 'Saved for discussion. Tell your designer which details you like; saving a home does not confirm any preferences.',
                 'status': 'catalogue_link', 'sourceUrl': home['sourceUrl'],
-                'catalogueId': item, 'sourceCheckedAt': catalogue['checkedAt'],
-                'sourceDetails': {key: home[key] for key in ['flatType', 'area', 'cost', 'year', 'designer']},
+                'catalogueId': item, 'sourceCheckedAt': home.get('checkedAt'),
+                'sourceDetails': {key: home.get(key) for key in ['flatType', 'area', 'year', 'designer', 'style', 'features', 'imageUrl']},
                 'consentConfirmed': True, 'consentActor': request.state.actor,
                 'createdAt': engine.now_iso(),
             })
@@ -244,7 +246,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.post("/api/demo", status_code=201)
     def create_demo(request: Request) -> dict[str, Any]:
-        state = engine.create_project("Project Haven", "15k_to_30k_sgd", "HDB 4-room")
+        state = engine.create_project("Project Haven", "HDB 4-room")
         state = engine.add_preferences(
             state,
             ["Create a comfortable room for family evenings", "Keep the space visually calm"],
@@ -270,7 +272,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.post('/api/demo/start', status_code=201)
     def start_demo(request: Request) -> dict[str, Any]:
-        state = engine.create_project('Project Haven — guided demo', '15k_to_30k_sgd', 'HDB 4-room')
+        state = engine.create_project('Project Haven — guided demo', 'HDB 4-room')
         state = engine.add_preferences(state, ['Comfortable family evenings', 'A calm, warm living room'], ['Cold grey surfaces'])
         state = engine.add_reference(state, {'id': engine.new_id('reference'), 'filename': 'Sample inspiration note', 'note': 'I like warm modern style and soft textiles', 'status': 'demo_note'})
         return created(state, request)

@@ -36,7 +36,7 @@ def build():
                     'text': paragraph, 'path': path, 'line': start,
                     'url': f'https://github.com/MickeyBadBad/atelier-mcp/blob/{REVISION}/docs/handbook/{path}#L{start}',
                     'revision': REVISION, 'sourceType': 'secondary_handbook',
-                    'verification': 'Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing.'})
+                    'verification': 'Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance.'})
 
         for number, line in enumerate(lines, 1):
             if re.match(r'^#{1,6} ', line):

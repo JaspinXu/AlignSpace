@@ -1,27 +1,25 @@
-# Singapore discovery and visual refresh
+# Visual discovery for design alignment
 
-The current interface replaces the cream/olive editorial direction with vivid purple, blue, lime and coral, bold sans-serif type, rounded photo cards and distinct content sections. The original “Make ‘I like this’ clear enough to design” headline and “Let’s make it clear” project entry are retained.
+The homepage starts with 57 lightweight, attributed previews from Singapore home projects. Each card foregrounds the image, source-labelled style, image tags and a style observation prompt. The prompt is editorial guidance about what to notice, not an assertion that every listed feature appears in the photograph. Home type, area, designer and source remain available; detail views also show completion year and photographed rooms where supplied.
 
-## Experience
+Search locally by words and style, filter by home type, or select **Search more homes** to retrieve the first results from the wider [Qanvast project collection](https://qanvast.com/sg/interior-design-singapore). The app displays those previews directly and links to the complete matching source selection. It does not claim to have loaded every source result. **Show more homes** reveals additional local previews, 12 at a time.
 
-Browse real Singapore renovation projects before starting a living-room brief. Search by project, town, style or designer; filter by HDB/BTO, resale HDB, condo, landed and published cost; sort by cost or completion year. Save up to six projects locally and compare up to three in an accessible dialog. Details include area, completed year, designer, published cost, listed works, original source and an AlignSpace discussion prompt.
+Save up to six references and compare up to three by image, style cues, source tags and spaces. Add saved sources to a new brief with consent, then specify exactly which details to keep or change. Saving a reference never confirms a preference. The server owns source metadata; callers cannot inject arbitrary external URLs into the import flow.
 
-The budget section provides whole-home planning ranges, duration and an optional arithmetic allowance. It does not change the separate living-room budget. Local guidance links to HDB flat types, renovation contractors and Singapore climate information. Saved source links can be imported on project creation; the server validates catalogue IDs and consent and never infers confirmed preferences from a saved home.
+## Source adapter
 
-## Sources and maintenance
+`app/discovery.py` reads the public server-rendered listing, parses its embedded JSON as data, and selects only preview fields. It never executes source JavaScript, imports a remote page into our DOM, or downloads image files. Images load from the attributed source CDN. Fixed hosts, HTTPS, redirect refusal, a 2 MB response ceiling, a 12-second request timeout and two concurrent fetch slots bound source access. Queries are at most 100 characters; supported style and home-type values are explicit.
 
-The manually curated snapshot is in `app/static/singapore.json`, checked on 13 September 2026. This is a collection of renovation case studies, not a live property-sales feed. Published project costs are historical, refer to different scopes and exclude no items by assumption. Furniture, appliance and tax inclusions are unverified. Garden Vines has no published price and remains null, including in sorting and comparison.
+Repeated searches use a 15-minute in-process cache with at most 64 entries. Up to 1,000 normalized public previews are retained in SQLite so saved IDs survive restarts. Imported projects embed their own source details independently. An old unimported saved ID that has been evicted is removed during resolution. Upstream failure shows matching saved previews with an explicit status and source link; legitimate empty live searches remain empty.
 
-Every project source URL, designer credit, image URL and completion year is recorded in the JSON and exposed in the UI. The seven projects are Tampines Street 61, Waterway View 682A, View at Kismis, Champions Bliss 562B, Garden Vines 236B, Smith Road and Dunsfold Drive, published on Qanvast. Photos load directly from Qanvast’s CDN with no referrer; no third-party photos were copied into the repository. Their ownership remains with their creators. Image failure leaves a fallback and original-source link. CSP allows only this specific image host in addition to local/blob images.
+The public listing provides the first source result batch and supports keywords, styles and home types. No private API credentials, LLM or MCP dependency are needed for this deterministic query. A future supported provider can implement the same normalized preview contract.
 
-- [Qanvast HDB renovation costs, 2026](https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568), published 12 February 2026: new and resale 3-, 4- and 5-room ranges.
-- [Qanvast condo renovation costs, 2025](https://qanvast.com/sg/articles/singapore-condo-renovation-costs-new-and-resale-in-2025-3389), published 24 January 2025: explicitly labelled 2025 rather than presented as current-year figures.
-- [HDB flat types](https://www.hdb.gov.sg/buying-a-flat/bto-sbf-and-open-booking-of-flats/finding-a-new-flat/types-of-flats).
-- [Meteorological Service Singapore climate facts](https://www.weather.gov.sg/climate-climate-of-singapore/): approximately 82% mean annual relative humidity. Material and airflow discussion prompts are AlignSpace editorial suggestions.
-- [HDB renovation contractor guidance](https://www.hdb.gov.sg/managing-my-home/renovation-and-maintenance/renovation/looking-for-renovation-contractors).
+## Maintenance
 
-To update, verify original pages, revise records and their dates, and keep unknown values null. Update the homepage source-check text alongside `checkedAt`. Do not silently replace historical completion dates with retrieval dates. The earlier generated room image is retained as an unused first-iteration asset.
+`app/static/singapore.json` contains preview metadata only. Run `python scripts/refresh_discovery.py` to refresh selected public style collections. Review metadata and the UI before committing. Source photos remain owned by their creators and are credited individually. This small snapshot remains usable if the source changes its markup; it is not a complete mirror.
+
+Schema 1.1.0 projects older records into supported alignment fields at startup. Source details are narrowed, obsolete constraint categories and associated conflicts are removed, and prior approvals are cleared. Identity, access membership, preferences and references are retained. The migration is audited once and requires both participants to approve the updated brief.
 
 ## Verification
 
-Automated tests cover validated/consented import, deduplication, source persistence, unchanged confirmed preferences and room budget, project access isolation, invalid input and catalogue consistency. Browser checks cover image loading, filters, empty state, saving across reload, comparison, unavailable price, budget calculations and source years, and creating a brief from a saved case. Responsive checks include 320px and 390px viewports.
+Tests cover import consent and isolation, unique attributed previews, live parsing, safe source URLs, source failure, empty results, caching, persistent saved-source imports and schema migration. Browser checks cover filtering, more previews, source searches, saving, comparison, details and project creation. Source search exposes public keywords to Qanvast; private project notes and uploaded images are not sent by this adapter.

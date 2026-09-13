@@ -28,7 +28,7 @@ Adapt when organiser rules are confirmed.
 1. Upload three consented references.
 2. Show source-linked tentative attributes; correct one error.
 3. Answer an adaptive lighting-conflict question.
-4. Designer adds a maintenance/budget constraint.
+4. Designer adds a maintenance constraint.
 5. Alignment Agent creates a neutral conflict.
 6. Resolve and view updated brief.
 7. Demonstrate dual approval and invalidation after edit.
@@ -39,7 +39,7 @@ The model proposes note-derived evidence; the deterministic interview chooses qu
 
 ### 3:35–4:20 Readiness
 
-Show Lightsail deployment, project-scoped image access, request budgets, manual fallback and professional-review blockers. Deletion automation and a dedicated kill-switch UI are not implemented.
+Show Lightsail deployment, project-scoped image access, request limits, manual fallback and professional-review blockers. Deletion automation and a dedicated kill-switch UI are not implemented.
 
 ### 4:20–4:50 Evidence
 
@@ -51,7 +51,7 @@ Show measured results with sample size. If incomplete, show evaluation design an
 
 ## Demo dataset
 
-Synthetic “Project Haven,” using licensed/project-created images. Seed: pale oak + concealed storage; one cool-lit reference; luxury look within mid budget; light upholstery vs household with pet. No real name, home, budget, face, or contact.
+Synthetic “Project Haven,” using licensed/project-created images. Seed: pale oak + concealed storage; one cool-lit reference; warmth and tactile materials; light upholstery vs household with pet. No real name, home, face, or contact.
 
 ## Reliability
 

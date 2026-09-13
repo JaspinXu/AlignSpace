@@ -10,7 +10,7 @@
 | 2026-09-06 | D-004 | Dual approval same version | Explicit/auditable agreement | pilot friction high |
 | 2026-09-06 | D-005 | Max 10 questions | Limit effort; force priority | test data available |
 | 2026-09-06 | D-006 | Curated/user images only | Reduce rights/privacy risk | partner catalogue |
-| 2026-09-06 | D-007 | Model abstraction | Cost/quality/availability change | unique capability needed |
+| 2026-09-06 | D-007 | Model abstraction | Quality/latency/availability change | unique capability needed |
 | 2026-09-06 | D-008 | AI attributes are proposals | Preference needs human confirmation | never |
 
 ## Open decisions
@@ -27,5 +27,5 @@
 
 ## Assumptions to validate
 
-Homeowners complete guided pre-work; designers prefer structured evidence; proposed dimensions are sufficient; ten questions work; serverless meets cost; dual approval earns its friction.
+Homeowners complete guided pre-work; designers prefer structured evidence; proposed dimensions are sufficient; ten questions work; serverless meets throughput needs; dual approval earns its friction.
 

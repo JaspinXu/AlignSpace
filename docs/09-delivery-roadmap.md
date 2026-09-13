@@ -25,7 +25,7 @@ Exit: one real set becomes evidence-linked editable attributes.
 
 ## Week 2, 12–18 September — two-sided flow
 
-Adaptive questions; designer constraints; conflict cards; orchestration; version/dual approval; 30 cases/red team; staging with logs, cost, deletion.
+Adaptive questions; designer constraints; conflict cards; orchestration; version/dual approval; 30 cases/red team; staging with logs, usage, deletion.
 
 Exit: happy path and a failure path work end to end.
 
@@ -53,7 +53,7 @@ Exit: gates pass and demo succeeds three consecutive clean runs.
 | P-06 | Conflict card | P0 | AI/Frontend | seeded recall |
 | P-07 | Version + dual approval | P0 | Backend | invariant tests |
 | P-08 | Review/escalation | P0 | AI/Quality | red-team report |
-| P-09 | Error/cost/latency metrics | P0 | Cloud | dashboard |
+| P-09 | Error/usage/latency metrics | P0 | Cloud | dashboard |
 | P-10 | Fallback/reset | P0 | Quality | 3 rehearsals |
 | P-11 | Reference retrieval | P1 | AI | rights/relevance |
 | P-12 | Visual directions | P1 | AI/UX | preference test |

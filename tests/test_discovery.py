@@ -8,16 +8,14 @@ from app.main import create_app
 def test_saved_homes_are_imported_once_with_server_owned_sources(tmp_path):
     client = TestClient(create_app(tmp_path / 'homes.db'))
     response = client.post('/api/projects', json={
-        'name': 'My Singapore room', 'budgetBand': 'under_15k_sgd',
-        'inspirationIds': ['tampines', 'tampines', 'tengah'], 'inspirationConsent': True,
+        'name': 'My Singapore room', 'inspirationIds': ['tampines', 'tampines', 'tengah'], 'inspirationConsent': True,
     })
     assert response.status_code == 201
     project = response.json()
     assert len(project['references']) == 2
     assert project['attributes'] == []
-    assert project['budgetBand'] == 'under_15k_sgd'
-    assert project['references'][0]['sourceDetails']['cost'] == 60000
-    assert project['references'][1]['sourceDetails']['cost'] is None
+    assert project['references'][0]['sourceDetails']['style']
+    assert project['references'][1]['sourceDetails']['features']
     assert all(ref['sourceUrl'].startswith('https://qanvast.com/sg/') for ref in project['references'])
     assert all(ref['consentConfirmed'] and ref['consentActor'] for ref in project['references'])
     restored = client.get('/api/projects/' + project['id']).json()
@@ -29,7 +27,7 @@ def test_saved_homes_are_imported_once_with_server_owned_sources(tmp_path):
 
 def test_invalid_or_unconsented_import_does_not_create_project(tmp_path):
     client = TestClient(create_app(tmp_path / 'homes.db'))
-    base = {'name': 'My room', 'budgetBand': '15k_to_30k_sgd'}
+    base = {'name': 'My room', }
     for extra in [
         {'inspirationIds': ['tampines']},
         {'inspirationIds': ['not-a-home'], 'inspirationConsent': True},
@@ -39,12 +37,12 @@ def test_invalid_or_unconsented_import_does_not_create_project(tmp_path):
     assert client.get('/api/projects').json() == []
 
 
-def test_catalogue_keeps_unknown_costs_and_benchmark_years_explicit():
+def test_catalogue_contains_attributed_style_previews():
     data = json.loads((Path(__file__).resolve().parents[1] / 'app/static/singapore.json').read_text(encoding='utf-8'))
+    assert len(data['projects']) > 40
     assert len({p['id'] for p in data['projects']}) == len(data['projects'])
-    assert {p['propertyType'] for p in data['projects']} == {'HDB', 'Condo', 'Landed'}
-    assert next(p for p in data['projects'] if p['id'] == 'tengah')['cost'] is None
-    for benchmark in data['budgets']:
-        assert 0 < benchmark['low'] <= benchmark['high']
-        assert str(benchmark['year']) in benchmark['sourceUrl']
-        assert benchmark['year'] == (2025 if benchmark['type'] == 'Condo' else 2026)
+    assert {p['propertyType'] for p in data['projects']} >= {'HDB', 'Condo', 'Landed'}
+    for home in data['projects']:
+        assert home['sourceUrl'].startswith('https://qanvast.com/sg/')
+        assert home['imageUrl'].startswith('https://d1hy6t2xeg0mdl.cloudfront.net/image/')
+        assert home['style'] and home['styleCue']

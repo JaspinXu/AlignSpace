@@ -8,14 +8,14 @@ AlignSpace is a communication tool, not a qualified architect, engineer, electri
 |---|---|---|---|
 | False inference | Marble vs laminate | tentative labels, confidence, evidence | correction + accuracy tests |
 | Unsafe advice | Recommends wall removal | blocked topic policy | professional task + log |
-| Price/stock fabrication | Exact supplier claim | source/tool required | citation check; dated estimate |
+| Availability fabrication | Exact supplier claim | source/tool required | citation and date check |
 | Privacy exposure | Family photo | consent, minimisation, private storage | delete + incident flow |
 | Copyright misuse | Scraped image reuse | provenance; curated catalogue | rights review |
 | Prompt injection | Image tells model to ignore policy | content is untrusted; tool allow-list | review agent + red team |
 | Cross-project access | Guessed project ID | server membership checks | anomaly alert + audit |
 | Over-automation | AI resolves conflict | human decision | approval invariant |
 | Stereotyping | Infers wealth/culture | forbid sensitive inference | sampled review |
-| Cost abuse | Repeated uploads | limits/quotas | alarms + circuit breaker |
+| Resource abuse | Repeated uploads | limits/quotas | alarms + circuit breaker |
 
 ## Data classes
 

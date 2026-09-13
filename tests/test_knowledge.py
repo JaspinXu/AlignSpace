@@ -11,7 +11,7 @@ from tests.test_engine import completed_state
 def test_no_evidence_abstains_and_does_not_create_preferences():
     assert knowledge.retrieve('') == []
     assert knowledge.retrieve('xyzzynonexistent') == []
-    state = engine.create_project('No inference', 'under_15k_sgd')
+    state = engine.create_project('No inference')
     engine.add_preferences(state, ['Maybe cosy but not Scandinavian'], [])
     assert state['shortlist'] == []
     assert state['attributes'] == []
@@ -35,7 +35,7 @@ def test_bilingual_retrieval_returns_stable_original_source_passages():
 
 
 def test_constraint_exclusion_is_applied_before_retrieval_and_waiver_releases_it():
-    state = engine.create_project('Materials', 'under_15k_sgd')
+    state = engine.create_project('Materials')
     engine.answer_question(state, 'primary_material', 'homeowner', 'light_oak')
     state['constraints'] = [{'incompatibleValue': 'stone', 'affectedDimension': 'material', 'waived': False}]
     exclusions = knowledge.exclusions(state)
@@ -72,7 +72,7 @@ def test_approval_does_not_refresh_corpus_mid_signature(monkeypatch):
 
 
 def test_aat_broader_mapping_does_not_claim_exact_oak_equivalence():
-    state = engine.create_project('Wood', 'under_15k_sgd')
+    state = engine.create_project('Wood')
     engine.answer_question(state, 'primary_material', 'homeowner', 'light_oak')
     term = state['terminology'][0]
     assert 'not exact' in term['mappingRelation']
@@ -93,7 +93,7 @@ def test_gateway_retrieval_is_bounded_and_cannot_become_user_evidence(monkeypatc
     monkeypatch.setenv('LLM_GATEWAY_API_KEY', 'test-key')
     monkeypatch.setenv('LLM_MODEL', 'test-model')
     monkeypatch.setenv('ALIGNSPACE_ALLOW_IMAGES', 'false')
-    state = engine.create_project('Grounded notes', 'under_15k_sgd')
+    state = engine.create_project('Grounded notes')
     engine.add_reference(state, {'id': 'user-ref', 'note': 'I like Scandinavian oak.'})
     captured = []
 

@@ -125,10 +125,9 @@ def directions(state):
     results = []
     for record in records:
         results.append({**record, 'kind': 'knowledge_reference',
-            'budget': None, 'overBudget': None, 'budgetLabel': 'Cost not assessed; obtain a project-specific quote',
             'relevantDimensions': [d for d, v in confirmed.items()
                 if set(tokens(expand(v))) & set(tokens(record['text'] + ' ' + record['title']))],
-            'unassessed': ['Budget', 'Site fit', 'Maintenance suitability', 'Singapore compliance']})
+            'unassessed': ['Site fit', 'Maintenance suitability', 'Singapore compliance']})
     return results
 
 

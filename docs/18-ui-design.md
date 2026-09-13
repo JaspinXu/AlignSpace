@@ -28,7 +28,7 @@ The 13 websites discussed with the user informed the following design choices. T
 ## Implementation
 
 - Landing page: split hero, accessible material detail toggle, three-step process, separate project entry and saved projects.
-- Workspace: confirmed preference ribbon, illustrative colour swatches, expandable matching explanations, persistent visible budget information and clearer role guidance.
+- Workspace: confirmed preference ribbon, illustrative colour swatches, expandable matching explanations, source image tags and style cues and clearer role guidance.
 - Shared brief: paper-like document layout with a separate approval area.
 - Responsive layouts at 900px and 620px; keyboard focus, skip link and reduced-motion support.
 - Navigation returns to the landing page without reloading. Opening another project resets the active workspace view.

@@ -17,7 +17,7 @@ Projects → Project overview → References → My preferences → Designer rev
 
 ### 1. Create project
 
-Project name, living room, housing type, optional dimensions, budget band, completion band. Copy: “Budget helps discuss trade-offs; it is not a quotation.”
+Project name, living room, housing type and optional dimensions. Copy: “Start with the details you love. We will help you explain them.”
 
 ### 2. Consent and upload
 

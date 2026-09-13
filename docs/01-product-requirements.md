@@ -43,7 +43,7 @@ Needs structured requirements rather than another transcript, with constraints a
 
 ### SME owner: Lina, studio director
 
-Needs shorter pre-design cycles, consistency, auditability, and predictable cost. Job: “Help my team align projects without adding operational risk.”
+Needs shorter pre-design cycles, consistency, auditability, and consistent review effort. Job: “Help my team align projects without adding operational risk.”
 
 ## Value proposition
 
@@ -62,7 +62,7 @@ Needs shorter pre-design cycles, consistency, auditability, and predictable cost
 - Create/join project with homeowner and designer roles.
 - Consent before upload.
 - Upload 3–10 JPG/PNG/WebP images, max 10 MB each.
-- Optional room dimensions; required budget band.
+- Optional room dimensions and housing type.
 - Extract tentative style, colour, material, lighting, furniture, layout, mood, and liked-element attributes.
 - Show evidence/confidence; allow correction/deletion.
 - Ask adaptive single-purpose questions with “not sure.”
@@ -83,7 +83,7 @@ Needs shorter pre-design cycles, consistency, auditability, and predictable cost
 ### Out of scope
 
 - Construction drawings, compliance, structural/electrical guidance.
-- Exact quotes, inventory claims, purchasing, or contracts.
+- Inventory claims, purchasing, or contracts.
 - Social-media scraping or foundation-model training.
 - Photorealistic guarantees, designer replacement, or whole-home support.
 
@@ -119,17 +119,16 @@ Validate against schema; distinguish preferences from constraints; require indep
 
 ### FR-08 Safety response
 
-Structural, electrical, regulatory, exact-price, and live-availability questions produce a limitation and professional-verification task.
+Structural, electrical, regulatory and live-availability questions produce a limitation and professional-verification task.
 
 ## Required brief fields
 
-Project/room metadata; goals; functional needs; style and anti-preferences; colour, material, lighting, furniture, layout, mood; budget/timeline context; liked/rejected references; designer constraints/trade-offs; agreement and unresolved decisions; provenance, confidence, version, approvals.
+Project/room metadata; goals; functional needs; style and anti-preferences; colour, material, lighting, furniture, layout, mood; timeline context; liked/rejected references; designer constraints/trade-offs; agreement and unresolved decisions; provenance, confidence, version, approvals.
 
 ## Non-functional requirements
 
 - Availability target: 99.5% during pilot hours.
 - First progress ≤3s; 10-image analysis p95 ≤60s; interactive p95 ≤8s.
-- Model/infrastructure target <S$3 per completed project; validate with telemetry.
 - Keyboard access, labelled controls, colour-independent status, WCAG 2.1 AA contrast target.
 - Private by default, least privilege, deletion workflow.
 - Append-only audit of proposals, edits, approvals, and blocks.
@@ -137,7 +136,7 @@ Project/room metadata; goals; functional needs; style and anti-preferences; colo
 
 ## Completion rule
 
-Stop when required attributes are confirmed, not applicable, or explicitly unresolved; no critical conflict remains; completeness ≥85%; and question budget remains. Users may stop early, but missing decisions stay visible.
+Stop when required attributes are confirmed, not applicable, or explicitly unresolved; no critical conflict remains; completeness ≥85%; and question allowance remains. Users may stop early, but missing decisions stay visible.
 
 ## Dependencies
 

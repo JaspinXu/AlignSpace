@@ -12,7 +12,7 @@
 
 - 5–8 homeowners who renovated in the last two years or plan to within a year.
 - 3–5 Singapore SME interior designers, including a studio lead.
-- Vary renovation experience, budget, housing type, and digital comfort.
+- Vary renovation experience, housing type, and digital comfort.
 
 This is formative research, not a representative survey.
 
@@ -32,7 +32,7 @@ Avoid leading with features or design labels.
 
 - Walk through first client conversation and artifacts.
 - Identify questions that repeatedly surface later.
-- Rank ambiguity cost across style, layout, function, material, lighting, budget, maintenance, timeline.
+- Rank ambiguity cost across style, layout, function, material, lighting, maintenance, timeline.
 - Mark brief fields required/optional/unhelpful.
 - Ask which provenance/confidence enables correction.
 - Explore project volume, roles, handover, retention, and approval.

@@ -7,7 +7,7 @@ from app import engine
 
 
 def completed_state():
-    state = engine.create_project("Test home", "15k_to_30k_sgd", "HDB")
+    state = engine.create_project("Test home", "HDB")
     state = engine.add_preferences(state, ["Relax together"], ["Cold surfaces"])
     for question_id, role, value in engine.demo_answers():
         state = engine.answer_question(state, question_id, role, value)
@@ -15,7 +15,7 @@ def completed_state():
 
 
 def test_akinator_selector_returns_a_bounded_high_information_question():
-    state = engine.create_project("Test home", "15k_to_30k_sgd")
+    state = engine.create_project("Test home")
     question = engine.next_question(state)
     assert question is not None
     assert question["target"] in {"homeowner", "designer"}
@@ -85,7 +85,7 @@ def test_two_approvals_use_the_same_content_hash():
 
 
 def test_reference_note_analysis_never_auto_confirms():
-    state = engine.create_project("Reference test", "under_15k_sgd")
+    state = engine.create_project("Reference test")
     state = engine.add_reference(
         state,
         {

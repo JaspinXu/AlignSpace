@@ -108,15 +108,14 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:12]}"
 
 
-def create_project(name: str, budget_band: str, housing_type: str | None = None) -> dict[str, Any]:
+def create_project(name: str, housing_type: str | None = None) -> dict[str, Any]:
     project_id = new_id("project")
     state = {
-        "schemaVersion": "1.0.0",
+        "schemaVersion": "1.1.0",
         "id": project_id,
         "name": name.strip(),
         "roomType": "living_room",
         "housingType": housing_type.strip() if housing_type else None,
-        "budgetBand": budget_band,
         "status": "homeowner_review",
         "stateVersion": 1,
         "briefVersion": 1,
@@ -156,6 +155,29 @@ def add_agent_message(state: dict[str, Any], sender: str, recipient: str, text: 
         }
     )
     state["agentMessages"] = state["agentMessages"][-30:]
+
+
+def migrate_project(previous: dict[str, Any]) -> dict[str, Any]:
+    """Project only supported fields into the alignment schema; re-approve changes."""
+    template = create_project(previous['name'], previous.get('housingType'))
+    state = {key: deepcopy(previous.get(key, default)) for key, default in template.items()}
+    state['schemaVersion'] = '1.1.0'
+    categories = {'space', 'function', 'maintenance', 'timeline', 'safety', 'regulatory', 'availability', 'other'}
+    removed_statements = [c.get('statement', '') for c in state['constraints'] if c.get('category') not in categories]
+    state['constraints'] = [c for c in state['constraints'] if c.get('category') in categories]
+    ids = {c['id'] for c in state['constraints']}
+    state['conflicts'] = [c for c in state['conflicts'] if not c.get('constraintId') or c['constraintId'] in ids]
+    for ref in state['references']:
+        if 'sourceDetails' in ref:
+            ref['sourceDetails'] = {k: v for k, v in ref['sourceDetails'].items()
+                if k in {'flatType', 'area', 'year', 'designer', 'style', 'features', 'imageUrl'}}
+        if ref.get('status') == 'catalogue_link':
+            ref['note'] = 'Saved for discussion. Choose which details you like; saving does not confirm preferences.'
+    state['agentMessages'] = [m for m in state['agentMessages']
+                              if not any(text and text in m.get('text', '') for text in removed_statements)]
+    add_agent_message(state, 'alignment_agent', 'homeowner_and_designer',
+                      'Your project now uses the updated alignment brief. Review it together and approve this version.', 'schema_update')
+    return bump_and_recompute(state)
 
 
 def _confirmed_map(state: dict[str, Any]) -> dict[str, str]:
@@ -215,7 +237,7 @@ def next_question(state: dict[str, Any], role: str | None = None) -> dict[str, A
 
 def answer_question(state: dict[str, Any], question_id: str, role: str, value: str) -> dict[str, Any]:
     if state['questionCount'] >= state['maxQuestions']:
-        raise ValueError('Question budget reached; edit the brief to complete remaining decisions')
+        raise ValueError('Question limit reached; edit the brief to complete remaining decisions')
     question = next((item for item in QUESTION_BANK if item["id"] == question_id), None)
     if not question:
         raise ValueError("Unknown question")
@@ -631,12 +653,11 @@ def build_brief(state: dict[str, Any]) -> dict[str, Any]:
             }
         )
     brief = {
-        "schemaVersion": "1.0.0",
+        "schemaVersion": "1.1.0",
         "project": {
             "id": state["id"],
             "roomType": state["roomType"],
             "housingType": state["housingType"],
-            "budgetBand": state["budgetBand"],
             "status": state["status"],
         },
         "goals": state["goals"],

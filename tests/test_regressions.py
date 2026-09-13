@@ -12,14 +12,14 @@ from app.main import create_app
 
 
 def complete():
-    state = engine.create_project('Regression room','under_15k_sgd')
+    state = engine.create_project('Regression room')
     for q,r,v in engine.demo_answers():
         engine.answer_question(state,q,r,v)
     return state
 
 
 def test_negation_is_not_a_positive_preference():
-    state = engine.create_project('Negative note','under_15k_sgd')
+    state = engine.create_project('Negative note')
     engine.add_reference(state, {'id':'r1','filename':'industrial-marble.jpg',
         'note':'I do not like industrial style, dark wood or marble. But I like light oak.'})
     engine.analyse_references(state)
@@ -58,14 +58,13 @@ def test_legacy_duplicate_values_block_approval():
     assert state['readiness']['blockers']
 
 
-def test_must_avoid_filters_candidates_and_budget_is_visible():
-    state = engine.create_project('Budget room','under_15k_sgd')
+def test_must_avoid_filters_candidates_and_source_is_visible():
+    state = engine.create_project('Reference room')
     engine.add_preferences(state,[],['industrial','marble'])
     engine.answer_question(state, 'primary_material', 'homeowner', 'light_oak')
     assert state['shortlist']
     assert all('industrial' not in (c['title'] + c['text']).lower() and
                'marble' not in c['text'].lower() for c in state['shortlist'])
-    assert all(c['overBudget'] is None and c['budget'] is None for c in state['shortlist'])
     with pytest.raises(ValueError,match='must-avoid'):
         engine.answer_question(state,'style_direction','homeowner','industrial')
 
@@ -112,7 +111,7 @@ def test_upload_requires_consent_decodes_and_is_project_private(tmp_path):
     assert ref['consentActor'] and ref['contentType']=='image/jpeg'
 
 
-def test_analysis_cooldown_and_budget_survive_store_restart(tmp_path):
+def test_analysis_cooldown_and_limits_survive_store_restart(tmp_path):
     client=TestClient(create_app(tmp_path/'db',tmp_path/'images'))
     p=client.post('/api/demo/start').json();base='/api/projects/'+p['id']
     assert client.post(base+'/analysis-runs').status_code==200
@@ -133,7 +132,7 @@ def test_model_outputs_have_no_authority_or_unknown_sources(monkeypatch,tmp_path
     monkeypatch.setenv('LLM_GATEWAY_API_KEY','test-key')
     monkeypatch.setenv('LLM_MODEL','test-model')
     monkeypatch.setattr(httpx.Client,'post',lambda *a,**k:httpx.Response(200,json={'message':{'content':json.dumps(bad)}}))
-    state=engine.create_project('Gateway test','under_15k_sgd')
+    state=engine.create_project('Gateway test')
     engine.add_reference(state,{'id':'r1','note':'cream'})
     with pytest.raises(GatewayError): Gateway().analyse(state,tmp_path)
     assert state['attributes']==[]
@@ -148,7 +147,7 @@ def test_auth_failure_is_not_retried_or_exposed(monkeypatch,tmp_path):
         calls.append(1)
         return httpx.Response(403,text='sensitive upstream details')
     monkeypatch.setattr(httpx.Client,'post',failed)
-    state=engine.create_project('Gateway test','under_15k_sgd')
+    state=engine.create_project('Gateway test')
     engine.add_reference(state,{'id':'r1','note':'cream'})
     with pytest.raises(GatewayError,match='HTTP 403') as error: Gateway().analyse(state,tmp_path)
     assert len(calls)==1 and 'sensitive' not in str(error.value)
@@ -172,7 +171,7 @@ def test_independent_vision_adapters_send_images_and_validate_output(monkeypatch
         else: result={'content':[{'type':'text','text':output}],'usage':{'input_tokens':10,'output_tokens':20}}
         return httpx.Response(200,json=result)
     monkeypatch.setattr(httpx.Client,'post',response)
-    state=engine.create_project('Vision test','under_15k_sgd')
+    state=engine.create_project('Vision test')
     engine.add_reference(state,{'id':'r1','note':'test','storageKey':'r.jpg'})
     proposals,usage=Gateway().analyse(state,tmp_path)
     assert proposals[0]['sourceType']=='image'
@@ -184,7 +183,7 @@ def test_concatenated_gateway_output_uses_only_first_valid_envelope(monkeypatch,
     monkeypatch.setenv('LLM_GATEWAY_API_KEY','test')
     monkeypatch.setenv('LLM_MODEL','test')
     monkeypatch.setattr(httpx.Client,'post',lambda *a,**k:httpx.Response(200,json={'message':{'content':'```json\n{"proposals":[]}\n``````json\n{"approve":true}'}}))
-    state=engine.create_project('Envelope test','under_15k_sgd');engine.add_reference(state,{'id':'r1','note':'cream'})
+    state=engine.create_project('Envelope test');engine.add_reference(state,{'id':'r1','note':'cream'})
     proposals,usage=Gateway().analyse(state,tmp_path)
     assert proposals==[] and usage['ignoredTrailingOutput']
 
@@ -207,7 +206,7 @@ def test_model_result_cannot_overwrite_a_newer_human_edit(tmp_path):
 
 def test_note_only_input_supports_users_without_images(tmp_path):
     client=TestClient(create_app(tmp_path/'db',tmp_path/'images'))
-    p=client.post('/api/projects',json={'name':'Notes only','budgetBand':'under_15k_sgd'}).json()
+    p=client.post('/api/projects',json={'name':'Notes only',}).json()
     base='/api/projects/'+p['id']
     assert client.post(base+'/reference-notes',json={'note':'I like light oak'}).status_code==422
     p=client.post(base+'/reference-notes',json={'note':'I like light oak','consent':True,'expectedStateVersion':p['stateVersion']}).json()

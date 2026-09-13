@@ -50,7 +50,7 @@ Updated 13 September 2026. Initial submission is due **28 September, 09:00 SGT**
 - [ ] Business assumptions exposed; pilot has cohort/metrics/stop criteria.
 - [ ] Each agent has goals/tools/inputs/outputs/forbidden actions.
 - [ ] Canonical state and transition owner clear.
-- [ ] Adaptive decision visible; loops/retries/budget bounded.
+- [ ] Adaptive decision visible; loops/retries/request counts bounded.
 - [ ] Human approval cannot be bypassed.
 - [ ] Model/prompt/evaluation versions recorded.
 

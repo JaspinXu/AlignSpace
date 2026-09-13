@@ -6,16 +6,15 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "project", "goals", "attributes", "constraints", "conflicts", "completeness", "version", "approvals"],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" },
+    "schemaVersion": { "const": "1.1.0" },
     "project": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "roomType", "budgetBand", "status"],
+      "required": ["id", "roomType", "status"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "roomType": { "const": "living_room" },
         "housingType": { "type": ["string", "null"] },
-        "budgetBand": { "enum": ["under_15k_sgd", "15k_to_30k_sgd", "30k_to_50k_sgd", "over_50k_sgd", "prefer_not_to_say"] },
         "status": { "enum": ["draft", "analysing", "homeowner_review", "designer_review", "alignment", "awaiting_approval", "approved", "archived"] }
       }
     },
@@ -75,7 +74,7 @@
       "required": ["id", "category", "statement", "severity", "verificationStatus", "owner"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
-        "category": { "enum": ["budget", "space", "function", "maintenance", "timeline", "safety", "regulatory", "availability", "other"] },
+        "category": { "enum": ["space", "function", "maintenance", "timeline", "safety", "regulatory", "availability", "other"] },
         "statement": { "type": "string", "minLength": 1 },
         "rationale": { "type": "string" },
         "severity": { "enum": ["advisory", "important", "critical"] },

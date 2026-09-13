@@ -26,7 +26,7 @@ def test_health_and_project_creation(tmp_path):
     assert client.get("/health").json()["status"] == "ok"
     response = client.post(
         "/api/projects",
-        json={"name": "Haven", "housingType": "HDB", "budgetBand": "15k_to_30k_sgd"},
+        json={"name": "Haven", "housingType": "HDB", },
     )
     assert response.status_code == 201
     project = response.json()
@@ -38,7 +38,7 @@ def test_optimistic_state_version_rejects_stale_writes(tmp_path):
     client = make_client(tmp_path)
     project = client.post(
         "/api/projects",
-        json={"name": "Haven", "budgetBand": "under_15k_sgd"},
+        json={"name": "Haven", },
     ).json()
     path = f"/api/projects/{project['id']}/preferences"
     first = client.put(
@@ -67,7 +67,7 @@ def test_reference_upload_and_conservative_analysis(tmp_path):
     client = make_client(tmp_path)
     project = client.post(
         "/api/projects",
-        json={"name": "Reference project", "budgetBand": "under_15k_sgd"},
+        json={"name": "Reference project", },
     ).json()
     upload = client.post(
         f"/api/projects/{project['id']}/references",
@@ -89,7 +89,7 @@ def test_upload_rejects_mismatched_image_content(tmp_path):
     client = make_client(tmp_path)
     project = client.post(
         "/api/projects",
-        json={"name": "Unsafe upload", "budgetBand": "under_15k_sgd"},
+        json={"name": "Unsafe upload", },
     ).json()
     response = client.post(
         f"/api/projects/{project['id']}/references",

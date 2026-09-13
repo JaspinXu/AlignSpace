@@ -4,7 +4,7 @@ AlignSpace helps a homeowner and an interior designer turn references, preferenc
 
 ## Try it
 
-The homepage now includes a colourful Singapore discovery experience: browse seven sourced renovation case studies, filter by home type or published cost, save up to six homes, and compare up to three. The budget guide separates 2026 HDB ranges from 2025 condo ranges. Saved source links can be added to a new brief with consent; they do not confirm preferences or set the living-room budget. See [Singapore discovery notes](docs/19-singapore-discovery.md) for sources and data maintenance.
+The homepage centres on visual inspiration: browse 57 attributed Singapore home previews, compare style cues and image tags, save up to six homes, and search the wider source collection without leaving AlignSpace. Search results show lightweight previews with links to the complete source selection. Saved links can be added to a new brief with consent; users choose which details they like. See [Singapore discovery notes](docs/19-singapore-discovery.md).
 
 Run the app locally using the setup below, then open http://127.0.0.1:8010.
 
@@ -25,13 +25,13 @@ Invitations expire after 24 hours. Browser sessions are possession-based access,
 | Reference understanding | Real model-backed **note** analysis through the competition gateway; every result stays proposed until human confirmation |
 | Image understanding | Adapter implemented, **disabled** pending a working vision endpoint; current competition gateway image probe returned `NO_IMAGE` |
 | Interview | Option-entropy heuristic with role filtering; includes no-fixed-style choice |
-| Design references | Local BM25 retrieval over 22 attributed excerpts from 9 Atelier handbook chapters; confirmed needs, exclusion filtering, source links and explicit unknown cost |
+| Design references | Local BM25 retrieval over 22 attributed excerpts from 9 Atelier handbook chapters; confirmed needs, exclusion filtering, source links and discussion prompts |
 | Alignment | Controlled preference replacement, constraint checks, unresolved-risk blockers and versioned approvals |
 | Collaboration | Separate homeowner/designer browser sessions, project isolation, single-use invitations |
 | Reliability | SQLite transactions, stale-version rejection, per-project and global request caps, limited retry, explicit offline fallback |
 | Evidence | Source snapshots in exported briefs and approval hashes; Getty AAT wood concept; audit events, model/prompt version, retrieval IDs and usage |
 
-Workflow messages are deterministic coordination messages, not autonomous LLM-to-LLM conversations. Reference costs are unknown; the user budget requires project-specific quotes. Confidence is an uncalibrated model estimate; offline rules use 0 to indicate no calibrated estimate. There is no verified business ROI yet.
+Workflow messages are deterministic coordination messages, not autonomous LLM-to-LLM conversations. Confidence is an uncalibrated model estimate; offline rules use 0 to indicate no calibrated estimate. There is no verified business ROI yet.
 
 See [grounded design knowledge notes](docs/20-grounded-design-knowledge.md) for source selection, attribution, retrieval limits and update instructions. The handbook is secondary reference material, not validated Singapore compliance guidance; Getty integration currently covers one verified broader material concept.
 
@@ -82,7 +82,7 @@ See [deployment runbook](docs/15-deployment-runbook.md) for setup and verificati
 python -m pytest -q
 ```
 
-Tests cover approval content hashes, stale edits, negation, preference replacement, unknown-cost handling and avoid filtering, project isolation, role spoofing, invitation replay, consent, image decoding, request caps and model schema boundaries. The [verification report](docs/16-verification-report.md) distinguishes automated evidence from pending user trials.
+Tests cover approval content hashes, stale edits, negation, preference replacement, source preview handling and avoid filtering, project isolation, role spoofing, invitation replay, consent, image decoding, request caps and model schema boundaries. The [verification report](docs/16-verification-report.md) distinguishes automated evidence from pending user trials.
 
 ## Competition delivery
 
@@ -90,7 +90,7 @@ Tests cover approval content hashes, stale edits, negation, preference replaceme
 - Required: Team Code, Project Name, judge-accessible GitHub URL, video URL, PDF write-up, deployment evidence/URL.
 - Do not upload the video directly into the submission channel. Briefing says 30 minutes; precise interpretation remains unconfirmed.
 - Finalists: **10 October 2026, 08:30 SGT**, face-to-face demo; use `#final-submission` for finalist artifacts.
-- AWS allocation is approximately USD 100 per team, shared across Lightsail and inference. Use a single medium instance; do not copy the starter kit's second-instance example.
+- Use the organiser-provided hosting and inference allocation. Use a single medium instance; do not copy the starter kit's second-instance example.
 - Kiro redemption deadline was 11 September; redeemed credits are valid through 31 October.
 
 See [official context](docs/00-official-context.md) and [submission checklist](docs/12-submission-checklist.md). Reconcile later organiser notices before submission.

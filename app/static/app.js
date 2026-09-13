@@ -18,8 +18,7 @@ const labels = {
   open_flow: "Open flow", zoned: "Zoned layout", compact: "Compact layout",
   conversation_focused: "Conversation-focused", storage_led: "Storage-led", easy_care: "Easy care",
   balanced: "Balanced care", premium_care: "Premium care", not_sure: "Not sure yet",
-  "15k_to_30k_sgd": "S$15,000–30,000", "30k_to_50k_sgd": "S$30,000–50,000",
-  under_15k_sgd: "Under S$15,000", over_50k_sgd: "Above S$50,000", prefer_not_to_say: "Budget not specified", vision_agent: "Reference assistant"
+  vision_agent: "Reference assistant"
 };
 
 // Illustrative palettes support comparison; they are not generated room proposals.
@@ -100,7 +99,7 @@ function render() {
   showWorkspace();
   const project = state.project;
   $("#project-name").textContent = project.name;
-  $("#project-meta").textContent = `${human(project.housingType || "Living room")} · ${human(project.budgetBand)} · Brief v${project.briefVersion}`;
+  $("#project-meta").textContent = `${human(project.housingType || "Living room")} · Brief v${project.briefVersion}`;
   $("#stage-label").textContent = project.readiness.stage;
   const readiness = Math.round(project.readiness.score * 100);
   $("#readiness-label").textContent = `${project.attributes.filter(a => a.status === "confirmed").length}/8 decisions confirmed`;
@@ -166,7 +165,7 @@ function knowledgeMarkup(items) {
         <p class="muted">${escapeHtml(item.verification)}</p>
       </details>
       <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">View handbook source ↗</a>
-      <p class="muted">${escapeHtml(item.budgetLabel)}. Site fit and maintenance need designer review.</p>
+      <p class="muted">Discuss how these ideas fit your activities, space and care preferences.</p>
     </article>`).join('');
 }
 
@@ -187,7 +186,7 @@ function renderPreferences() {
 
 function renderReferences() {
   $("#reference-list").innerHTML = state.project.references.map(reference => `
-    <div class="reference-item ${reference.status === 'catalogue_link' ? 'catalogue-reference' : ''}">${reference.storageKey ? `<img class="reference-preview" src="/api/projects/${state.project.id}/references/${reference.id}/image" alt="Uploaded inspiration reference" loading="lazy">` : `<span class="sample-label">${reference.status === 'catalogue_link' ? 'Saved Singapore home' : reference.status === 'demo_note' ? 'Sample note' : 'Your note'}</span>`}<strong>${escapeHtml(reference.filename)}</strong><br><span class="muted">${escapeHtml(reference.note || "No note added")}</span>${reference.status === 'catalogue_link' && /^https:\/\/qanvast\.com\/sg\/[a-z0-9/-]+$/.test(reference.sourceUrl || '') ? `<br><a href="${reference.sourceUrl}" target="_blank" rel="noopener noreferrer">View original project on Qanvast ↗</a><br><small>${escapeHtml(reference.sourceDetails?.flatType)} · ${escapeHtml(reference.sourceDetails?.area)} m² · Completed ${escapeHtml(reference.sourceDetails?.year)}</small>` : ''}</div>`).join("");
+    <div class="reference-item ${reference.status === 'catalogue_link' ? 'catalogue-reference' : ''}">${reference.status === 'catalogue_link' && /^https:\/\/d1hy6t2xeg0mdl\.cloudfront\.net\/image\//.test(reference.sourceDetails?.imageUrl || '') ? `<img class="reference-preview" src="${escapeHtml(reference.sourceDetails.imageUrl)}" alt="${escapeHtml(reference.filename)}" loading="lazy" referrerpolicy="no-referrer">` : reference.storageKey ? `<img class="reference-preview" src="/api/projects/${state.project.id}/references/${reference.id}/image" alt="Uploaded inspiration reference" loading="lazy">` : `<span class="sample-label">${reference.status === 'catalogue_link' ? 'Saved Singapore home' : reference.status === 'demo_note' ? 'Sample note' : 'Your note'}</span>`}<strong>${escapeHtml(reference.filename)}</strong><br><span class="muted">${escapeHtml(reference.note || "No note added")}</span>${reference.status === 'catalogue_link' && /^https:\/\/qanvast\.com\/sg\/[a-z0-9/-]+$/.test(reference.sourceUrl || '') ? `<br><a href="${reference.sourceUrl}" target="_blank" rel="noopener noreferrer">View original project on Qanvast ↗</a><br><small>${escapeHtml(reference.sourceDetails?.style || 'Choose the details you like')} · ${escapeHtml(reference.sourceDetails?.flatType || 'Home reference')}</small>` : ''}</div>`).join("");
 }
 
 function renderProposals() {
@@ -254,7 +253,7 @@ async function loadAudit() {
   try {
     const events = await api(`/api/projects/${state.project.id}/audit`);
     const runs = await api(`/api/projects/${state.project.id}/analysis-runs`);
-    $('#usage-list').innerHTML = '<h3>Analysis runs</h3>' + (runs.map(r => `<p>${human(r.mode)} · ${human(r.status)} · ${r.latencyMs ?? '—'} ms · Input tokens: ${r.inputTokens ?? 'unavailable'} · Output tokens: ${r.outputTokens ?? 'unavailable'}</p>`).join('') || '<p>No model calls yet.</p>') + '<p class="muted">Token counts may be unavailable for failed calls. Monetary cost is not estimated without verified pricing. Check team quota in Slack.</p>';
+    $('#usage-list').innerHTML = '<h3>Analysis runs</h3>' + (runs.map(r => `<p>${human(r.mode)} · ${human(r.status)} · ${r.latencyMs ?? '—'} ms · Input tokens: ${r.inputTokens ?? 'unavailable'} · Output tokens: ${r.outputTokens ?? 'unavailable'}</p>`).join('') || '<p>No model calls yet.</p>') + '<p class="muted">Token counts may be unavailable for failed calls. Check team quota in Slack.</p>';
     $("#audit-list").innerHTML = events.map(event => `<div class="audit-event"><code>v${event.state_version}</code><strong>${human(event.action)}</strong><span>${human(event.actor)} · ${new Date(event.created_at).toLocaleString()}</span></div>`).join("");
   } catch (error) { notify(error.message, true); }
 }
@@ -284,7 +283,7 @@ function renderGuidance() {
 
 function applyRoleControls() {
   const role = state.project.viewerRole;
-  $('#constraint-role-help').textContent = role === 'designer' ? 'Bring the practical details into the brief. Explain the impact of each constraint.' : 'A space for your designer’s expertise. Invite them to add layout, care and budget considerations.';
+  $('#constraint-role-help').textContent = role === 'designer' ? 'Bring the practical details into the brief. Explain the impact of each constraint.' : 'A space for your designer’s expertise. Invite them to add layout, care and everyday activities.';
   for (const id of ['preferences-form', 'reference-form']) {
     $$('input,textarea,button,select', $('#'+id)).forEach(el => el.disabled = role !== 'homeowner');
   }
@@ -323,7 +322,7 @@ $("#project-form").addEventListener("submit", async event => {
   const form = new FormData(event.currentTarget);
   try {
     const inspirationIds = form.get('importInspiration') ? (window.AlignDiscovery?.selectedIds() || []) : [];
-    state.project = await api("/api/projects", { method: "POST", body: JSON.stringify({ name: form.get("name"), housingType: form.get("housingType") || null, budgetBand: form.get("budgetBand"), inspirationIds, inspirationConsent: inspirationIds.length > 0 }) });
+    state.project = await api("/api/projects", { method: "POST", body: JSON.stringify({ name: form.get("name"), housingType: form.get("housingType") || null, inspirationIds, inspirationConsent: inspirationIds.length > 0 }) });
     localStorage.setItem("alignspaceProjectId", state.project.id);
     render();
   } catch (error) { alert(error.message); }

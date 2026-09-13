@@ -33,7 +33,7 @@ AWS service selection is proposed, not an official mandate beyond the event's AW
 - **DynamoDB:** brief, versions, approvals, history, idempotency.
 - **S3:** encrypted originals, thumbnails, exports, lifecycle deletion.
 - **Retrieval:** curated/licensed catalogue with source and rights metadata.
-- **CloudWatch/X-Ray:** latency, errors, cost, blocks; no sensitive content.
+- **CloudWatch/X-Ray:** latency, errors, usage, blocks; no sensitive content.
 
 ## Trust boundaries
 
@@ -76,19 +76,17 @@ Idempotency, dead-letter queue, timeouts, bounded retries, manual mode, database
 
 ## Observability
 
-Dimensions: environment, step, model, prompt, project pseudonym, outcome, latency, usage, estimated cost, retry, policy. Alarms:
+Dimensions: environment, step, model, prompt, project pseudonym, outcome, latency, usage, retry, policy. Alarms:
 
 - workflow failure >5% over 15 minutes;
 - p95 interactive latency >8s;
-- per-project model cost >S$5;
 - policy-block rate >2× baseline;
 - approval without two valid roles: critical.
 
-## Cost template
+## Resource planning
 
 `image analysis + interview + designer/alignment + review + storage + requests + observability`
 
-Record current provider prices at deployment time. The <S$3/project figure is a target, not a current claim.
 
 ## Deployment gates
 
