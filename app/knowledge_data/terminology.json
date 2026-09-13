@@ -1,0 +1,16 @@
+[
+  {
+    "id": "300011914",
+    "uri": "http://vocab.getty.edu/aat/300011914",
+    "url": "https://www.getty.edu/vow/AATFullDisplay?find=wood&logic=AND&note=&subjectid=300011914",
+    "preferredLabel": "wood (plant material)",
+    "sourceLabels": ["wood (plant material)", "wooden", "木材 (植物材料)", "木"],
+    "queryAliases": ["wood", "wooden", "木材", "light_oak", "walnut", "橡木", "胡桃木"],
+    "localValues": ["light_oak", "walnut"],
+    "mappingRelation": "broader material concept; local mapping, not exact equivalence",
+    "attribution": "Art & Architecture Thesaurus, Getty Research Institute",
+    "license": "ODC-By-1.0",
+    "licenseUrl": "https://opendatacommons.org/licenses/by/1-0/",
+    "verifiedOn": "2026-09-13"
+  }
+]

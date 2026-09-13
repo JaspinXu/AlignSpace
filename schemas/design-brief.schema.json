@@ -25,6 +25,8 @@
     "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } },
     "conflicts": { "type": "array", "items": { "$ref": "#/$defs/conflict" } },
     "unresolvedDecisions": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "knowledgeReferences": { "type": "array", "items": { "type": "object", "required": ["id", "url", "text", "revision", "corpusVersion", "verification"] } },
+    "terminology": { "type": "array", "items": { "type": "object", "required": ["id", "url", "mappingRelation", "attribution"] } },
     "completeness": { "type": "number", "minimum": 0, "maximum": 1 },
     "version": { "type": "integer", "minimum": 1 },
     "contentHash": { "type": "string", "minLength": 1 },

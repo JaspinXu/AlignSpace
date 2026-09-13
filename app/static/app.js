@@ -5,6 +5,7 @@ const state = { project: null, activeTab: "alignment" };
 let runtime = {analysisMode:'offline', imageAnalysisEnabled:false};
 
 const labels = {
+  no_fixed_style: "No fixed style — combine individual preferences",
   warm_modern: "Warm modern", japandi: "Japandi", contemporary_luxe: "Contemporary luxe",
   industrial: "Industrial", scandinavian: "Scandinavian", calm: "Calm", cosy: "Cosy",
   bright: "Bright", dramatic: "Dramatic", social: "Social", warm_neutral: "Warm neutrals",
@@ -154,19 +155,29 @@ function renderMessages() {
     </div>`).join("") || '<p class="muted">The agent exchange will appear here.</p>';
 }
 
-function renderShortlist() {
-  $("#candidate-count").textContent = state.project.shortlist.length;
-  $("#shortlist").innerHTML = state.project.shortlist.map(candidate => `
-    <div class="direction">
-      ${paletteMarkup(candidate.style,'direction-palette')}
-      <div class="direction-head"><h3>${escapeHtml(candidate.title)}</h3><span class="match">${state.project.readiness.coverage ? Math.round(candidate.matchScore * 100)+"% preference match" : "Explore"}</span></div>
-      <p>${human(candidate.style)} · ${human(candidate.mood)} · ${human(candidate.material)} · ${human(candidate.layout)}</p>
-      <details><summary>Why this direction?</summary>
-      <p class="muted">Matches: ${candidate.matches.map(human).join(', ') || 'Explore this direction'}</p>
-      <p class="muted">Trade-offs: ${candidate.tradeoffs.map(human).join(', ') || 'No preference mismatch'}${candidate.overBudget ? ' · Above your budget band' : ''}</p>
-      </details><small>${human(candidate.budget)}${candidate.overBudget ? ' · Above your budget band' : ''}<br>Illustrative palette, not a quote</small>
-    </div>`).join("") || '<p>No sample directions meet your must-avoid choices. Your brief can still describe a custom direction.</p>';
+function knowledgeMarkup(items) {
+  return items.filter(item => item.kind === 'knowledge_reference').map(item => `
+    <article class="direction knowledge-reference">
+      <p class="eyebrow">Design reference · secondary source</p>
+      <h3>${escapeHtml(item.title)}</h3>
+      <p class="muted">${escapeHtml(item.section)} · Related topics: ${item.relevantDimensions.map(human).join(', ') || 'General context'}</p>
+      <details><summary>Read the source excerpt</summary>
+        <p class="source-excerpt">${escapeHtml(item.text)}</p>
+        <p class="muted">${escapeHtml(item.verification)}</p>
+      </details>
+      <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">View handbook source ↗</a>
+      <p class="muted">${escapeHtml(item.budgetLabel)}. Site fit and maintenance need designer review.</p>
+    </article>`).join('');
 }
+
+function renderShortlist() {
+  const refs = state.project.shortlist.filter(item => item.kind === 'knowledge_reference');
+  $("#candidate-count").textContent = refs.length;
+  $("#shortlist").innerHTML = knowledgeMarkup(refs) || '<p>No supporting excerpts yet. Confirm a preference to search the handbook. Your brief can describe a custom direction even when the library has no match.</p>';
+  const terms = state.project.terminology || [];
+  if (terms.length) $("#shortlist").innerHTML += `<div class="direction"><h3>Shared terminology</h3>${terms.map(term => `<p><a href="${escapeHtml(term.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(term.preferredLabel)} · Getty AAT ↗</a><br><small>${escapeHtml(term.mappingRelation)}. ${escapeHtml(term.attribution)} · ${escapeHtml(term.license)}</small></p>`).join('')}</div>`;
+}
+
 
 function renderPreferences() {
   const form = $("#preferences-form");
@@ -224,7 +235,7 @@ function renderBrief() {
     <div class="brief-section"><h3>Confirmed design language</h3><div class="attribute-grid">${attributes}</div></div>
     <div class="brief-section"><h3>Must avoid</h3><ul>${brief.antiPreferences.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>None recorded</li>"}</ul></div>
     <div class="brief-section"><h3>Designer constraints</h3><ul>${brief.constraints.map(item => `<li><strong>${human(item.category)}:</strong> ${escapeHtml(item.statement)} <span class="muted">(${item.waived ? "Withdrawn by designer" : human(item.severity)})</span></li>`).join("") || "<li>No constraints recorded</li>"}</ul></div>
-    <div class="brief-section"><h3>Preferred directions</h3><ul>${state.project.shortlist.map(item => `<li>${item.title} — ${human(item.style)}, ${human(item.mood)}, ${human(item.layout)}</li>`).join("")}</ul></div>
+    <div class="brief-section"><h3>Supporting design references</h3>${knowledgeMarkup(brief.knowledgeReferences || []) || "<p>No supporting excerpts recorded.</p>"}</div>
     <div class="brief-section"><h3>Open decisions</h3><ul>${brief.unresolvedDecisions.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>None</li>"}</ul></div>`;
 }
 

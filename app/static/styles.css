@@ -447,3 +447,7 @@ footer p { max-width:380px; margin:0; font-size:10px; line-height:1.8; }.footer-
 }
 @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { transition:none!important; } }
 @media print { body { background:white; color:black; }.decision-ribbon,.workspace-topline,.skip-link,#request-status,.discovery-toast,dialog { display:none!important; } #welcome,#alignment-panel,#activity-panel { display:none!important; } #workspace,#brief-panel { display:block!important; }.brief-paper { padding:0; }.attribute-grid { grid-template-columns:repeat(3,1fr); } }
+
+.source-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .88rem; line-height: 1.65; }
+.knowledge-reference a { overflow-wrap: anywhere; }
+@media print { .knowledge-reference details > * { display: block; } }

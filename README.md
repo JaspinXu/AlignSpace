@@ -24,14 +24,16 @@ Invitations expire after 24 hours. Browser sessions are possession-based access,
 | Reference images | Decoded, resized, metadata removed, stored privately and displayed only to project members |
 | Reference understanding | Real model-backed **note** analysis through the competition gateway; every result stays proposed until human confirmation |
 | Image understanding | Adapter implemented, **disabled** pending a working vision endpoint; current competition gateway image probe returned `NO_IMAGE` |
-| Interview | Deterministic information-gain selection from a controlled question bank, filtered by participant role |
-| Candidate directions | 12 illustrative catalogue records; must-avoid filtering, budget-aware ordering, explicit match/trade-off explanations |
+| Interview | Option-entropy heuristic with role filtering; includes no-fixed-style choice |
+| Design references | Local BM25 retrieval over 22 attributed excerpts from 9 Atelier handbook chapters; confirmed needs, exclusion filtering, source links and explicit unknown cost |
 | Alignment | Controlled preference replacement, constraint checks, unresolved-risk blockers and versioned approvals |
 | Collaboration | Separate homeowner/designer browser sessions, project isolation, single-use invitations |
 | Reliability | SQLite transactions, stale-version rejection, per-project and global request caps, limited retry, explicit offline fallback |
-| Evidence | Audit events, model run status, model/prompt version, latency, token counts where the provider returns them |
+| Evidence | Source snapshots in exported briefs and approval hashes; Getty AAT wood concept; audit events, model/prompt version, retrieval IDs and usage |
 
-Workflow messages are deterministic coordination messages, not autonomous LLM-to-LLM conversations. Candidate budgets are illustrative, not quotes. Confidence is an uncalibrated model estimate; offline rules use 0 to indicate no calibrated estimate. There is no verified business ROI yet.
+Workflow messages are deterministic coordination messages, not autonomous LLM-to-LLM conversations. Reference costs are unknown; the user budget requires project-specific quotes. Confidence is an uncalibrated model estimate; offline rules use 0 to indicate no calibrated estimate. There is no verified business ROI yet.
+
+See [grounded design knowledge notes](docs/20-grounded-design-knowledge.md) for source selection, attribution, retrieval limits and update instructions. The handbook is secondary reference material, not validated Singapore compliance guidance; Getty integration currently covers one verified broader material concept.
 
 ## Local setup
 
@@ -80,7 +82,7 @@ See [deployment runbook](docs/15-deployment-runbook.md) for setup and verificati
 python -m pytest -q
 ```
 
-Tests cover approval content hashes, stale edits, negation, preference replacement, budget/avoid filtering, project isolation, role spoofing, invitation replay, consent, image decoding, request caps and model schema boundaries. The [verification report](docs/16-verification-report.md) distinguishes automated evidence from pending user trials.
+Tests cover approval content hashes, stale edits, negation, preference replacement, unknown-cost handling and avoid filtering, project isolation, role spoofing, invitation replay, consent, image decoding, request caps and model schema boundaries. The [verification report](docs/16-verification-report.md) distinguishes automated evidence from pending user trials.
 
 ## Competition delivery
 

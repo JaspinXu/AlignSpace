@@ -61,8 +61,11 @@ def test_legacy_duplicate_values_block_approval():
 def test_must_avoid_filters_candidates_and_budget_is_visible():
     state = engine.create_project('Budget room','under_15k_sgd')
     engine.add_preferences(state,[],['industrial','marble'])
-    assert all(c['style']!='industrial' and c['material']!='stone' for c in engine._ranked_candidates(state))
-    assert state['shortlist'][0]['overBudget'] is False
+    engine.answer_question(state, 'primary_material', 'homeowner', 'light_oak')
+    assert state['shortlist']
+    assert all('industrial' not in (c['title'] + c['text']).lower() and
+               'marble' not in c['text'].lower() for c in state['shortlist'])
+    assert all(c['overBudget'] is None and c['budget'] is None for c in state['shortlist'])
     with pytest.raises(ValueError,match='must-avoid'):
         engine.answer_question(state,'style_direction','homeowner','industrial')
 

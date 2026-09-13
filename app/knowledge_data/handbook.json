@@ -1,0 +1,308 @@
+{
+  "version": "handbook-subset-v1",
+  "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+  "files": [
+    {
+      "path": "styles/scandinavian.md",
+      "sha256": "9be6bdb7aafa6dcd8c556253586db71e8343fac7d1be260b873849fb93d33314"
+    },
+    {
+      "path": "styles/japanese-wabi-sabi.md",
+      "sha256": "af553875b7ea49123b593b36972ddd7179895d52b9720f39e3770ac2d1f0091c"
+    },
+    {
+      "path": "styles/muji-minimal.md",
+      "sha256": "3102dc43aaf911a11d101670790666b45667ce0df4451465c96370c447c014b0"
+    },
+    {
+      "path": "styles/modern-minimal.md",
+      "sha256": "62c7682470a273ca49700dcf719b629659e8c736f083ba97a064a235b9054ce1"
+    },
+    {
+      "path": "styles/quiet-luxury.md",
+      "sha256": "a1cf78421d8118889838f04131c780cf999a8216537b82a6e66c32c8c0a53613"
+    },
+    {
+      "path": "styles/industrial-loft.md",
+      "sha256": "5a789c3e2fa430eac0a7d04b5fdd4804a01e16db7f6f7f4802b028d6ba619e35"
+    },
+    {
+      "path": "styles/mid-century-modern.md",
+      "sha256": "c3849079ceffa76611835283edb776c6e62bb9c02587ab3f50821b3d7015a5fd"
+    },
+    {
+      "path": "materials.md",
+      "sha256": "8f26829e81425e46b71ab0e33bf253ebfdec1ab311800714e48a74c30bfd3f72"
+    },
+    {
+      "path": "lighting.md",
+      "sha256": "1bcb711400141d9f2777eb28b7776e1ca2bd8066aaee97f7a901b058eefd0f98"
+    }
+  ],
+  "records": [
+    {
+      "id": "d1d7d4ea9b2f23f8",
+      "title": "Style: Scandinavian (Skandinavisk)",
+      "section": "Anchor description",
+      "text": "Scandinavian design is the marriage of organic form with everyday functionality, born of a Nordic \"democratic design\" tradition that bridges craft and industrial production (per Fiell, *Scandinavian Design*, intro essay). At the residential scale it expresses itself as **hygge** — a cultivated atmosphere of comfort, togetherness, and well-being created mainly through tactile natural materials and warm low-Kelvin light, prioritizing \"rustic over new, simple over posh, ambience over excitement\" (per Wiking, *The Little Book of Hygge*, 2016, ch. 2). For a 3D scene this means: light wood floors, off-white walls, soft wool textiles, a single dark or muted accent, and many small warm light sources rather than one bright ceiling fixture.",
+      "path": "styles/scandinavian.md",
+      "line": 6,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/scandinavian.md#L6",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "5620048c4be2de12",
+      "title": "Style: Scandinavian (Skandinavisk)",
+      "section": "In",
+      "text": "- **Pale-grain hardwoods — oak, ash, birch.** Scandinavian design is rooted in native timber craft and specifically in the post-war embrace of organic form in wood (per Fiell, *Scandinavian Design*, on Norway/Sweden/Denmark/Finland/Iceland furniture traditions). The Vipp Loft makes the canonical move: wide Dinesen oak plank flooring + exposed oak rafters as the room's structural texture (per Remodelista feature on Vipp Loft).\n- **Wool, linen, boucle, sheepskin throws.** Hygge prioritizes \"things made of wood … blankets and cushions … tactile stuff\" and clothing/textiles \"rely on soft natural fabrics like wool\" (per Wiking, *Little Book of Hygge*, ch. 6 \"Home\").\n- **Vegetable-tanned / unfinished leather.** Used for sling chairs and strap details on cabinetry; reads as ageable rather than polished (per Fiell on Danish modern furniture's \"organic forms and functionality\").\n- **Matte ceramic, low-saturation glaze.** Hygge home checklist explicitly includes \"Ceramics, tactile stuff, vintage stuff\" (per Wiking, ch. 6).\n- **Brass — oxidized / brushed, never bright.** The Audo uses \"warming brass accents to lift the industrial architecture\" — warmed and dulled, not mirror-polished (per Dezeen 2019).\n- **Lime-washed brick, raw concrete (industrial-Scandi crossover).** Vipp Chimney House: \"lime-washed brickwork and terrazzo pebble floors\" inside an old brick frame (per Wallpaper*/Dwell coverage of Vipp Chimney House by Studio David Thulstrup).",
+      "path": "styles/scandinavian.md",
+      "line": 26,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/scandinavian.md#L26",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "3dcdb8c044a3a11e",
+      "title": "Style: Japanese Wabi-Sabi (日式侘寂)",
+      "section": "Anchor description",
+      "text": "Wabi-sabi is \"a beauty of things imperfect, impermanent, and incomplete … of things modest and humble … of things unconventional\" (per Koren, *Wabi-Sabi for Artists, Designers, Poets & Philosophers*, 1994, definition page). At residential scale it is the deliberate cultivation of patina, asymmetry, and the trace of time — \"the refinement of simplicity, a rustic elegance, a nobility without sophistication, beauty brought back to its true nature\" (per Vervoordt, *Wabi Inspirations*, Flammarion 2010, introduction). For 3D rendering it means: muted earth tones, no glossy surfaces, hand-troweled or hand-thrown finishes, asymmetric placement, one or two beautifully aged objects, and light treated as an emotional rather than functional element.",
+      "path": "styles/japanese-wabi-sabi.md",
+      "line": 6,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/japanese-wabi-sabi.md#L6",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "1a655671303c8fd9",
+      "title": "Style: Japanese Wabi-Sabi (日式侘寂)",
+      "section": "In",
+      "text": "- **Hand-troweled lime / clay / sand plaster.** Norm Architects' Kinfolk gallery is the published touchstone: \"walls covered in sandy-toned plaster that give them a 'special earthy wabi-sabi quality'\" (per Dezeen 21 Nov 2016). The wall must visibly carry the trowel mark; a smooth painted plane reads the opposite of wabi.\n- **Raw / board-formed concrete.** Tadao Ando's residential signature: \"concrete ages, develops a patina of moisture, and darkens with time. This is not a defect — it is a process\" (per ArchEyes on Ando's residential philosophy). Casa Wabi's 312-meter concrete wall is the canonical residential application (per Dezeen 14 Jan 2016).\n- **Aged, reclaimed, weathered wood.** Vervoordt's vocabulary: \"aged wood, natural stone, untreated linen: each material tells its own story\" (per Acumen Magazine feature on Vervoordt). Reclaimed beams, weathered floor planks with visible knots, charred *shou sugi ban* cladding all qualify.\n- **Untreated / unbleached linen and raw hemp.** \"Rough Belgian linen curtains\" and \"untreated linen\" appear consistently across Vervoordt's published interiors (per *Wabi Inspirations* 2010 / Acumen feature). No silk, no satin, no synthetic sheen.\n- **Unglazed and low-fire ceramics — Bizen, Shigaraki, raw stoneware.** Koren's wabi-sabi examples explicitly include \"unglazed pottery\" as a defining material category (per Koren 1994, on the patina thesis). Glazed white porcelain reads anti-wabi; raw clay with kiln marks reads correct.\n- **Stone with visible cleavage and chisel marks — not polished, not honed.** The Vervoordt interior thesis privileges \"surfaces rough or irregular\" (per Koren 1994 quoting Webster's \"rustic\" definition that Koren extends as \"the initial impression many people have when they first see a wabi-sabi expression\"). Use cleft slate, split granite, weathered limestone — never polished marble.\n- **Light itself, treated as material.** Ando's interiors are organized around the Japanese concept of *ma* (間) and \"shintai\", \"the bodily perception of space\" (per ArchEyes on Ando) — light through a slot in concrete is treated as a furnishing rather than a fixture.",
+      "path": "styles/japanese-wabi-sabi.md",
+      "line": 26,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/japanese-wabi-sabi.md#L26",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "342dab15ae933f9e",
+      "title": "Style: Muji Minimal (極簡 Muji 風 / 無印良品)",
+      "section": "Anchor description",
+      "text": "Muji minimal is the residential expression of Mujirushi Ryōhin's \"no-brand\" philosophy: a household built around ordinary objects with their intent removed (per Hara, *Designing Design*, ch. 5 \"MUJI\"). Kenya Hara calls the brand's controlling aesthetic *kara* — emptiness — \"a vessel ready to receive any image or use\" (per Hara, *Designing Design*, ch. 4 \"White\"). Naoto Fukasawa, Muji's design advisor since 2003, frames it as *supernormal*: design \"you use immediately as normal products: to write, to eat … without thinking\" (per MAS Context, \"Intuitive Design,\" 2014). For a 3D scene this means: untreated cypress / pine / oak surfaces, paper-white walls with no paint sheen, one or two textile colors total, no logos, no metal jewelry, daylight as the hero, and every prop chosen because a Japanese household would actually use it — not because it \"looks Muji.\"",
+      "path": "styles/muji-minimal.md",
+      "line": 6,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/muji-minimal.md#L6",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "b639bcd463f324d8",
+      "title": "Style: Muji Minimal (極簡 Muji 風 / 無印良品)",
+      "section": "In",
+      "text": "- **Untreated softwoods — cypress (hinoki), Japanese cedar (sugi), pine.** Fukasawa's Muji Wood Hut uses untreated timber inside as the room's dominant texture (per Designboom, 2015). The brand's first residential model, Ki no Ie (\"Wood House,\" 2004, designed by Kazuhiko Nanba), establishes the same vocabulary at full residential scale (per Dwell coverage of the Muji house line).\n- **Cypress plywood and oriented-strand subfloor used as finish surface.** Documented in Muji's Yō no Ie spec — \"interior walls are made of untreated cypress plywood\" with the construction surface treated as the final surface, not hidden (per Dwell coverage of Muji Yō no Ie).\n- **Mortar / cement screed floor.** The Yō no Ie spec reads \"the mortar floor finish is strong and easy to clean\" — the floor is the building, not a layer added on top (per Dwell, Yō no Ie).\n- **Undyed cotton, linen, and muslin.** Muji's textile aesthetic is uniformly low-saturation natural fiber; Hara's *Designing Design* treats this as the textile face of the *kara* concept — a fabric \"ready to receive any image or use\" (per Hara, ch. 4–5).\n- **Plain stoneware and porcelain in matte glaze.** Fits the *supernormal* checklist — \"objects that you use immediately as normal products\" (per MAS Context interview, 2014).\n- **Paper — shoji, washi lampshades, paperback books with no jacket.** White paper is, in Hara's framing, \"a symbol of nonbeing … a condition which will likely be filled with content\" (per Hara, ch. 4 \"White\").",
+      "path": "styles/muji-minimal.md",
+      "line": 26,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/muji-minimal.md#L26",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "e8b4b066cf3db6e8",
+      "title": "Style: Modern Minimal (现代简约 / contemporary minimalism)",
+      "section": "Anchor description",
+      "text": "Modern Minimal is the art of subtraction — \"the minimum, which is the quality an object or space has when it is no longer possible to improve it by subtraction\" (per John Pawson, quoted in Phaidon \"Defining Style with John Pawson\", March 2025). At residential scale it is not a cold white box; it is \"warm minimalism\" with a \"reduction to the essence\" (per Van Duysen interview, JACQUES NYC), where one or two natural materials carry the entire room and ornament is replaced by proportion, light, and tactility. For 3D rendering this means: an off-white plaster ground, a single warm wood (oak), one stone or plaster surface as punctuation, and very few — but very deliberately placed — objects.",
+      "path": "styles/modern-minimal.md",
+      "line": 6,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/modern-minimal.md#L6",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "6b3b0c607619394a",
+      "title": "Style: Modern Minimal (现代简约 / contemporary minimalism)",
+      "section": "In",
+      "text": "- **Lime plaster / marmorino on walls.** Pawson's Home Farm walls are coated \"in a chalky, white lime plaster that reflects the dappled light\" (per Phaidon \"Defining Style with John Pawson\", March 2025). Dirand's Paris walls are \"marmorino, a type of pigmented stucco … slightly irregular walls subtly shift in color\" (per 1stDibs Introspective). The wall is never a flat painted plane — it has a hand-troweled, light-catching texture.\n- **Untouched / wide-plank natural oak.** \"Long, uncut 15-meter planks that ran the entire length of the house, connecting spaces and adding depth and direction\" (per ArchDaily on Pawson + Dinesen, 2024). Yovanovitch laid \"18th-century oak planks, left untouched … no oil or wax finish\" — sanding \"would have destroyed their beauty\" (per Interior Design feature on Yovanovitch).\n- **Limestone, Belgian bluestone, lias stone.** Van Duysen's Antwerp palette explicitly: \"a bit of aged Belgian bluestone\" alongside natural wood and plaster (per JACQUES NYC interview). Yovanovitch's bath is defined by \"Lias stone … with a Dornbracht tub filler\" (per Interior Design feature).\n- **Concrete terrazzo, poured floors.** Pawson \"poured concrete terrazzo floors in a creamy shade of grey\" at Home Farm (per Phaidon March 2025). Concrete reads minimal when it is a continuous monolithic plane, not a panelized system.\n- **Heavily veined marble — used as a single sculptural slab.** Dirand uses \"large slabs of heavily veined marble\" as his kitchen and bathroom signature (per 1stDibs Introspective). Marble enters as a controlled act of \"disorder\" against the otherwise calm field, not as a luxury overlay.\n- **Bouclé, linen, raw wool, suede in restrained quantity.** Yovanovitch's interiors carry \"nubby fabrics\" against sandblasted oak (per Interior Design feature). Dirand pairs \"a suede-covered Oscar Niemeyer chair … in front of an Irving Penn photograph\" (per 1stDibs Introspective).",
+      "path": "styles/modern-minimal.md",
+      "line": 26,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/modern-minimal.md#L26",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "fc062531649fb198",
+      "title": "Style: Quiet Luxury (轻奢)",
+      "section": "Anchor description",
+      "text": "Quiet Luxury is the residential register of restraint as luxury — interiors built from rare, ageable materials and meticulous craftsmanship, deliberately stripped of obvious display. Its three patron designers across the past decade are Vincent Van Duysen (\"warm minimalism,\" \"essentialism,\" the \"architecture of visual silence\" — per Designboom 2016 and Salone del Mobile editorial), Pierre Yovanovitch (\"monk-like but comfortable,\" \"useless ornament must give way to essential\" — per AUTHOR Magazine, \"Pierre Yovanovitch's Exacting Interiors\"), and Axel Vervoordt (wabi-sabi, \"feeling at home with less\" — per My World of Interiors and AD's Belgian-countryside-home feature). Vincent Van Duysen's defining brief: \"calm architecture — a sort of visual silence, geared to promoting and infusing comfort and wellbeing … measured, sometimes monastic, but warm\" (per Salone del Mobile editorial, \"Quiet luxury: an impression of discreet luxury, also in design\"). For a 3D scene this means: matte plaster walls in chalky neutrals, smoked oak / limewashed oak millwork, bouclé and linen seating, one piece of art or sculpture placed with intention, no logos, no metal jewelry, no chromatic accent.",
+      "path": "styles/quiet-luxury.md",
+      "line": 6,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/quiet-luxury.md#L6",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "327ac673a755ed24",
+      "title": "Style: Quiet Luxury (轻奢)",
+      "section": "In",
+      "text": "- **Lime plaster, Tadelakt, Marmorino, troweled mineral wall finishes.** Pierre Yovanovitch: \"Matte plaster can quiet a space more effectively than decoration\" (per AUTHOR Magazine). Vervoordt: \"plaster walls in chalky whites\" anchor every published interior (per AD, Belgian countryside home).\n- **Smoked / fumed / lime-washed oak — solid, not veneer.** Vervoordt's material vocabulary: \"raw stone, smoked oak, light lime, and washed linen\" (per My World of Interiors). The published register treats this oak as planks, panels, or solid joinery — never as a printed laminate.\n- **Bouclé, linen, washed cotton, cashmere, wool.** Bouclé is named explicitly across Yovanovitch's documented material list — \"Oak, plaster, stone, ceramic, bronze, velvet, bouclé\" (per AUTHOR Magazine). The 2024 trend coverage cements bouclé as a defining hallmark: \"ivory boucle couches, mixed natural textures and warm intentional lighting … Bouclé is a fundamental part of the quiet luxury trend\" (per Studio Steidley 2024; Rebel Walls Trend Report 2024).\n- **Raw stone — limestone, travertine, fossil-rich slabs — honed (not polished).** Vervoordt's Japanese-wabi-sabi vocabulary: \"raw stone … celebrates imperfect, humble, and timeless beauty\" (per My World of Interiors). Honed (matte) finish is canonical; polished mirror-finish reads contemporary luxury, not quiet luxury.\n- **Patinated bronze and unlacquered brass for ironmongery and lighting.** Yovanovitch's \"metal sculpted doors and marble floors\" (per AUTHOR Magazine) and bronze listed alongside oak and plaster as \"tonal instruments.\"\n- **Hand-thrown ceramic, low-saturation glaze.** The Vervoordt prop convention; pairs with the chalk wall and smoked oak as the room's punctuation.",
+      "path": "styles/quiet-luxury.md",
+      "line": 26,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/quiet-luxury.md#L26",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "a52c48745b541183",
+      "title": "Style: Industrial Loft (工业 Loft)",
+      "section": "Anchor description",
+      "text": "Industrial Loft is the residential register of the converted late-19th / early-20th-century factory or warehouse — the cast-iron column and timber-beam structure left visible, the brick wall left raw, the windows reinstated as the room's hero. The style \"emerged in the 1960s and 1970s when artists and creatives began repurposing abandoned factories and warehouses into residential spaces, taking advantage of the large, light-filled spaces and raw, industrial elements\" (per Nazmiyal, \"New York Loft Style Interior Design Approach,\" referencing the SoHo / Tribeca artist-loft origin). The architectural-character checklist is settled vocabulary: \"Cast iron columns, heavy timber beams, and masonry bearing walls were engineered for heavy performance, not aesthetics — yet they now give these spaces their character. In many New York loft buildings, particularly in areas such as SoHo's Cast Iron District, the structure is integral to the identity of the interior\" (per Fontan Architecture, \"Industrial Loft Design: Architecture, Materials, and Detail\"). At the high editorial end, Roman and Williams's Ace Hotel New York (Hotel Breslin, 1904) and The Standard High Line define the contemporary register: vintage seating \"with their original patinas,\" \"custom-designed lighting fixtures, made of blown glass globes and industrial pipes,\" \"an 18-foot laboratory table with a slate top,\" \"handmade orange, black and cream tile,\" and \"tambour wooden ceiling and headboard\" (per ArchDaily Ace Hotel feature; Roman and Williams interiors documentation of The Standard High Line).",
+      "path": "styles/industrial-loft.md",
+      "line": 6,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/industrial-loft.md#L6",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "76dc299c68daeb0a",
+      "title": "Style: Industrial Loft (工业 Loft)",
+      "section": "In",
+      "text": "- **Exposed weathered brick — load-bearing, unpainted, mortar joints raked.** \"Authentic Industrial Loft with Modern Finishes in a Historic Tribeca Caviar Factory … on one of Tribeca's most picturesque cobblestone streets, situated in a former 19th-century caviar factory\" (per 6sqft Tribeca caviar factory loft feature). The 19th-century brick and 19th-century mortar are the surface — not a brick veneer, not a brick wallpaper.\n- **Cast-iron columns and heavy timber beams left structurally visible.** \"Cast iron columns, heavy timber beams, and masonry bearing walls were engineered for heavy performance, not aesthetics — yet they now give these spaces their character\" (per Fontan Architecture). The 6 Varick Street artists' loft documents \"original steel beam columns, massive oak beams\" (per 6sqft).\n- **Tin or pressed-metal ceilings.** 6 Varick Street loft: \"10-foot-tall tin ceilings\" (per 6sqft). The pressed-metal ceiling is the period-correct upper-plane treatment; a flat drywall ceiling breaks the read.\n- **Wide oak / pine plank floors with visible nail heads and patina.** 6 Varick: \"original wooden plank floors\" (per 6sqft). The plank should read used — knots, gaps, and the dark line of accumulated wax/dirt at the seams.\n- **Blackened steel — Crittall-style steel windows, factory-sash glazing, steel-pipe shelving.** Lewis Steel Building: \"massive factory sized casement windows\" against dark brick (per project documentation). The window grid is the architectural protagonist of an industrial loft — wider muntins, taller proportions than residential sash.\n- **Vintage leather and patinated upholstery.** Ace Hotel New York lobby: \"vintage seating pieces with their original patinas — some recovered with modest industrial fabrics such as felt and wool and others recovered with more luxurious velvets\" (per ArchDaily Ace Hotel). The published register is patina-as-finish, not as antique-store reproduction.\n- **Slate, soapstone, and rough-honed stone tops.** Ace Hotel: \"an 18-foot laboratory table with a slate top provides space for impromptu meetings, meals and conversation\" (per ArchDaily Ace Hotel). The Standard High Line includes orange / black / cream handmade tile (per Roman and Williams interiors). Material register: utilitarian stone, factory-grade tile, never polished marble.\n- **Industrial-pipe, blown-glass-globe, and Edison-filament lighting.** Ace Hotel: \"Custom-designed lighting fixtures, made of blown glass globes and industrial pipes\" (per ArchDaily Ace Hotel). Roman and Williams's Wallpaper*-covered exhibition \"A Slant of Light\" reinforces the firm's continuing investment in this lighting vocabulary (per Wallpaper*, Roman and Williams lighting exhibition coverage).",
+      "path": "styles/industrial-loft.md",
+      "line": 27,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/industrial-loft.md#L27",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "579dc23eb7347901",
+      "title": "Style: Mid-Century Modern (北欧中古 / MCM residential)",
+      "section": "Anchor description",
+      "text": "Mid-Century Modern is the postwar (1945-1969) marriage of new industrial materials — molded plywood, fiberglass, cast aluminum, plate glass — with organic and sculptural form, born of the Case Study House Program and the Knoll/Herman Miller furniture industries (per ArchEyes on the Case Study House Program; Dwell on the Eames Pavilion System). Its residential thesis is \"innovative and affordable housing designs that could be built on a large scale\" (per Mid Century Home on the Case Study Houses) — meaning open-plan glass-walled volumes, warm-wood ceilings and walls, and a small set of sculptural furniture pieces (Eames lounge, Saarinen Womb, Saarinen Tulip) staged against primary-color or earth-tone accents. For 3D rendering it means: warm wood (walnut, teak, oak), white-painted brick or panel walls, plate glass to a landscape, and one or two named-designer hero pieces.",
+      "path": "styles/mid-century-modern.md",
+      "line": 6,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/mid-century-modern.md#L6",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "4ddcd188b8cfa204",
+      "title": "Style: Mid-Century Modern (北欧中古 / MCM residential)",
+      "section": "In",
+      "text": "- **Walnut, teak, rosewood — solid, with visible grain.** Saarinen's Tulip side table is \"the iconic knife-edged walnut top with early cast iron tulip base\" (per 1stDibs / Knoll archive). The Eero Saarinen Knoll furniture line and the Dwell-published midcentury interiors are unified by warm-wood horizontal surfaces (per Dwell \"20 Great Midcentury Modern Interiors\"; Dezeen 8 Oct 2024 on Saarinen).\n- **Douglas fir, hemlock, stained oak — for ceilings, walls, and floors.** A Dwell-featured residence specifies \"Douglas fir for the ceiling, hemlock for the walls, and stained oak for the floor\" (per Dwell \"20 Great Midcentury Modern Interiors\"). Wood is layered as ceiling-wall-floor system, not used in only one place.\n- **Molded plywood — in seating shells, screens, and furniture.** Eames + Saarinen MoMA Organic Design competition entry \"the Organic Chair … would act as a prototype\" for both designers' later plywood work (per Dezeen 8 Oct 2024 on Saarinen). The Eames LCW and DCM lounge chairs (1946) are the canonical residential application.\n- **Fiberglass — for chair shells, side tables.** \"Postwar boom in new materials. Designers suddenly had access to industrial-grade plywood, fiberglass, plastics, and metals\" (per general MCM material thesis). Saarinen's Womb (1948) and Tulip (1957) chairs both use fiberglass shells (per Knoll heritage on Saarinen designs).\n- **Cast aluminum, polished or matte chrome bases.** Saarinen's Tulip pedestal is cast aluminum (per Knoll Tulip product page). Mid-century-era chrome reads correctly when paired with warm wood; standalone chrome reads industrial.\n- **Steel frame, painted black or warm grey.** Eames House uses \"thin steel columns and braces, painted a warm grey. Over time, painting schemes allowed the grey to become black\" (per ArchEyes on Case Study House 8).\n- **Plate glass — floor-to-ceiling, on at least one wall.** Case Study House 9 (Eames + Saarinen, the Entenza House) uses \"a floor-to-ceiling sliding-glass door [that] connects the interiors with the surrounding meadow and the ocean beyond\" (per Mid Century Home on Case Study House 9). Glass-to-landscape is the canonical MCM residential move.\n- **Brick — painted white or left raw — as accent wall.** Dwell \"20 Great Midcentury Modern Interiors\" repeatedly features \"white brick wall provides visual and material contrast to warm wood elements\" (per Dwell coverage).\n- **Tile — small mosaic or terrazzo — on hearth or kitchen floor.** Period vernacular; small-format mosaic in earth tones reads correctly.",
+      "path": "styles/mid-century-modern.md",
+      "line": 29,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/styles/mid-century-modern.md#L29",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "d7818904ffd35f25",
+      "title": "Materials and Color",
+      "section": "Color adjacency (Albers / simultaneous contrast)",
+      "text": "Albers' *Interaction of Color* (1963) rests on the claim that color is contextual, not absolute. The Yale University Press description of the book lists his demonstrated principles as *\"color relativity, intensity, and temperature; vibrating and vanishing boundaries; and the illusion of transparency and reversed grounds\"* (per Yale University Press catalog, *Interaction of Color* description). Albers' own framing is captured in the *Wikipedia* article on the book: *\"Every perception of colour is an illusion … we do not see colors as they really are. In our perception they alter one another\"* (per Wikipedia, \"Interaction of Color\" article).",
+      "path": "materials.md",
+      "line": 92,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/materials.md#L92",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "59d218a89dd1f5a0",
+      "title": "Materials and Color",
+      "section": "Color adjacency (Albers / simultaneous contrast)",
+      "text": "The practical takeaway for Blender material authoring:",
+      "path": "materials.md",
+      "line": 92,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/materials.md#L92",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "735835efad1c70e0",
+      "title": "Materials and Color",
+      "section": "Color adjacency (Albers / simultaneous contrast)",
+      "text": "- **A swatch's appearance changes based on what surrounds it.** A grey looks warm next to a cool field and cool next to a warm one. If you are color-picking a material from a reference photo, you must keep the material's *neighbours* the same as in the reference, or recalibrate.\n- **Saturated complements vibrate.** Pure red against pure green (or in our case, saturated purple against saturated emerald) produces flickering, hard-to-read edges. Desaturate one side, or insert a neutral spacer (matte black, walnut).\n- **Warm and cool readings flip with adjacency.** The same emerald `#1a3a2e` next to brass reads warmer; next to retro purple it reads cooler. Plan for both readings.",
+      "path": "materials.md",
+      "line": 92,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/materials.md#L92",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "7b0b9c7a7a04cc50",
+      "title": "Materials and Color",
+      "section": "Warm vs. cool palettes",
+      "text": "Munsell's color notation gives a defensible vocabulary for warm/cool: hue is one of the system's three independent dimensions, alongside *value* (lightness, 0-10) and *chroma* (saturation) (per Munsell Color Company, \"How Color Notation Works\"). Warm (red/orange/yellow) and cool (blue/green/violet) are conventional groupings on the hue ring. Pantone organizes the same intuition through named library colors keyed to physical pigment swatches and *\"allows different manufacturers in different locations to refer to the Pantone system to make sure colors match\"* (per Wikipedia, \"Pantone\" article, summarizing PMS purpose).",
+      "path": "materials.md",
+      "line": 102,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/materials.md#L102",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "127ae2ffa16ffa39",
+      "title": "Materials and Color",
+      "section": "Warm vs. cool palettes",
+      "text": "For the cafe: emerald `#1a3a2e` is a cool dominant; walnut and brass are warm secondaries; retro purple `#3d2449` is a cool-leaning accent. Amber 2200-2400K lighting (see `lighting.md`) shifts the warm channel up and reads the emerald slightly less saturated — this is intentional speakeasy-mood behavior.",
+      "path": "materials.md",
+      "line": 102,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/materials.md#L102",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "20768ebb956e1da5",
+      "title": "Lighting Design",
+      "section": "The four-layer model",
+      "text": "Architectural lighting practice resolves a room into three or four functional layers. The Wikipedia \"Lighting\" overview (per the Wikipedia \"Lighting\" article, \"Forms of lighting\" section) names three: **task**, **accent**, and **general (ambient)** lighting. Practising designers add a fourth — **decorative** — to cover sources whose primary purpose is to be looked at (chandeliers, neon, candle stand-ins).",
+      "path": "lighting.md",
+      "line": 12,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/lighting.md#L12",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "9b931a0f1c595f5c",
+      "title": "Lighting Design",
+      "section": "The four-layer model",
+      "text": "| Layer | Purpose | Typical lux contribution at the work plane | Source |\n|---|---|---|---|\n| Ambient (general) | Baseline visibility for circulation; sets the room's \"fill\" | 50–80 lux for lounge / 200–500 lux for office | (per Wikipedia \"Lighting\" art. — three-layer taxonomy; per IES residential summary on Super Bright LEDs — bedroom/living general 20 fc ≈ 200 lux; per Archtoolbox citing IESNA Handbook — open office 30–50 fc) |\n| Accent | Directs the eye to focal objects (art, product, architectural feature) | 3–5× the ambient level on the focal object | (per ERCO Lighting Knowledge \"Arranging luminaires\" — accent illuminance contrast ratio rule of thumb; primary IES section not verified online) |\n| Task | Local illumination for an activity (reading, food prep, retail counter, bar) | 300–750 lux at the task surface | (per Archtoolbox citing IESNA Handbook — kitchen task 70 fc ≈ 750 lux; per Super Bright LEDs IES summary — vanity task 80 fc, kitchen counter 70 fc) |\n| Decorative | The fixture itself is a visual element; lumen output is secondary | 20–40 lux contribution typical | (per Wikipedia \"Lighting\" article — accent / decorative distinction; specific numeric range is convention, not standard) |",
+      "path": "lighting.md",
+      "line": 12,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/lighting.md#L12",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    },
+    {
+      "id": "61c5d02653aefdb6",
+      "title": "Lighting Design",
+      "section": "The four-layer model",
+      "text": "The four-layer breakdown above is interior-design convention rather than a numbered clause in any single standard. When citing it to a client, frame it as practice-based, not code-mandated.",
+      "path": "lighting.md",
+      "line": 12,
+      "url": "https://github.com/MickeyBadBad/atelier-mcp/blob/b21325782089bb26bbc0ff96204d4602264f86ea/docs/handbook/lighting.md#L12",
+      "revision": "b21325782089bb26bbc0ff96204d4602264f86ea",
+      "sourceType": "secondary_handbook",
+      "verification": "Upstream citations retained; not independently verified. Design discussion only; not Singapore compliance or pricing."
+    }
+  ]
+}
