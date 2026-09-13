@@ -18,8 +18,26 @@ const labels = {
   conversation_focused: "Conversation-focused", storage_led: "Storage-led", easy_care: "Easy care",
   balanced: "Balanced care", premium_care: "Premium care", not_sure: "Not sure yet",
   "15k_to_30k_sgd": "S$15,000–30,000", "30k_to_50k_sgd": "S$30,000–50,000",
-  under_15k_sgd: "Under S$15,000", above_50k_sgd: "Above S$50,000", vision_agent: "Reference assistant"
+  under_15k_sgd: "Under S$15,000", over_50k_sgd: "Above S$50,000", prefer_not_to_say: "Budget not specified", vision_agent: "Reference assistant"
 };
+
+// Illustrative palettes support comparison; they are not generated room proposals.
+const palettes = {
+  warm_modern: ['#d9cbb8','#ad8b63','#656a50','#eee8dd'],
+  japandi: ['#e3ddce','#bda57e','#525843','#d0ccc0'],
+  contemporary_luxe: ['#d2c9bd','#887354','#46473f','#e9e4db'],
+  industrial: ['#a9a49b','#656562','#815e43','#d7d0c5'],
+  scandinavian: ['#ebe6dc','#cdb58c','#8b9b91','#d8d7c8'],
+  warm_neutral: ['#e4d8c5','#bdab92','#8a7660'],
+  light_neutral: ['#f0ece3','#d9d6cb','#b9b8ac'],
+  earthy: ['#b3a17a','#876647','#747953'],
+  monochrome: ['#e4e1da','#92938b','#393d38'],
+  deep_tones: ['#454f42','#706051','#3c4245']
+};
+function paletteMarkup(value, className) {
+  const colours = palettes[value];
+  return colours ? `<span class="${className}" aria-hidden="true">${colours.map(colour => `<${className === 'option-swatch' ? 'i' : 'span'} style="background:${colour}"></${className === 'option-swatch' ? 'i' : 'span'}>`).join('')}</span>` : '';
+}
 
 function human(value) {
   return escapeHtml(labels[value] || String(value || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()));
@@ -68,6 +86,10 @@ async function loadProject(projectId) {
 }
 
 function showWorkspace() {
+  if (!$("#welcome").hidden) {
+    selectTab('alignment');
+    window.scrollTo({top: 0, behavior: 'instant'});
+  }
   $("#welcome").hidden = true;
   $("#workspace").hidden = false;
 }
@@ -82,6 +104,8 @@ function render() {
   const readiness = Math.round(project.readiness.score * 100);
   $("#readiness-label").textContent = `${project.attributes.filter(a => a.status === "confirmed").length}/8 decisions confirmed`;
   $("#progress-bar").style.width = `${project.readiness.coverage * 100}%`;
+  const confirmed = project.attributes.filter(a => a.status === 'confirmed');
+  $('#decision-ribbon').innerHTML = confirmed.length ? confirmed.map(a => `<div class="decision-chip"><span>${human(a.dimension)}</span>${human(a.value)} <span aria-hidden="true">✓</span></div>`).join('') : '<div class="decision-chip empty">Your design language will take shape here, one decision at a time.</div>';
   renderQuestion(project.questionsByRole?.[project.viewerRole] || null);
   renderGuidance();
   renderMessages();
@@ -107,7 +131,7 @@ function renderQuestion(question) {
     <p class="eyebrow">One decision at a time</p>
     <h2>${question.prompt}</h2>
     <p class="question-why">Why now: ${question.rationale}</p>
-    <div class="option-grid">${question.options.map(option => `<button class="option-button" type="button" data-answer="${option}">${human(option)}</button>`).join("")}</div>`;
+    <div class="option-grid">${question.options.map(option => `<button class="option-button" type="button" data-answer="${option}">${paletteMarkup(option,'option-swatch')}${human(option)}</button>`).join("")}</div>`;
   $$('[data-answer]', card).forEach(button => button.addEventListener("click", () => answerQuestion(question, button.dataset.answer)));
 }
 
@@ -134,11 +158,13 @@ function renderShortlist() {
   $("#candidate-count").textContent = state.project.shortlist.length;
   $("#shortlist").innerHTML = state.project.shortlist.map(candidate => `
     <div class="direction">
-      <div class="direction-head"><h3>${candidate.title}</h3><span class="match">${state.project.readiness.coverage ? Math.round(candidate.matchScore * 100)+"% preference match" : "Explore"}</span></div>
+      ${paletteMarkup(candidate.style,'direction-palette')}
+      <div class="direction-head"><h3>${escapeHtml(candidate.title)}</h3><span class="match">${state.project.readiness.coverage ? Math.round(candidate.matchScore * 100)+"% preference match" : "Explore"}</span></div>
       <p>${human(candidate.style)} · ${human(candidate.mood)} · ${human(candidate.material)} · ${human(candidate.layout)}</p>
+      <details><summary>Why this direction?</summary>
       <p class="muted">Matches: ${candidate.matches.map(human).join(', ') || 'Explore this direction'}</p>
       <p class="muted">Trade-offs: ${candidate.tradeoffs.map(human).join(', ') || 'No preference mismatch'}${candidate.overBudget ? ' · Above your budget band' : ''}</p>
-      <small>${human(candidate.budget)} · Illustrative, not a quote</small>
+      </details><small>${human(candidate.budget)}${candidate.overBudget ? ' · Above your budget band' : ''}<br>Illustrative palette, not a quote</small>
     </div>`).join("") || '<p>No sample directions meet your must-avoid choices. Your brief can still describe a custom direction.</p>';
 }
 
@@ -150,7 +176,7 @@ function renderPreferences() {
 
 function renderReferences() {
   $("#reference-list").innerHTML = state.project.references.map(reference => `
-    <div class="reference-item">${reference.storageKey ? `<img class="reference-preview" src="/api/projects/${state.project.id}/references/${reference.id}/image" alt="Uploaded inspiration reference" loading="lazy">` : `<span class="sample-label">${reference.status === 'demo_note' ? 'Sample note' : 'Your note'} · no image</span>`}<strong>${escapeHtml(reference.filename)}</strong><br><span class="muted">${escapeHtml(reference.note || "No note added")}</span></div>`).join("");
+    <div class="reference-item ${reference.status === 'catalogue_link' ? 'catalogue-reference' : ''}">${reference.storageKey ? `<img class="reference-preview" src="/api/projects/${state.project.id}/references/${reference.id}/image" alt="Uploaded inspiration reference" loading="lazy">` : `<span class="sample-label">${reference.status === 'catalogue_link' ? 'Saved Singapore home' : reference.status === 'demo_note' ? 'Sample note' : 'Your note'}</span>`}<strong>${escapeHtml(reference.filename)}</strong><br><span class="muted">${escapeHtml(reference.note || "No note added")}</span>${reference.status === 'catalogue_link' && /^https:\/\/qanvast\.com\/sg\/[a-z0-9/-]+$/.test(reference.sourceUrl || '') ? `<br><a href="${reference.sourceUrl}" target="_blank" rel="noopener noreferrer">View original project on Qanvast ↗</a><br><small>${escapeHtml(reference.sourceDetails?.flatType)} · ${escapeHtml(reference.sourceDetails?.area)} m² · Completed ${escapeHtml(reference.sourceDetails?.year)}</small>` : ''}</div>`).join("");
 }
 
 function renderProposals() {
@@ -247,6 +273,7 @@ function renderGuidance() {
 
 function applyRoleControls() {
   const role = state.project.viewerRole;
+  $('#constraint-role-help').textContent = role === 'designer' ? 'Bring the practical details into the brief. Explain the impact of each constraint.' : 'A space for your designer’s expertise. Invite them to add layout, care and budget considerations.';
   for (const id of ['preferences-form', 'reference-form']) {
     $$('input,textarea,button,select', $('#'+id)).forEach(el => el.disabled = role !== 'homeowner');
   }
@@ -284,7 +311,8 @@ $("#project-form").addEventListener("submit", async event => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   try {
-    state.project = await api("/api/projects", { method: "POST", body: JSON.stringify({ name: form.get("name"), housingType: form.get("housingType") || null, budgetBand: form.get("budgetBand") }) });
+    const inspirationIds = form.get('importInspiration') ? (window.AlignDiscovery?.selectedIds() || []) : [];
+    state.project = await api("/api/projects", { method: "POST", body: JSON.stringify({ name: form.get("name"), housingType: form.get("housingType") || null, budgetBand: form.get("budgetBand"), inspirationIds, inspirationConsent: inspirationIds.length > 0 }) });
     localStorage.setItem("alignspaceProjectId", state.project.id);
     render();
   } catch (error) { alert(error.message); }
@@ -298,12 +326,24 @@ $("#demo-button").addEventListener("click", async () => {
   } catch (error) { alert(error.message); }
 });
 
-$("#back-button").addEventListener("click", () => {
+function showHome() {
   localStorage.removeItem("alignspaceProjectId");
   state.project = null;
-  loadSavedProjects();
+  loadSavedProjects().catch(e => { $('#saved-projects').textContent = e.message; });
   $("#workspace").hidden = true;
   $("#welcome").hidden = false;
+}
+$("#back-button").addEventListener("click", () => { showHome(); window.scrollTo({top: 0, behavior: 'instant'}); });
+$$('[data-home-anchor]').forEach(link => link.addEventListener('click', event => {
+  event.preventDefault();
+  showHome();
+  document.getElementById(link.dataset.homeAnchor).scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+}));
+$('.material-pin').addEventListener('click', event => {
+  const open = event.currentTarget.getAttribute('aria-expanded') !== 'true';
+  event.currentTarget.setAttribute('aria-expanded', String(open));
+  event.currentTarget.textContent = open ? '−' : '+';
+  $('#material-note').hidden = !open;
 });
 
 $("#preferences-form").addEventListener("submit", async event => {
@@ -367,12 +407,16 @@ $("#export-button").addEventListener("click", () => {
   link.click(); URL.revokeObjectURL(url);
 });
 
-$$('.tab').forEach(button => button.addEventListener("click", () => {
-  state.activeTab = button.dataset.tab;
-  $$('.tab').forEach(item => item.classList.toggle("active", item === button));
+function selectTab(name) {
+  state.activeTab = name;
+  $$('.tab').forEach(item => {
+    item.classList.toggle('active', item.dataset.tab === name);
+    item.setAttribute('aria-pressed', String(item.dataset.tab === name));
+  });
   $$('.tab-panel').forEach(panel => { panel.hidden = panel.id !== `${state.activeTab}-panel`; });
-  if (state.activeTab === "activity") loadAudit();
-}));
+  if (state.activeTab === "activity" && state.project) loadAudit();
+}
+$$('.tab').forEach(button => button.addEventListener("click", () => selectTab(button.dataset.tab)));
 
 const savedProject = localStorage.getItem("alignspaceProjectId");
 if (location.hash.startsWith('#invite=')) {
@@ -380,7 +424,7 @@ if (location.hash.startsWith('#invite=')) {
   history.replaceState(null, '', location.pathname);
   api('/api/invitations/claim', {method:'POST',body:JSON.stringify({token})}).then(r => loadProject(r.projectId)).catch(e => alert(e.message));
 } else if (savedProject) loadProject(savedProject).catch(() => localStorage.removeItem("alignspaceProjectId"));
-loadSavedProjects();
+loadSavedProjects().catch(e => { $('#saved-projects').textContent = `Projects are unavailable: ${e.message}`; });
 
 $('#guided-button').addEventListener('click', async () => {
   try {

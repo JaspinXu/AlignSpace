@@ -1,0 +1,249 @@
+{
+  "checkedAt": "2026-09-13",
+  "projects": [
+    {
+      "id": "tampines",
+      "title": "Tampines Street 61",
+      "town": "Tampines",
+      "region": "East",
+      "propertyType": "HDB",
+      "condition": "New",
+      "flatType": "4-room BTO",
+      "area": 95,
+      "cost": 60000,
+      "year": 2022,
+      "style": "Contemporary",
+      "designer": "SHE Interior",
+      "sourceUrl": "https://qanvast.com/sg/interior-design-singapore/she-interior-tampines-street-61-20023",
+      "imageUrl": "https://d1hy6t2xeg0mdl.cloudfront.net/image/627850/625c5fbb7b/standard",
+      "works": [
+        "Carpentry",
+        "Flooring",
+        "Tiling",
+        "Plumbing"
+      ],
+      "prompt": "How would you balance built-in storage with open space?"
+    },
+    {
+      "id": "waterway",
+      "title": "Waterway View · 682A",
+      "town": "Punggol",
+      "region": "North-East",
+      "propertyType": "HDB",
+      "condition": "Resale",
+      "flatType": "4-room HDB",
+      "area": 93,
+      "cost": 44000,
+      "year": 2024,
+      "style": "Modern / Farmhouse",
+      "designer": "The Interior Lab",
+      "sourceUrl": "https://qanvast.com/sg/interior-design-singapore/the-interior-lab-waterway-view-block-682a-27757",
+      "imageUrl": "https://d1hy6t2xeg0mdl.cloudfront.net/image/808418/e487c64cbf/standard",
+      "works": [
+        "Carpentry",
+        "Flooring",
+        "Hacking",
+        "Aircon",
+        "Electrical rewiring"
+      ],
+      "prompt": "Which existing finishes would you keep in a resale home?"
+    },
+    {
+      "id": "kismis",
+      "title": "View at Kismis",
+      "town": "Bukit Timah",
+      "region": "West",
+      "propertyType": "Condo",
+      "condition": "New",
+      "flatType": "4-bedroom condo",
+      "area": 111,
+      "cost": 72000,
+      "year": 2025,
+      "style": "Modern / Contemporary",
+      "designer": "Insight.Out Studio",
+      "sourceUrl": "https://qanvast.com/sg/interior-design-singapore/insightout-studio-view-at-kismis-31376",
+      "imageUrl": "https://d1hy6t2xeg0mdl.cloudfront.net/image/916473/450b84cfa5/standard",
+      "works": [
+        "Carpentry",
+        "Feature wall",
+        "Flooring",
+        "Tiling"
+      ],
+      "prompt": "Would you prefer a dramatic feature wall or a lighter backdrop?"
+    },
+    {
+      "id": "champions",
+      "title": "Champions Bliss · 562B",
+      "town": "Woodlands",
+      "region": "North",
+      "propertyType": "HDB",
+      "condition": "New",
+      "flatType": "4-room BTO",
+      "area": 93,
+      "cost": 45000,
+      "year": 2025,
+      "style": "Minimalist",
+      "designer": "Yu Sen Dezign",
+      "sourceUrl": "https://qanvast.com/sg/interior-design-singapore/dezign-origin-champions-bliss-block-562b-29132",
+      "imageUrl": "https://d1hy6t2xeg0mdl.cloudfront.net/image/848866/a697d1c03a/standard",
+      "works": [
+        "Carpentry",
+        "Flooring",
+        "Lighting",
+        "Painting"
+      ],
+      "prompt": "Where would hidden storage make everyday life easier?"
+    },
+    {
+      "id": "tengah",
+      "title": "Garden Vines · 236B",
+      "town": "Tengah",
+      "region": "West",
+      "propertyType": "HDB",
+      "condition": "New",
+      "flatType": "5-room BTO",
+      "area": 104,
+      "cost": null,
+      "year": 2024,
+      "style": "Modern",
+      "designer": "Forefront Interior",
+      "sourceUrl": "https://qanvast.com/sg/interior-design-singapore/forefront-interior-garden-vines-tengah-block-236b-31182",
+      "imageUrl": "https://d1hy6t2xeg0mdl.cloudfront.net/image/910427/e1428b70bf/standard",
+      "works": [
+        "Carpentry",
+        "Feature wall",
+        "Flooring",
+        "Aircon"
+      ],
+      "prompt": "How would you divide space for relaxing and hosting?"
+    },
+    {
+      "id": "smith",
+      "title": "Smith Road",
+      "town": "Singapore",
+      "region": "Central",
+      "propertyType": "HDB",
+      "condition": "Resale",
+      "flatType": "4-room HDB",
+      "area": 94,
+      "cost": 80000,
+      "year": 2024,
+      "style": "Contemporary / Wabi-Sabi",
+      "designer": "SG Interior Design",
+      "sourceUrl": "https://qanvast.com/sg/interior-design-singapore/sg-interior-design-smith-road-28216",
+      "imageUrl": "https://d1hy6t2xeg0mdl.cloudfront.net/image/822353/b4d8972408/standard",
+      "works": [
+        "Carpentry",
+        "Hacking",
+        "Flooring",
+        "Painting"
+      ],
+      "prompt": "Do you like the quiet palette, the texture, or both?"
+    },
+    {
+      "id": "dunsfold",
+      "title": "Dunsfold Drive",
+      "town": "Singapore",
+      "region": "Central",
+      "propertyType": "Landed",
+      "condition": "Resale",
+      "flatType": "Landed home",
+      "area": 433,
+      "cost": 168000,
+      "year": 2020,
+      "style": "Modern / Scandinavian",
+      "designer": "The I-Plan Studio",
+      "sourceUrl": "https://qanvast.com/sg/interior-design-singapore/the-i-plan-studio-dunsfold-drive-15862",
+      "imageUrl": "https://d1hy6t2xeg0mdl.cloudfront.net/image/508437/b9da318ffd/standard",
+      "works": [
+        "Carpentry",
+        "Feature wall",
+        "Painting",
+        "Lighting"
+      ],
+      "prompt": "Which ideas could work at the scale of your own living room?"
+    }
+  ],
+  "budgets": [
+    {
+      "type": "3-room",
+      "condition": "New",
+      "low": 40800,
+      "high": 52500,
+      "weeks": "6–8",
+      "year": 2026,
+      "sourceUrl": "https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568",
+      "sourceDate": "2026-02-12"
+    },
+    {
+      "type": "3-room",
+      "condition": "Resale",
+      "low": 55000,
+      "high": 68300,
+      "weeks": "8–10",
+      "year": 2026,
+      "sourceUrl": "https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568",
+      "sourceDate": "2026-02-12"
+    },
+    {
+      "type": "4-room",
+      "condition": "New",
+      "low": 50000,
+      "high": 60000,
+      "weeks": "8–10",
+      "year": 2026,
+      "sourceUrl": "https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568",
+      "sourceDate": "2026-02-12"
+    },
+    {
+      "type": "4-room",
+      "condition": "Resale",
+      "low": 70000,
+      "high": 81600,
+      "weeks": "8–10",
+      "year": 2026,
+      "sourceUrl": "https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568",
+      "sourceDate": "2026-02-12"
+    },
+    {
+      "type": "5-room",
+      "condition": "New",
+      "low": 60600,
+      "high": 76500,
+      "weeks": "9–10",
+      "year": 2026,
+      "sourceUrl": "https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568",
+      "sourceDate": "2026-02-12"
+    },
+    {
+      "type": "5-room",
+      "condition": "Resale",
+      "low": 80800,
+      "high": 98900,
+      "weeks": "9–11",
+      "year": 2026,
+      "sourceUrl": "https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568",
+      "sourceDate": "2026-02-12"
+    },
+    {
+      "type": "Condo",
+      "condition": "New",
+      "low": 40400,
+      "high": 51500,
+      "weeks": "8",
+      "year": 2025,
+      "sourceUrl": "https://qanvast.com/sg/articles/singapore-condo-renovation-costs-new-and-resale-in-2025-3389",
+      "sourceDate": "2025-01-24"
+    },
+    {
+      "type": "Condo",
+      "condition": "Resale",
+      "low": 80800,
+      "high": 105000,
+      "weeks": "10–12",
+      "year": 2025,
+      "sourceUrl": "https://qanvast.com/sg/articles/singapore-condo-renovation-costs-new-and-resale-in-2025-3389",
+      "sourceDate": "2025-01-24"
+    }
+  ]
+}

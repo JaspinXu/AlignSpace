@@ -40,6 +40,8 @@ class ProjectCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     budgetBand: str
     housingType: str | None = Field(default=None, max_length=80)
+    inspirationIds: list[str] = Field(default_factory=list, max_length=6)
+    inspirationConsent: bool = False
 
     @field_validator("budgetBand")
     @classmethod
@@ -159,7 +161,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
         response = await call_next(request)
         response.headers['Referrer-Policy'] = 'no-referrer'
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: https://d1hy6t2xeg0mdl.cloudfront.net; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         if request.url.path.startswith('/api/'):
             response.headers['Cache-Control'] = 'no-store'
         if new_session:
@@ -220,7 +222,24 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.post("/api/projects", status_code=201)
     def create_project(data: ProjectCreate, request: Request) -> dict[str, Any]:
+        catalogue = json.loads((STATIC_DIR / 'singapore.json').read_text(encoding='utf-8'))
+        homes = {home['id']: home for home in catalogue['projects']}
+        if any(item not in homes for item in data.inspirationIds):
+            raise HTTPException(422, 'Choose inspiration from the available Singapore collection')
+        if data.inspirationIds and not data.inspirationConsent:
+            raise HTTPException(422, 'Confirm that you want to add saved inspiration links to this project')
         state = engine.create_project(data.name, data.budgetBand, data.housingType)
+        for item in dict.fromkeys(data.inspirationIds):
+            home = homes[item]
+            state = engine.add_reference(state, {
+                'id': engine.new_id('reference'), 'filename': home['title'],
+                'note': 'Saved for discussion. Tell your designer which details you like; saving a home does not confirm its style or budget.',
+                'status': 'catalogue_link', 'sourceUrl': home['sourceUrl'],
+                'catalogueId': item, 'sourceCheckedAt': catalogue['checkedAt'],
+                'sourceDetails': {key: home[key] for key in ['flatType', 'area', 'cost', 'year', 'designer']},
+                'consentConfirmed': True, 'consentActor': request.state.actor,
+                'createdAt': engine.now_iso(),
+            })
         return created(state, request)
 
     @application.post("/api/demo", status_code=201)

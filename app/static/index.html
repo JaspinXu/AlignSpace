@@ -8,43 +8,77 @@
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/styles.css">
   <script src="/assets/app.js" defer></script>
+  <script src="/assets/discover.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header">
     <a class="brand" href="/" aria-label="AlignSpace home">
       <span class="brand-mark">A</span>
       <span>AlignSpace</span>
     </a>
-    <div class="header-meta">
-      <span class="live-dot"></span>
-      <span>Shared design alignment</span>
-    </div>
+    <nav class="header-nav" aria-label="Main navigation"><a href="/#discover" data-home-anchor="discover">Explore homes</a><a href="/#budget-guide" data-home-anchor="budget-guide">Reno budgets</a><a href="/#local-guide" data-home-anchor="local-guide">SG essentials</a></nav>
+    <a class="header-project-link" href="/#start-project" data-home-anchor="start-project">My room brief <span aria-hidden="true">↗</span></a>
   </header>
 
-  <main>
+  <main id="main-content">
     <section id="welcome" class="welcome-shell">
+      <div class="hero-layout">
       <div class="welcome-copy">
-        <p class="eyebrow">From inspiration to shared intent</p>
+        <p class="eyebrow"><span class="sg-dot"></span> SINGAPORE HOMES. YOUR KIND OF SPACE.</p>
         <h1>Make “I like this” <em>clear enough to design.</em></h1>
-        <p class="lead">Collect what you like, work through practical trade-offs with your designer, and leave with one clear living-room brief. You stay in control of every decision.</p>
-        <div class="idea-strip" aria-label="How AlignSpace works">
-          <div><strong>01</strong><span>Share references</span></div>
-          <div><strong>02</strong><span>Clarify both sides</span></div>
-          <div><strong>03</strong><span>Approve one brief</span></div>
-        </div>
+        <p class="lead">Not sure what you like yet? Explore real Singapore homes, get a feel for renovation budgets, and build a clearer brief with your designer.</p>
+        <div class="hero-actions"><a class="button primary hero-cta" href="#discover">Find my inspiration <span aria-hidden="true">↗</span></a><a class="hero-secondary" href="#start-project">I’m ready to start →</a></div>
+        <div class="hero-tags"><span>HDB & BTO</span><span>Condo</span><span>Landed</span><span>All in S$</span></div>
       </div>
-
+      <figure class="hero-visual">
+        <img src="https://d1hy6t2xeg0mdl.cloudfront.net/image/627850/625c5fbb7b/standard" alt="Tampines Street 61 home designed by SHE Interior, published on Qanvast" width="1200" height="800" fetchpriority="high" referrerpolicy="no-referrer">
+        <div class="image-kicker">HOME SPOTLIGHT <span>↗ TAMPINES</span></div>
+        <button class="material-pin" type="button" aria-expanded="false" aria-controls="material-note" aria-label="Explore the material detail">+</button>
+        <div id="material-note" class="material-note" hidden><span class="eyebrow">LOOK A LITTLE CLOSER</span><strong>Love a detail? Start there.</strong><p>Save the home, then tell your designer what caught your eye.</p></div>
+        <figcaption><span>Tampines Street 61 <strong>S$60k</strong></span><span>4-room BTO · 95 m² · Completed 2022 · Published project cost</span><a href="https://qanvast.com/sg/interior-design-singapore/she-interior-tampines-street-61-20023" target="_blank" rel="noopener noreferrer">Design / photo: SHE Interior via Qanvast ↗</a></figcaption>
+        <div class="hero-sticker" aria-hidden="true">YOUR HOME,<br>YOUR RULES.<span>✳</span></div>
+      </figure>
+      </div>
+      <div class="discovery-strip"><span>✦ A little browsing. A lot more clarity.</span><a href="#discover">Real homes</a><a href="#budget-guide">Published budgets</a><a href="#local-guide">Local know-how</a></div>
+      <section id="discover" class="discovery-section" aria-labelledby="discover-title">
+        <div class="section-heading"><div><p class="eyebrow">THE SINGAPORE EDIT</p><h2 id="discover-title">Find your <span>“that’s the one.”</span></h2><p>Real renovated homes. Different spaces, styles and budgets.</p></div><button id="saved-filter" class="button ghost" type="button" aria-pressed="false">♡ Saved <span id="saved-count">0</span></button></div>
+        <div class="discovery-controls"><label class="search-field"><span>Search homes</span><input id="home-search" type="search" placeholder="Try Tampines, minimalist, 4-room…"></label><label>Published reno cost<select id="home-budget"><option value="all">Any budget</option><option value="50000">Up to S$50k</option><option value="80000">Up to S$80k</option><option value="100000">Up to S$100k</option><option value="over">Over S$100k</option></select></label><label>Sort by<select id="home-sort"><option value="featured">Our edit</option><option value="cost">Cost: low to high</option><option value="recent">Completion: newest</option></select></label></div>
+        <div class="collection-tabs" aria-label="Filter homes by property type"><button type="button" data-home-type="All" aria-pressed="true">All homes</button><button type="button" data-home-type="BTO" aria-pressed="false">✳ BTO / New HDB</button><button type="button" data-home-type="Resale" aria-pressed="false">⌂ Resale HDB</button><button type="button" data-home-type="Condo" aria-pressed="false">▥ Condo</button><button type="button" data-home-type="Landed" aria-pressed="false">⌂ Landed</button></div>
+        <p id="collection-status" class="collection-status" role="status">Loading the Singapore collection…</p>
+        <div id="home-grid" class="home-grid"></div>
+        <button id="more-homes" class="button ghost" type="button" hidden>Show the full collection ↓</button>
+        <p class="source-note">Curated renovation case studies, not properties for sale. Prices are the project costs published by Qanvast, not today’s quotes or living-room-only estimates. Checked 13 Sep 2026. Photos remain credited to their original creators.</p>
+        <div id="compare-tray" class="compare-tray" hidden><span id="compare-label"></span><button id="compare-open" class="button primary" type="button">Compare homes ↗</button><button id="compare-clear" class="text-button" type="button">Clear</button></div>
+      </section>
+      <section id="budget-guide" class="budget-section" aria-labelledby="budget-title">
+        <div class="budget-intro"><p class="eyebrow">LESS GUESSWORK, MORE PLANNING</p><h2 id="budget-title">Big ideas.<br><span>Real-world budgets.</span></h2><p>Get a starting range for the whole home, then decide what belongs in your living-room brief.</p><div class="budget-controls"><label>Your home<select id="estimate-type"><option value="3-room">3-room HDB</option><option value="4-room" selected>4-room HDB</option><option value="5-room">5-room HDB</option><option value="Condo">Condo</option><option value="Landed">Landed</option></select></label><label>Condition<select id="estimate-condition"><option value="New">BTO / New</option><option value="Resale">Resale</option></select></label><label>My extra allowance<select id="estimate-buffer"><option value="0">No extra allowance</option><option value="10">Add 10%</option><option value="15">Add 15%</option><option value="20">Add 20%</option></select></label></div></div>
+        <div id="budget-result" class="budget-result" aria-live="polite"></div>
+      </section>
+      <section id="local-guide" class="local-section" aria-labelledby="local-title"><div class="section-heading"><div><p class="eyebrow">BUILT AROUND LIFE HERE</p><h2 id="local-title">A little Singapore know-how.</h2></div><span class="local-stamp">01° N / 103° E</span></div>
+        <div class="local-grid"><article class="local-card lilac"><span class="local-icon" aria-hidden="true">▥</span><p class="eyebrow">HOME TYPES</p><h3>Start with your floor plan.</h3><p>HDB offers different flat types, including 2-room Flexi, 3-, 4- and 5-room homes. Explore the official guide, then check your own unit’s layout.</p><a href="https://www.hdb.gov.sg/buying-a-flat/bto-sbf-and-open-booking-of-flats/finding-a-new-flat/types-of-flats" target="_blank" rel="noopener noreferrer">Explore HDB flat types ↗</a></article>
+        <article class="local-card lime"><span class="local-icon" aria-hidden="true">☀</span><p class="eyebrow">TROPICAL LIVING</p><h3>Design for the everyday.</h3><p>Singapore’s mean annual humidity is around 82%. A useful design conversation: airflow, easy-care materials and how you use air-conditioning.</p><a href="https://www.weather.gov.sg/climate-climate-of-singapore/" target="_blank" rel="noopener noreferrer">Climate facts from MSS ↗</a></article>
+        <article class="local-card peach"><span class="local-icon" aria-hidden="true">↗</span><p class="eyebrow">BEFORE YOU RENOVATE</p><h3>Find the right expertise.</h3><p>Use HDB’s Directory of Renovation Contractors to research your team. Discuss the proposed scope and relevant approvals before committing to works.</p><a href="https://www.hdb.gov.sg/managing-my-home/renovation-and-maintenance/renovation/looking-for-renovation-contractors" target="_blank" rel="noopener noreferrer">HDB contractor guidance ↗</a></article></div>
+      </section>
+      <section id="how-it-works" class="process-section" aria-labelledby="process-title">
+        <div><p class="eyebrow">THE PROCESS</p><h2 id="process-title">Good design starts <br>with understanding.</h2></div>
+        <div class="process-step"><span>01 / COLLECT</span><h3>Bring what moves you.</h3><p>A room, a texture, a few words. Share the details you love, and the ones you don’t.</p></div>
+        <div class="process-step"><span>02 / CLARIFY</span><h3>Make room for both views.</h3><p>Explore your preferences. Let your designer bring space, care and budget into focus.</p></div>
+        <div class="process-step"><span>03 / ALIGN</span><h3>Leave on the same page.</h3><p>Review and approve one shared brief. A thoughtful starting point for your space.</p></div>
+      </section>
+      <section id="start-project" class="project-entry" aria-labelledby="start-title">
+      <div class="entry-copy"><p class="eyebrow">YOUR NEXT CHAPTER</p><h2>A space that feels <br>like <em>you.</em></h2><p>You don’t need the right design words.<br>Just a place to start.</p><div class="material-palette" aria-hidden="true"><span class="linen"></span><span class="oak"></span><span class="olive"></span><span class="stone"></span></div><span class="palette-caption">LINEN / OAK / OLIVE / STONE</span><div class="entry-note"><span aria-hidden="true">↗</span><p>Every suggestion is yours to keep, change or leave behind.</p></div></div>
       <div class="start-card">
         <div>
           <p class="eyebrow">Start a living-room project</p>
-          <h2>Set the practical frame</h2>
+          <h2 id="start-title">Let’s make it clear.</h2>
         </div>
         <p class="muted">About 10 minutes. No design vocabulary needed. You can change your answers later.</p>
         <div id="saved-projects"></div>
         <form id="project-form">
           <label>Project name<input name="name" value="My living room" required minlength="2" maxlength="80"></label>
-          <label>Housing type<input name="housingType" placeholder="e.g. HDB 4-room"></label>
-          <label>Renovation budget
+          <label>Housing type<select name="housingType"><option>HDB 4-room</option><option>HDB 2-room Flexi</option><option>HDB 3-room</option><option>HDB 5-room</option><option>HDB Executive / Maisonette</option><option>Condo / EC</option><option>Landed</option><option>Not sure yet</option></select></label>
+          <label>Living-room budget (S$)
             <select name="budgetBand" required>
               <option value="under_15k_sgd">Under S$15k</option>
               <option value="15k_to_30k_sgd" selected>S$15k–30k</option>
@@ -53,13 +87,14 @@
               <option value="prefer_not_to_say">Prefer not to say</option>
             </select>
           </label>
+          <div id="inspiration-import" class="inspiration-import" hidden><label class="consent"><input name="importInspiration" type="checkbox" checked><span>Add my <strong id="import-count">0</strong> saved home links to this brief</span></label><p>Links are starting points for discussion. You’ll choose which details you actually like.</p></div>
           <label class="consent"><input type="checkbox" required> I have the right to use uploaded references and consent to AI-assisted analysis for this project.</label>
           <button class="button primary" type="submit">Start my room brief <span>→</span></button>
-          <button class="button ghost" id="demo-button" type="button">Explore a filled-in example</button>
-          <button class="button secondary" id="guided-button" type="button">Try a guided sample</button>
+          <div class="sample-actions"><button class="text-button" id="demo-button" type="button">View a finished example ↗</button><button class="text-button" id="guided-button" type="button">Try a guided sample ↗</button></div>
           <p class="muted">Start as the homeowner. Invite your designer with a private link when ready. To try both roles yourself, open the invitation in a separate browser profile or private window.</p>
         </form>
       </div>
+      </section>
     </section>
 
     <section id="workspace" class="workspace" hidden>
@@ -75,6 +110,7 @@
           <div class="progress-track" aria-label="Brief readiness"><span id="progress-bar"></span></div>
         </div>
       </div>
+      <div id="decision-ribbon" class="decision-ribbon" aria-label="Your confirmed design preferences"></div>
 
       <section class="onboarding-strip" aria-label="Your next step"><div><span id="viewer-role" class="eyebrow"></span><h2 id="next-step-title"></h2><p id="next-step-help" class="muted"></p></div><div><button id="invite-button" class="button ghost" type="button">Invite my designer</button><button id="refresh-button" class="button ghost" type="button">Refresh shared changes</button></div><input id="invite-link" readonly hidden aria-label="Private designer invitation link"></section>
       <nav class="tabs" aria-label="Workspace views">
@@ -92,16 +128,17 @@
 
             <article class="panel">
               <div class="panel-heading">
-                <div><p class="eyebrow">Shared understanding bridge</p><h2>What both sides understand</h2></div>
+                <div><p class="eyebrow">The conversation</p><h2>A shared point of view</h2></div>
                 <span class="muted">Latest exchanges</span>
               </div>
               <div id="agent-messages" class="message-list"></div>
             </article>
 
-            <article class="panel">
+            <article class="panel designer-panel">
               <div class="panel-heading">
                 <div><p class="eyebrow">Human input</p><h2>Designer constraint</h2></div>
               </div>
+              <p id="constraint-role-help" class="muted"></p>
               <form id="constraint-form" class="constraint-form">
                 <label>Constraint category
                   <select name="category"><option value="space">Space</option><option value="budget">Budget</option><option value="function">Function</option><option value="maintenance">Maintenance</option><option value="timeline">Timeline</option><option value="safety">Safety</option></select>
@@ -122,12 +159,12 @@
 
           <aside class="side-column">
             <article class="panel compact">
-              <div class="panel-heading"><div><p class="eyebrow">Candidate space</p><h2>Directions to discuss</h2></div><span id="candidate-count" class="count-badge"></span></div>
+              <div class="panel-heading"><div><p class="eyebrow">Your evolving palette</p><h2>Directions to discuss</h2></div><span id="candidate-count" class="count-badge"></span></div>
               <div id="shortlist" class="shortlist"></div>
             </article>
 
             <article class="panel compact">
-              <div class="panel-heading"><div><p class="eyebrow">Evidence</p><h2>Goals & references</h2></div></div>
+              <div class="panel-heading"><div><p class="eyebrow">Your inspiration board</p><h2>The details you love</h2></div></div>
               <form id="preferences-form" class="stack-form">
                 <label>Project goals<textarea name="goals" placeholder="One goal per line"></textarea></label>
                 <label>Must avoid<textarea name="antiPreferences" placeholder="One item per line"></textarea></label>
@@ -186,8 +223,11 @@
       </section>
     </section>
   </main>
+  <dialog id="home-dialog" aria-labelledby="home-dialog-title"><div class="dialog-top"><span>SINGAPORE HOME FILE</span><button class="dialog-close" type="button" aria-label="Close home details">×</button></div><div id="home-detail"></div></dialog>
+  <dialog id="compare-dialog" aria-labelledby="compare-dialog-title"><div class="dialog-top"><h2 id="compare-dialog-title">A side-by-side look.</h2><button class="dialog-close" type="button" aria-label="Close comparison">×</button></div><div id="compare-content"></div></dialog>
+  <div id="discovery-toast" class="discovery-toast" role="status" hidden></div>
 
   <div id="request-status" role="status" aria-live="polite" hidden></div>
-  <footer>AlignSpace is a requirements-alignment aid, not construction, structural, electrical, regulatory, pricing, or availability advice.</footer>
+  <footer><div class="footer-brand">AlignSpace<span>Different perspectives. A shared direction.</span></div><p>AlignSpace is a requirements-alignment aid, not construction, structural, electrical, regulatory, pricing, or availability advice.</p><span class="footer-signoff">MAKE IT CLEAR. MAKE IT YOURS.</span></footer>
 </body>
 </html>

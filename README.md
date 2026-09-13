@@ -4,6 +4,8 @@ AlignSpace helps a homeowner and an interior designer turn references, preferenc
 
 ## Try it
 
+The homepage now includes a colourful Singapore discovery experience: browse seven sourced renovation case studies, filter by home type or published cost, save up to six homes, and compare up to three. The budget guide separates 2026 HDB ranges from 2025 condo ranges. Saved source links can be added to a new brief with consent; they do not confirm preferences or set the living-room budget. See [Singapore discovery notes](docs/19-singapore-discovery.md) for sources and data maintenance.
+
 Run the app locally using the setup below, then open http://127.0.0.1:8010.
 
 1. Choose **Start my room brief**, or **Try a guided sample** for labelled sample notes.
