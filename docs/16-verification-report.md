@@ -10,7 +10,7 @@
 
 ## Deployed checks
 
-Ubuntu systemd service and Caddy run on the supplied Lightsail instance. HTTPS is temporarily served at https://54-255-93-19.sslip.io:80/ because managed firewall port 443 is unavailable. External certificate validation and public health passed.
+The application was tested on the supplied Ubuntu Lightsail instance. These results record the earlier deployment test; instance-specific networking and service configuration are not part of the repository's setup requirements.
 
 Seven live checks passed using separate browser-equivalent HTTP sessions and synthetic project data: Secure cookie; project isolation; invitation replay rejection; role spoof rejection; distinct dual approvals; content revision invalidating approvals; service restart preserving state and access. Local check results are in ignored tmp/deployment-checks.json.
 
@@ -18,4 +18,4 @@ Browser trial confirmed guided sample creation and real note suggestions shown a
 
 ## Evidence still needed
 
-No authorised room-image dataset or independent designer study was supplied. The owner will run the trial worksheet in docs/17-user-trial.md. No time savings, satisfaction score or business ROI is claimed. Candidate prices are illustrative. This prototype does not verify professional construction constraints or provide account recovery. Standard HTTPS port and certificate renewal need organiser follow-up; current certificate expires 11 December 2026.
+No authorised room-image dataset or independent designer study was supplied. The owner will run the trial worksheet in docs/17-user-trial.md. No time savings, satisfaction score or business ROI is claimed. Candidate prices are illustrative. This prototype does not verify professional construction constraints or provide account recovery.

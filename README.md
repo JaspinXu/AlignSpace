@@ -4,9 +4,7 @@ AlignSpace helps a homeowner and an interior designer turn references, preferenc
 
 ## Try it
 
-Deployment target: [AlignSpace trial](https://54-255-93-19.sslip.io:80/).
-
-The temporary trial uses HTTPS on port 80 because the managed firewall blocks 443. Keep `https://` and `:80` in the URL. The current certificate expires 11 December 2026; standard HTTPS and renewal require follow-up before then.
+Run the app locally using the setup below, then open http://127.0.0.1:8010.
 
 1. Choose **Start my room brief**, or **Try a guided sample** for labelled sample notes.
 2. Answer a few homeowner questions. Optionally upload an image you have permission to use and explain which elements you like.
@@ -70,9 +68,9 @@ Model calls run outside the SQLite write transaction. Results are committed only
 
 ## Deploy
 
-One organiser **medium Lightsail instance**. Native systemd deployment files are in `deploy/`; the service listens only on localhost:8010, behind Caddy HTTPS. This keeps the existing Hermes installation separate.
+For assessment, run the application on one organiser-provided **medium Lightsail instance**. Transfer the code or pull it from Git, install dependencies, configure the backend `.env`, and start the application. The repository does not require a particular domain or web proxy.
 
-See [deployment runbook](docs/15-deployment-runbook.md) for configuration, health checks, persistence and rollback. For local Docker use, copy `.env.example` to `.env`, then run `docker compose up --build` (localhost trial port 8000). Never expose the development port as the public production endpoint.
+See [deployment runbook](docs/15-deployment-runbook.md) for setup and verification. For local Docker use, copy `.env.example` to `.env`, then run `docker compose up --build` (trial port 8000).
 
 ## Verify
 
