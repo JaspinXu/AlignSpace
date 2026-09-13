@@ -79,7 +79,10 @@
         "rationale": { "type": "string" },
         "severity": { "enum": ["advisory", "important", "critical"] },
         "verificationStatus": { "enum": ["unverified", "designer_asserted", "professional_review_required", "verified"] },
-        "owner": { "enum": ["designer", "qualified_professional", "homeowner"] }
+        "owner": { "enum": ["designer", "qualified_professional", "homeowner"] },
+        "appliesTo": { "type": "string" },
+        "attributeId": { "type": "string" },
+        "proposedBy": { "type": "string" }
       }
     },
     "conflict": {
@@ -94,7 +97,8 @@
         "status": { "enum": ["open", "resolved", "escalated", "accepted_unresolved"] },
         "resolution": { "type": ["string", "null"] },
         "severity": { "enum": ["advisory", "important", "critical"] },
-        "resolutionAttempts": { "type": "integer", "minimum": 0 }
+        "resolutionAttempts": { "type": "integer", "minimum": 0 },
+        "constraintId": { "type": "string" }
       }
     },
     "approval": {

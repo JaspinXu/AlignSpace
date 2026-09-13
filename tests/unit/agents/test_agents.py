@@ -25,7 +25,11 @@ from alignspace.domain.models import (
     Question,
     calculate_brief_content_hash,
 )
-from alignspace.providers.mock import SequenceLanguageProvider, build_mock_agents
+from alignspace.providers.mock import (
+    SequenceLanguageProvider,
+    build_fixture_agents,
+    build_mock_agents,
+)
 from alignspace.providers.validated import ProviderOutputError, generate_validated
 
 
@@ -84,7 +88,7 @@ def test_homeowner_agent_asks_broad_question_before_detail() -> None:
 
 
 def test_designer_agent_only_applies_configured_fixture_feedback() -> None:
-    agents = build_mock_agents()
+    agents = build_fixture_agents()
     state = ProjectState(project_id="project-1")
 
     result = agents.designer.run(state)
@@ -96,7 +100,7 @@ def test_designer_agent_only_applies_configured_fixture_feedback() -> None:
 
 
 def test_alignment_routes_open_tradeoff_to_homeowner() -> None:
-    agents = build_mock_agents()
+    agents = build_fixture_agents()
     reviewed = agents.designer.run(ProjectState(project_id="project-1", completeness=1)).state
 
     result = agents.alignment.run(reviewed)

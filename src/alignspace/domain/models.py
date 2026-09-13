@@ -71,6 +71,10 @@ class Constraint(DomainModel):
     owner: ConstraintOwner
     evidence: list[Evidence] = Field(min_length=1)
     verified_by: str | None = None
+    applies_to: str = ""
+    attribute_id: str | None = None
+    proposed_by: str = ""
+    withdrawn: bool = False
 
     @model_validator(mode="after")
     def validate_verified_provenance(self) -> "Constraint":
@@ -106,6 +110,7 @@ class Conflict(DomainModel):
     resolution: str | None = None
     severity: ConstraintSeverity
     resolution_attempts: int = Field(default=0, ge=0, le=2)
+    constraint_id: str | None = None
 
 
 class BriefVersion(DomainModel):

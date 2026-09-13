@@ -139,10 +139,11 @@ def build_graph(agents: AgentBundle, checkpointer: object):
             constraint.model_dump(
                 mode="json",
                 by_alias=True,
-                exclude={"evidence", "verified_by"},
+                exclude={"evidence", "verified_by", "withdrawn"},
                 exclude_none=True,
             )
             for constraint in state.constraints
+            if not constraint.withdrawn
         ]
         payload["conflicts"] = [
             conflict.model_dump(mode="json", by_alias=True, exclude_none=True)

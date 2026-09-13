@@ -66,7 +66,12 @@ class MockVisionProvider:
         return observations
 
 
-def build_mock_agents() -> AgentBundle:
+def build_fixture_agents() -> AgentBundle:
+    """Deterministic designer fixtures, for isolated tests only.
+
+    The real application flow uses :func:`build_mock_agents`, where designer
+    constraints come from real designer input instead of this fixture.
+    """
     budget_constraint = Constraint(
         id="mock-natural-stone-budget",
         category=ConstraintCategory.BUDGET,
@@ -95,6 +100,17 @@ def build_mock_agents() -> AgentBundle:
         vision=VisionAnalyst(MockVisionProvider()),
         homeowner=HomeownerInterviewAgent(),
         designer=DesignerAgent([budget_constraint], [budget_conflict]),
+        alignment=AlignmentAgent(),
+        review=ReviewAgent(),
+    )
+
+
+def build_mock_agents() -> AgentBundle:
+    """Real flow: deterministic vision, but no fixture designer constraints."""
+    return AgentBundle(
+        vision=VisionAnalyst(MockVisionProvider()),
+        homeowner=HomeownerInterviewAgent(),
+        designer=DesignerAgent(),
         alignment=AlignmentAgent(),
         review=ReviewAgent(),
     )

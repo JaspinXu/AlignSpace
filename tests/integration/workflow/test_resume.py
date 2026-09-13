@@ -1,11 +1,11 @@
 from langgraph.types import Command
 
-from alignspace.providers.mock import build_mock_agents
+from alignspace.providers.mock import build_fixture_agents, build_mock_agents
 from alignspace.workflow.runtime import memory_graph
 
 
 def test_homeowner_answer_resumes_same_thread() -> None:
-    graph = memory_graph(build_mock_agents())
+    graph = memory_graph(build_fixture_agents())
     config = {"configurable": {"thread_id": "project-1"}}
     graph.invoke({"project_id": "project-1"}, config=config)
 
