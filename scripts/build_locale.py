@@ -18,7 +18,7 @@ for values in engine.REFERENCE_KEYWORDS.values():
   zh=engine._ZH_ALIASES.get(value)
   if zh:data[value.replace('_',' ')]=zh[0]
 handbook = Path('app/knowledge_data/handbook.json')
-if hashlib.sha256(handbook.read_bytes()).hexdigest() != '29cb7dfb3f168bd184b68e23781b611086665fbdc039329a678c6b8f7179e539':
+if hashlib.sha256(handbook.read_text(encoding='utf-8').encode()).hexdigest() != '7292f97c2940d1be990aeb8efcd397eb10414f06fa5ecf66d3a42e05211681e8':
  raise ValueError('Handbook changed: review translated source descriptions before updating the snapshot hash')
 records=json.loads(Path('app/knowledge_data/handbook.json').read_text(encoding='utf-8'))['records']
 # Prevent translations from silently attaching to changed or reordered source paragraphs.

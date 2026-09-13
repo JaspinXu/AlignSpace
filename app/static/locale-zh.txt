@@ -621,3 +621,4 @@ accept_designer_constraint|接受设计师约束
 retain_preference_after_discussion|讨论后保留偏好
 discuss_offline|线下讨论
 Remove this detail|移除这条细节
+Landed home|有地住宅
