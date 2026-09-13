@@ -171,6 +171,7 @@ class TwoAccountDriver:
                 "severity": "important",
                 "appliesTo": "worktop",
                 "attributeId": "manual-material",
+                "incompatibleWith": ["natural stone"],
             },
             headers=self.designer,
         )

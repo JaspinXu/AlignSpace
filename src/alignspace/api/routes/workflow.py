@@ -71,3 +71,13 @@ def resolve_conflict(
     container: Container,
 ) -> WorkflowResponse:
     return container.workflow.resolve_conflict(project_id, conflict_id, actor, envelope)
+
+
+@router.post("/{project_id}/realign", response_model=WorkflowResponse)
+def realign(
+    project_id: str,
+    envelope: WriteEnvelope[dict[str, object]],
+    actor: Actor,
+    container: Container,
+) -> WorkflowResponse:
+    return container.workflow.realign(project_id, actor, envelope)

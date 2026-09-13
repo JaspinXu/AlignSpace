@@ -1,12 +1,10 @@
-import json
-from pathlib import Path
-
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from alignspace.agents.contracts import AgentBundle, AssetRef
+from alignspace.application.briefing import build_brief_version
 from alignspace.domain.enums import ConflictStatus, NextAction, ProjectStatus, ReviewDecision
-from alignspace.domain.models import BriefVersion, ProjectState, calculate_brief_content_hash
+from alignspace.domain.models import ProjectState
 from alignspace.domain.patches import (
     StatePatch,
     UpsertBriefVersion,
@@ -122,49 +120,12 @@ def build_graph(agents: AgentBundle, checkpointer: object):
 
     def draft_brief(workflow_state: WorkflowState) -> WorkflowState:
         state = _project_state(workflow_state)
-        root = Path(__file__).resolve().parents[3]
-        payload = json.loads((root / "examples/project-haven.design-brief.json").read_text())
-        payload["project"]["id"] = state.project_id
-        payload["project"]["status"] = ProjectStatus.AWAITING_APPROVAL.value
-        payload["completeness"] = state.completeness
-        version = max((brief.version for brief in state.brief_versions), default=0) + 1
-        payload["version"] = version
-        payload.pop("contentHash", None)
-        payload["approvals"] = []
-        payload["attributes"] = [
-            attribute.model_dump(mode="json", by_alias=True, exclude_none=True)
-            for attribute in state.attributes
-        ]
-        payload["constraints"] = [
-            constraint.model_dump(
-                mode="json",
-                by_alias=True,
-                exclude={"evidence", "verified_by", "withdrawn"},
-                exclude_none=True,
-            )
-            for constraint in state.constraints
-            if not constraint.withdrawn
-        ]
-        payload["conflicts"] = [
-            conflict.model_dump(mode="json", by_alias=True, exclude_none=True)
-            for conflict in state.conflicts
-        ]
-        payload["unresolvedDecisions"] = [
-            attribute.value
-            for attribute in state.attributes
-            if attribute.status.value == "unresolved"
-        ]
-        brief = BriefVersion(
-            version=version,
-            content_hash=calculate_brief_content_hash(payload),
-            payload=payload,
-            completeness=state.completeness,
-        )
+        brief = build_brief_version(state)
         operation = UpsertBriefVersion(brief_version=brief)
         updated = apply_patch(
             state,
             StatePatch(expected_state_version=state.state_version, operations=[operation]),
-        )
+        ).model_copy(update={"brief_stale": False})
         return {"project_state": _dump(updated)}
 
     def review(workflow_state: WorkflowState) -> WorkflowState:

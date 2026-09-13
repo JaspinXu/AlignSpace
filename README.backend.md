@@ -10,7 +10,7 @@
 - 3–10 张真实参考图片的本地存储（JPEG / PNG / WebP，单张不超过 10MB）、图片处理同意门槛和删除流程。
 - 稀疏偏好记录：系统不会因为属性未被提及就预先创建空数据；人工明确补充的偏好才会新增。
 - 广泛提问后再细化、最多 10 个屋主问题、设计约束冲突和人工解决。
-- 设计师真实约束录入：新增、修改、撤销与查询；`important`/`critical` 且关联已确认偏好的约束按规则派生 `preference_vs_constraint` 冲突；属性/约束/冲突变化会使过时方案审批失效，未解决冲突不会被自动标记为已解决。
+- 设计师真实约束录入：新增、修改、撤销与查询；**仅当**设计师显式声明不兼容取值且关联到已确认偏好时才派生 `preference_vs_constraint` 冲突；属性/约束/冲突变化会清空审批并标记方案过时，需 `POST /realign` 重新生成后才能再次审批；未解决冲突不会被自动标记为已解决。
 - JSON Schema 方案校验、内容哈希、版本化编辑和同版本双人审批。
 - 结构、电气、法规、安全、精确价格和实时库存声明的专业复核门槛。
 
@@ -93,6 +93,7 @@ POST   /v1/projects/{projectId}/constraints
 PATCH  /v1/projects/{projectId}/constraints/{constraintId}
 POST   /v1/projects/{projectId}/constraints/{constraintId}/withdraw
 GET    /v1/projects/{projectId}/constraints
+POST   /v1/projects/{projectId}/realign
 POST   /v1/projects/{projectId}/analysis-runs
 PATCH  /v1/projects/{projectId}/attributes/{attributeId}
 GET    /v1/projects/{projectId}/questions/next

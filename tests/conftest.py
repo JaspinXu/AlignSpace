@@ -472,6 +472,7 @@ class WorkflowDriver:
                 "severity": "important",
                 "appliesTo": "worktop",
                 "attributeId": "manual-material",
+                "incompatibleWith": ["natural stone"],
             },
             headers=self.designer_headers,
         )

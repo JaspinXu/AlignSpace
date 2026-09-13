@@ -10,8 +10,9 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from alignspace.application.briefing import build_brief_version
 from alignspace.application.commands import ActorContext, WriteEnvelope
-from alignspace.domain.constraints import invalidate_approvals, reconcile_constraint_conflict
+from alignspace.domain.constraints import flag_brief_change, reconcile_constraints
 from alignspace.domain.enums import (
     ActorKind,
     AttributeStatus,
@@ -237,8 +238,13 @@ class WorkflowService:
                     operations=[UpsertAttribute(attribute=changed)],
                 ),
             )
-            updated = updated.model_copy(update={"completeness": calculate_completeness(updated)})
-            updated = invalidate_approvals(updated)
+            updated = updated.model_copy(
+                update={
+                    "completeness": calculate_completeness(updated),
+                    "conflicts": reconcile_constraints(updated),
+                }
+            )
+            updated = flag_brief_change(updated)
             response = self._response(updated)
             uow.projects.save(updated, expected_version=state.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)
@@ -334,7 +340,7 @@ class WorkflowService:
                     operations=[UpsertConflict(conflict=changed)],
                 ),
             )
-            updated = invalidate_approvals(updated)
+            updated = flag_brief_change(updated)
             response = self._response(updated)
             uow.projects.save(updated, expected_version=state.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)
@@ -440,6 +446,55 @@ class WorkflowService:
     def list_constraints(self, project_id: str, actor: ActorContext) -> list[Constraint]:
         return list(self.get_state(project_id, actor).constraints)
 
+    def realign(
+        self,
+        project_id: str,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> WorkflowResponse:
+        """Regenerate the brief from the current state after a change invalidated it."""
+        self._authorize(project_id, actor)
+        request_hash = self._hash_request("realign", project_id, actor, envelope)
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return WorkflowResponse.model_validate(replay.response_payload)
+            state = uow.projects.load(project_id)
+            self._check_version(state, envelope.expected_state_version)
+            if not can_draft_brief(state):
+                updated = state.model_copy(
+                    update={
+                        "state_version": state.state_version + 1,
+                        "status": ProjectStatus.ALIGNMENT,
+                    }
+                )
+                response = self._response(updated)
+                uow.projects.save(updated, expected_version=state.state_version)
+                self._record_replay(uow, project_id, envelope, request_hash, response)
+                uow.commit()
+                return response
+            brief = build_brief_version(state)
+            self._validate_professional_content(brief.payload)
+            self._validate_brief(brief.payload)
+            updated = apply_patch(
+                state,
+                StatePatch(
+                    expected_state_version=state.state_version,
+                    operations=[UpsertBriefVersion(brief_version=brief)],
+                ),
+            ).model_copy(
+                update={
+                    "approvals": [],
+                    "status": ProjectStatus.AWAITING_APPROVAL,
+                    "brief_stale": False,
+                }
+            )
+            response = self._response(updated)
+            uow.projects.save(updated, expected_version=state.state_version)
+            self._record_replay(uow, project_id, envelope, request_hash, response)
+            uow.commit()
+            return response
+
     @staticmethod
     def _require_designer(actor: ActorContext) -> None:
         if actor.role != Role.DESIGNER:
@@ -497,6 +552,25 @@ class WorkflowService:
                 description="Designer-entered constraint.",
             )
         )
+        raw_incompatible = value(
+            "incompatibleWith", existing.incompatible_with if existing else []
+        )
+        if isinstance(raw_incompatible, str):
+            incompatible_with = [item.strip() for item in raw_incompatible.split(",") if item.strip()]
+        elif isinstance(raw_incompatible, list):
+            incompatible_with = [str(item).strip() for item in raw_incompatible if str(item).strip()]
+        else:
+            incompatible_with = []
+        material_changed = existing is not None and any(
+            (
+                existing.statement != statement,
+                existing.severity != severity,
+                existing.applies_to != applies_to,
+                existing.attribute_id != attribute_id,
+                existing.incompatible_with != incompatible_with,
+            )
+        )
+        revision = existing.revision + 1 if material_changed else (existing.revision if existing else 1)
         return Constraint(
             id=constraint_id,
             category=category,
@@ -515,6 +589,8 @@ class WorkflowService:
             attribute_id=attribute_id,
             proposed_by=existing.proposed_by if existing else actor.actor_id,
             withdrawn=False,
+            revision=revision,
+            incompatible_with=incompatible_with,
         )
 
     @staticmethod
@@ -526,10 +602,8 @@ class WorkflowService:
                 operations=[UpsertConstraint(constraint=constraint)],
             ),
         )
-        updated = updated.model_copy(
-            update={"conflicts": reconcile_constraint_conflict(state, constraint)}
-        )
-        return invalidate_approvals(updated)
+        updated = updated.model_copy(update={"conflicts": reconcile_constraints(updated)})
+        return flag_brief_change(updated)
 
     def latest_brief(self, project_id: str, actor: ActorContext) -> BriefView:
         state = self.get_state(project_id, actor)
@@ -598,7 +672,11 @@ class WorkflowService:
                     operations=[UpsertBriefVersion(brief_version=brief)],
                 ),
             ).model_copy(
-                update={"approvals": [], "status": ProjectStatus.AWAITING_APPROVAL}
+                update={
+                    "approvals": [],
+                    "status": ProjectStatus.AWAITING_APPROVAL,
+                    "brief_stale": False,
+                }
             )
             response = self._brief_view(updated, brief)
             uow.projects.save(updated, expected_version=state.state_version)
@@ -631,6 +709,10 @@ class WorkflowService:
             if brief.version != version:
                 raise StaleStateError(
                     f"brief version {version} is stale; latest version is {brief.version}"
+                )
+            if state.brief_stale:
+                raise ApprovalNotAllowedError(
+                    "brief is outdated; regenerate it before approving"
                 )
             submitted_hash = envelope.data.get("contentHash")
             if submitted_hash != brief.content_hash:

@@ -96,9 +96,10 @@ uv run ruff check src tests
 - Project list, project creation, and joining with a 12-character one-time code.
 - Reloadable `?project=<id>` navigation and browser back/forward support.
 - Role-aware workspace: reference image upload, analysis start, broad
-  question, explicit preferences, confirm/reject of proposed observations,
-  designer constraint create/withdraw with rationale, conflict decisions,
-  designer review notes, brief edit and dual approval.
+  question, explicit preferences and revision of an existing preference,
+  confirm/reject of proposed observations, designer constraint create/edit/
+  withdraw with rationale and declared incompatible values, conflict decisions,
+  designer review notes, brief edit, regeneration of a stale brief and dual approval.
 - Versioned writes keep `idempotencyKey` + `expectedStateVersion`; a 409 keeps
   the typed input, refetches state, and requires a deliberate resubmit with a
   new key. Unsaved brief goals survive newer server versions; save them before
@@ -129,10 +130,11 @@ uv run ruff check src tests
   the sidebar directs both parties to that task instead of offering a second
   resolution action that would leave the graph paused.
 - Designer constraints are entered as structured fields (category, applies-to,
-  optional linked preference, statement, rationale, severity) and can be
-  withdrawn. They are not free-text extraction; the system never estimates cost
-  or feasibility itself. An important/critical constraint linked to a confirmed
-  preference derives a conflict that a human resolves; changing attributes,
-  constraints or conflicts clears stale approvals and returns the project to
-  alignment.
+  optional linked preference, declared incompatible values, statement,
+  rationale, severity) and can be edited or withdrawn. A conflict is derived
+  only when the designer explicitly lists an incompatible value that matches a
+  confirmed preference; the system never estimates cost or feasibility itself.
+  Changing attributes, constraints or conflicts clears stale approvals and
+  marks the brief stale; the brief must be regenerated ("重新生成方案") before it
+  can be approved again. Unresolved conflicts are never auto-resolved.
 - The SQLite migrations are SQLite-specific.

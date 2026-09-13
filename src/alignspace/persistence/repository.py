@@ -111,6 +111,7 @@ class ProjectRepository:
                 room_type=room_type,
                 budget_band=budget_band,
                 consent=consent,
+                brief_stale=state.brief_stale,
             )
         )
         self._replace_entities(state)
@@ -133,6 +134,7 @@ class ProjectRepository:
             completeness=project.completeness,
             current_node=project.current_node,
             wait_reason=project.wait_reason,
+            brief_stale=project.brief_stale,
         )
 
     def save(self, state: ProjectState, expected_version: int) -> None:
@@ -150,6 +152,7 @@ class ProjectRepository:
                 completeness=state.completeness,
                 current_node=state.current_node,
                 wait_reason=state.wait_reason,
+                brief_stale=state.brief_stale,
             )
         )
         if result.rowcount != 1:

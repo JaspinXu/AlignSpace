@@ -28,6 +28,8 @@ export function conflictSnapshot(role: 'homeowner' | 'designer' = 'homeowner'): 
           attributeId: 'mock-lighting-lighting',
           proposedBy: 'designer-1',
           withdrawn: false,
+          revision: 1,
+          incompatibleWith: ['warm ambient'],
         },
       ],
       conflicts: [

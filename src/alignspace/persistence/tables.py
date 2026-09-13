@@ -20,6 +20,7 @@ class ProjectRow(Base):
     room_type: Mapped[str | None] = mapped_column(String)
     budget_band: Mapped[str | None] = mapped_column(String)
     consent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    brief_stale: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class ProjectMemberRow(Base):

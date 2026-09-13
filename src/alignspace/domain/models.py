@@ -75,6 +75,8 @@ class Constraint(DomainModel):
     attribute_id: str | None = None
     proposed_by: str = ""
     withdrawn: bool = False
+    revision: int = Field(default=1, ge=1)
+    incompatible_with: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_verified_provenance(self) -> "Constraint":
@@ -147,3 +149,4 @@ class ProjectState(DomainModel):
     completeness: float = Field(default=0, ge=0, le=1)
     current_node: str | None = None
     wait_reason: str | None = None
+    brief_stale: bool = False

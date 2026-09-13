@@ -171,6 +171,7 @@ def test_schema_uses_canonical_entity_tables_without_a_state_snapshot(tmp_path) 
         "current_node",
         "room_type",
         "wait_reason",
+        "brief_stale",
     }
     engine.dispose()
 

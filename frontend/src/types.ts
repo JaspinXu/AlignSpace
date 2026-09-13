@@ -70,6 +70,8 @@ export type Constraint = {
   attributeId?: string | null;
   proposedBy?: string;
   withdrawn?: boolean;
+  revision?: number;
+  incompatibleWith?: string[];
 };
 
 export type Conflict = {
@@ -122,6 +124,7 @@ export type ProjectState = {
   completeness: number;
   currentNode: string | null;
   waitReason: string | null;
+  briefStale?: boolean;
 };
 
 export type ProjectSnapshot = {

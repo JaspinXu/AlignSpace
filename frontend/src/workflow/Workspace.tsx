@@ -97,9 +97,12 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   const [constraintSeverity, setConstraintSeverity] = useState('important');
   const [constraintAppliesTo, setConstraintAppliesTo] = useState('');
   const [constraintAttributeId, setConstraintAttributeId] = useState('');
+  const [constraintIncompatible, setConstraintIncompatible] = useState('');
+  const [editingConstraintId, setEditingConstraintId] = useState<string | null>(null);
+  const [editAttributeId, setEditAttributeId] = useState('');
+  const [editAttributeValue, setEditAttributeValue] = useState('');
   const goalsDirty = useRef(false);
   const goalsRevision = useRef(0);
-  const attributeId = useRef(`manual-${Math.random().toString(36).slice(2)}`);
 
   const load = useCallback(async () => {
     try {
@@ -190,7 +193,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   };
   const goalsMatchBrief = latestBrief && JSON.stringify(goalsDraft.split('\n')
     .map((line) => line.trim()).filter(Boolean)) === JSON.stringify(latestBrief.payload.goals);
-  const canApprove = !goalsDirty.current && Boolean(goalsMatchBrief);
+  const canApprove = !goalsDirty.current && Boolean(goalsMatchBrief) && !projectState.briefStale;
 
   const handleWriteError = async (error: unknown) => {
     if (error instanceof ApiError && error.status === 409) {
@@ -243,14 +246,13 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     try {
       await client.execute(
         prepareWrite(
-          `/v1/projects/${projectId}/attributes/${attributeId.current}`,
+          `/v1/projects/${projectId}/attributes/manual-${dimension}`,
           'PATCH',
           project.stateVersion,
           { targetElement: 'living_room', dimension, value, status: 'confirmed' },
         ),
       );
       setValue('');
-      attributeId.current = `manual-${crypto.randomUUID()}`;
       setNotice('偏好已保存。');
       await load();
     } catch (error) {
@@ -345,20 +347,69 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
       setNotice('请填写约束内容。');
       return;
     }
+    const incompatibleWith = constraintIncompatible
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
     try {
+      const path = editingConstraintId
+        ? `/v1/projects/${projectId}/constraints/${editingConstraintId}`
+        : `/v1/projects/${projectId}/constraints`;
       await client.execute(
-        prepareWrite(`/v1/projects/${projectId}/constraints`, 'POST', project.stateVersion, {
+        prepareWrite(path, editingConstraintId ? 'PATCH' : 'POST', project.stateVersion, {
           category: constraintCategory,
           statement: constraintStatement,
           rationale: constraintRationale,
           severity: constraintSeverity,
           appliesTo: constraintAppliesTo,
           attributeId: constraintAttributeId || null,
+          incompatibleWith,
         }),
       );
+      const wasEditing = Boolean(editingConstraintId);
+      setEditingConstraintId(null);
       setConstraintStatement('');
       setConstraintRationale('');
-      setNotice('约束已录入，冲突与方案审批已重新计算。');
+      setConstraintIncompatible('');
+      setNotice(
+        wasEditing ? '约束已更新，过时审批已失效。' : '约束已录入，冲突与方案审批已重新计算。',
+      );
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const editConstraint = (constraint: Constraint) => {
+    setEditingConstraintId(constraint.id);
+    setConstraintCategory(constraint.category);
+    setConstraintStatement(constraint.statement);
+    setConstraintRationale(constraint.rationale ?? '');
+    setConstraintSeverity(constraint.severity);
+    setConstraintAppliesTo(constraint.appliesTo ?? '');
+    setConstraintAttributeId(constraint.attributeId ?? '');
+    setConstraintIncompatible((constraint.incompatibleWith ?? []).join(', '));
+  };
+
+  const updateAttribute = async () => {
+    const target = projectState.attributes.find((item) => item.id === editAttributeId);
+    if (!target || !editAttributeValue.trim()) {
+      setNotice('请选择要修改的偏好并填写新内容。');
+      return;
+    }
+    const editable = ['confirmed', 'rejected', 'unresolved', 'not_applicable'];
+    const status = editable.includes(target.status) ? target.status : 'confirmed';
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/attributes/${target.id}`,
+          'PATCH',
+          project.stateVersion,
+          { status, value: editAttributeValue },
+        ),
+      );
+      setEditAttributeValue('');
+      setNotice('偏好已修改，关联冲突与方案已重新检查。');
       await load();
     } catch (error) {
       await handleWriteError(error);
@@ -412,6 +463,18 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
         ),
       );
       setNotice('已批准当前版本。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const realignBrief = async () => {
+    try {
+      await client.execute(
+        prepareWrite(`/v1/projects/${projectId}/realign`, 'POST', project.stateVersion, {}),
+      );
+      setNotice('已根据当前约束重新生成方案。');
       await load();
     } catch (error) {
       await handleWriteError(error);
@@ -615,6 +678,34 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
             </section>
           )}
 
+          {isHomeowner && projectState.attributes.length > 0 && (
+            <section aria-label="修改已有偏好">
+              <h3>修改已有偏好</h3>
+              <label htmlFor="edit-attribute">选择偏好</label>
+              <select
+                id="edit-attribute"
+                value={editAttributeId}
+                onChange={(event) => setEditAttributeId(event.target.value)}
+              >
+                <option value="">（请选择）</option>
+                {projectState.attributes.map((attribute) => (
+                  <option key={attribute.id} value={attribute.id}>
+                    {attribute.dimension}：{attribute.value}（{attribute.status}）
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="edit-attribute-value">新的取值</label>
+              <input
+                id="edit-attribute-value"
+                value={editAttributeValue}
+                onChange={(event) => setEditAttributeValue(event.target.value)}
+              />
+              <button type="button" onClick={() => void updateAttribute()}>
+                保存偏好修改
+              </button>
+            </section>
+          )}
+
           {latestBrief && (
             <section aria-label="设计方案">
               <h3>设计方案</h3>
@@ -637,15 +728,27 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                 <button type="button" onClick={() => void saveBriefEdit()}>
                   保存方案修改
                 </button>
-                <button
-                  type="button"
-                  disabled={!canApprove}
-                  onClick={() => void approveBrief(latestBrief.version, latestBrief.contentHash)}
-                >
-                  批准此版本
-                </button>
+                {projectState.briefStale ? (
+                  <button type="button" onClick={() => void realignBrief()}>
+                    重新生成方案
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!canApprove}
+                    onClick={() => void approveBrief(latestBrief.version, latestBrief.contentHash)}
+                  >
+                    批准此版本
+                  </button>
+                )}
               </div>
-              {goalsDirty.current && <p className="hint">方案目标有未保存的修改，请先保存再审批。</p>}
+              {projectState.briefStale ? (
+                <p role="status" className="notice">
+                  方案已过时，请重新生成后再审批。
+                </p>
+              ) : (
+                goalsDirty.current && <p className="hint">方案目标有未保存的修改，请先保存再审批。</p>
+              )}
             </section>
           )}
         </main>
@@ -700,13 +803,22 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                   </div>
                   {constraint.rationale && <div className="hint">理由：{constraint.rationale}</div>}
                   {isDesigner && !constraint.withdrawn && (
-                    <button
-                      type="button"
-                      aria-label={`撤销 ${constraint.statement}`}
-                      onClick={() => void withdrawConstraint(constraint)}
-                    >
-                      撤销
-                    </button>
+                    <span className="actions">
+                      <button
+                        type="button"
+                        aria-label={`编辑 ${constraint.statement}`}
+                        onClick={() => editConstraint(constraint)}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`撤销 ${constraint.statement}`}
+                        onClick={() => void withdrawConstraint(constraint)}
+                      >
+                        撤销
+                      </button>
+                    </span>
                   )}
                 </li>
               ))}
@@ -718,7 +830,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                   void createConstraint();
                 }}
               >
-                <h4>新增约束</h4>
+                <h4>{editingConstraintId ? '编辑约束' : '新增约束'}</h4>
                 <label htmlFor="constraint-category">约束类别</label>
                 <select
                   id="constraint-category"
@@ -774,7 +886,30 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                   value={constraintRationale}
                   onChange={(event) => setConstraintRationale(event.target.value)}
                 />
-                <button type="submit">保存约束</button>
+                <label htmlFor="constraint-incompatible">不兼容取值（逗号分隔）</label>
+                <input
+                  id="constraint-incompatible"
+                  value={constraintIncompatible}
+                  onChange={(event) => setConstraintIncompatible(event.target.value)}
+                />
+                <div className="actions">
+                  <button type="submit">
+                    {editingConstraintId ? '更新约束' : '保存约束'}
+                  </button>
+                  {editingConstraintId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingConstraintId(null);
+                        setConstraintStatement('');
+                        setConstraintRationale('');
+                        setConstraintIncompatible('');
+                      }}
+                    >
+                      取消编辑
+                    </button>
+                  )}
+                </div>
               </form>
             )}
           </section>
