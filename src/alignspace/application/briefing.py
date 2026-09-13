@@ -14,8 +14,14 @@ _CONSTRAINT_EXCLUDES = {
 
 
 def build_brief_payload(state: ProjectState) -> dict[str, object]:
-    root = Path(__file__).resolve().parents[3]
-    payload = json.loads((root / "examples/project-haven.design-brief.json").read_text())
+    if state.brief_versions:
+        latest = max(state.brief_versions, key=lambda item: item.version)
+        # Start from the latest brief so user-edited fields (e.g. goals) survive;
+        # the system-derived fields below are overwritten from current state.
+        payload = json.loads(json.dumps(latest.payload))
+    else:
+        root = Path(__file__).resolve().parents[3]
+        payload = json.loads((root / "examples/project-haven.design-brief.json").read_text())
     payload["project"]["id"] = state.project_id
     payload["project"]["status"] = ProjectStatus.AWAITING_APPROVAL.value
     payload["completeness"] = state.completeness

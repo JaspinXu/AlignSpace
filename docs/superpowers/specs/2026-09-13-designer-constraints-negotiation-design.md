@@ -61,8 +61,9 @@ incompatible_with: list[str] = []    # 设计师明确声明该约束排除的�
 **只有当设计师在 `incompatible_with` 中明确列出与所关联已确认偏好取值相同（忽略大小写/空白）的项时，
 才创建派生冲突；仅“有关联”不构成矛盾。**
 
-- 派生冲突 id = `constraint-conflict-{constraintId}-r{revision}`，`constraint_id=constraintId`，
+- 派生冲突 id = `constraint-conflict-{constraintId}-r{revision}-{matchedValueTag}`，绑定约束版本**与当时匹配到的偏好取值**；`constraint_id=constraintId`，
   `type=preference_vs_constraint`，`severity` 取约束严重度，`status=open`。
+  因此对某个取值的决定不会自动覆盖后来出现的**另一个不兼容取值**（会建立新的待处理冲突，旧结论保留为历史）。
 - 每次协调（约束写入、偏好变更）都重算：保留所有人工已解决/接受未决的记录作为历史；对每条约束，
   至多保留一个 `open` 冲突，且只针对其**当前 revision**；旧 revision 的 open 冲突被新版本取代。
 - 约束被撤销、关联被移除、偏好不再为 confirmed、或不兼容取值不再匹配时，其 open 派生冲突被移除
@@ -92,6 +93,10 @@ POST   /v1/projects/{projectId}/realign                        # 成员：依据
 - `POST /realign` 依据当前状态生成**新版本**方案（版本号递增），清空审批、`brief_stale=False`、
   状态 `awaiting_approval`；若当前不满足生成条件（完整性 <0.85 或有 open critical 冲突），
   则保持/回到 `alignment`，不生成新方案。
+- `realign` 从**最新方案**出发：仅覆盖系统派生字段（项目/状态/完整性/版本/审批/属性/约束/冲突/未决项），
+  保留用户已编辑内容（如 `goals`）；仅在无历史方案时才回退到示例模板。
+- 过时方案执行普通编辑（`edit_brief`）时：先按当前状态重建内容（含最新约束），
+  再叠加请求中的用户可编辑字段（如 `goals`），生成新版本；不会保存过时的约束集合。
 - 双方随后对**同一新版本与同一内容哈希**重新审批。
 
 ## 7. 真实流程与测试 fixture 分离

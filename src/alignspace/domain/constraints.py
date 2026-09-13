@@ -6,6 +6,8 @@ preference AND the designer explicitly lists the preference value it rules out
 never estimates cost or feasibility itself.
 """
 
+import hashlib
+
 from alignspace.domain.enums import (
     AttributeStatus,
     ConflictStatus,
@@ -17,8 +19,18 @@ from alignspace.domain.models import Attribute, Conflict, Constraint, ProjectSta
 DERIVED_CONFLICT_PREFIX = "constraint-conflict-"
 
 
-def derived_conflict_id(constraint_id: str, revision: int) -> str:
-    return f"{DERIVED_CONFLICT_PREFIX}{constraint_id}-r{revision}"
+def _value_tag(value: str) -> str:
+    normalized = value.strip().casefold().encode("utf-8")
+    return hashlib.sha1(normalized).hexdigest()[:8]
+
+
+def derived_conflict_id(constraint_id: str, revision: int, value: str) -> str:
+    """Bind a derived conflict to the constraint revision AND the matched preference value.
+
+    A decision made for one preference value must not silently cover a later, different
+    incompatible value; including the value gives each clash its own lifecycle.
+    """
+    return f"{DERIVED_CONFLICT_PREFIX}{constraint_id}-r{revision}-{_value_tag(value)}"
 
 
 def _linked_attribute(state: ProjectState, constraint: Constraint) -> Attribute | None:
@@ -42,7 +54,7 @@ def conflicting_value(state: ProjectState, constraint: Constraint) -> str | None
 
 def build_derived_conflict(constraint: Constraint, attribute_value: str) -> Conflict:
     return Conflict(
-        id=derived_conflict_id(constraint.id, constraint.revision),
+        id=derived_conflict_id(constraint.id, constraint.revision, attribute_value),
         type=ConflictType.PREFERENCE_VS_CONSTRAINT,
         summary=constraint.statement,
         impact=f"与已确认偏好「{attribute_value}」冲突，需要屋主或设计师决定。",
@@ -65,12 +77,13 @@ def reconcile_constraints(state: ProjectState) -> list[Conflict]:
         if conflict.constraint_id is None or conflict.status != ConflictStatus.OPEN
     ]
     for constraint in state.constraints:
-        current_id = derived_conflict_id(constraint.id, constraint.revision)
+        value = conflicting_value(state, constraint)
+        if value is None:
+            continue
+        current_id = derived_conflict_id(constraint.id, constraint.revision, value)
         if any(conflict.id == current_id for conflict in kept):
             continue
-        value = conflicting_value(state, constraint)
-        if value is not None:
-            kept.append(build_derived_conflict(constraint, value))
+        kept.append(build_derived_conflict(constraint, value))
     return kept
 
 

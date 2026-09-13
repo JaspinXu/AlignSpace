@@ -10,7 +10,7 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from alignspace.application.briefing import build_brief_version
+from alignspace.application.briefing import build_brief_payload, build_brief_version
 from alignspace.application.commands import ActorContext, WriteEnvelope
 from alignspace.domain.constraints import flag_brief_change, reconcile_constraints
 from alignspace.domain.enums import (
@@ -641,15 +641,28 @@ class WorkflowService:
             raw_payload = envelope.data.get("payload")
             if not isinstance(raw_payload, dict):
                 raise BriefSchemaError("brief edit requires a payload object")
-            payload = dict(raw_payload)
-            project = payload.get("project")
+            client_payload = dict(raw_payload)
+            project = client_payload.get("project")
             if not isinstance(project, dict) or project.get("id") != project_id:
                 raise BriefSchemaError("brief project id must match the route project")
+            if state.brief_stale:
+                # A stale brief is rebuilt from current state first, so a normal edit
+                # cannot persist an outdated constraint set; the request's user-editable
+                # fields are applied on top of the rebuilt content.
+                payload = build_brief_payload(state)
+                goals = client_payload.get("goals")
+                if isinstance(goals, list):
+                    payload["goals"] = goals
+            else:
+                payload = client_payload
             next_version = latest.version + 1
             payload["version"] = next_version
             payload["approvals"] = []
             payload.pop("contentHash", None)
-            payload["project"] = {**project, "status": ProjectStatus.AWAITING_APPROVAL.value}
+            payload["project"] = {
+                **payload["project"],
+                "status": ProjectStatus.AWAITING_APPROVAL.value,
+            }
             self._validate_professional_content(payload)
             self._validate_brief(payload)
             completeness = payload.get("completeness")

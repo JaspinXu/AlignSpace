@@ -90,7 +90,7 @@ def test_linking_alone_is_not_a_conflict():
 
 def test_derived_conflict_carries_revision_and_constraint():
     conflict = build_derived_conflict(constraint(), "natural stone")
-    assert conflict.id == derived_conflict_id("c1", 1)
+    assert conflict.id == derived_conflict_id("c1", 1, "natural stone")
     assert conflict.constraint_id == "c1"
     assert conflict.status == ConflictStatus.OPEN
     assert conflict.severity == ConstraintSeverity.IMPORTANT
@@ -99,16 +99,16 @@ def test_derived_conflict_carries_revision_and_constraint():
 def test_reconcile_adds_one_open_conflict_per_revision():
     state = project(constraints=[constraint()])
     conflicts = reconcile_constraints(state)
-    assert [c.id for c in conflicts] == [derived_conflict_id("c1", 1)]
+    assert [c.id for c in conflicts] == [derived_conflict_id("c1", 1, "natural stone")]
 
     revised = state.model_copy(update={"constraints": [constraint(revision=2)]})
     refreshed = reconcile_constraints(revised)
-    assert [c.id for c in refreshed] == [derived_conflict_id("c1", 2)]
+    assert [c.id for c in refreshed] == [derived_conflict_id("c1", 2, "natural stone")]
 
 
 def test_reconcile_keeps_resolved_history_and_opens_a_new_revision_conflict():
     resolved = Conflict(
-        id=derived_conflict_id("c1", 1),
+        id=derived_conflict_id("c1", 1, "natural stone"),
         type="preference_vs_constraint",
         summary="旧结论",
         impact="done",
@@ -120,9 +120,34 @@ def test_reconcile_keeps_resolved_history_and_opens_a_new_revision_conflict():
     state = project(constraints=[constraint(revision=2)], conflicts=[resolved])
     conflicts = reconcile_constraints(state)
     ids = {c.id for c in conflicts}
-    assert derived_conflict_id("c1", 1) in ids  # history kept
-    assert derived_conflict_id("c1", 2) in ids  # new pending conflict
-    assert next(c for c in conflicts if c.id == derived_conflict_id("c1", 2)).status == "open"
+    assert derived_conflict_id("c1", 1, "natural stone") in ids  # history kept
+    new_id = derived_conflict_id("c1", 2, "natural stone")
+    assert new_id in ids  # new pending conflict for revision 2
+    assert next(c for c in conflicts if c.id == new_id).status == "open"
+
+
+def test_changing_the_matched_preference_value_opens_a_new_conflict():
+    resolved = Conflict(
+        id=derived_conflict_id("c1", 1, "natural stone"),
+        type="preference_vs_constraint",
+        summary="同意天然石材例外",
+        impact="done",
+        status=ConflictStatus.RESOLVED,
+        severity=ConstraintSeverity.IMPORTANT,
+        resolution_attempts=1,
+        constraint_id="c1",
+    )
+    state = project(
+        attributes=[attribute(value="solid oak")],
+        constraints=[constraint(incompatible_with=["natural stone", "solid oak"])],
+        conflicts=[resolved],
+    )
+    conflicts = reconcile_constraints(state)
+    ids = {c.id for c in conflicts}
+    assert derived_conflict_id("c1", 1, "natural stone") in ids  # history kept
+    new_id = derived_conflict_id("c1", 1, "solid oak")
+    assert new_id in ids  # different value needs its own decision
+    assert next(c for c in conflicts if c.id == new_id).status == "open"
 
 
 def test_reconcile_drops_open_conflict_when_cause_goes_away():

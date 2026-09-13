@@ -235,7 +235,7 @@ def test_material_constraint_change_after_resolution_opens_a_new_conflict(
     opened = [c for c in conflicts if c["status"] == "open"]
     assert len(opened) == 1
     assert opened[0]["severity"] == "critical"
-    assert opened[0]["id"].endswith("-r2")
+    assert "-r2-" in opened[0]["id"]
 
 
 def test_preference_change_re_reconciles_the_linked_conflict(client, ready_project) -> None:
@@ -348,3 +348,121 @@ def test_stale_brief_blocks_reapproval_until_regenerated(client, brief_ready_pro
         },
     )
     assert second.json()["status"] == "approved"
+
+
+def test_editing_a_stale_brief_rebuilds_from_current_state(client, brief_ready_project) -> None:
+    stale_source = client.get(
+        f"/v1/projects/{brief_ready_project}/briefs/latest", headers=_headers()
+    ).json()
+    created = _create_constraint(
+        client, brief_ready_project, version=1, attributeId="confirmed-material"
+    )
+    assert created.json()["projectState"]["briefStale"] is True
+
+    edited_payload = dict(stale_source["payload"])
+    edited_payload["goals"] = ["保留祖传书柜"]
+    edited = client.patch(
+        f"/v1/projects/{brief_ready_project}/briefs/1",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "edit-stale",
+            "expectedStateVersion": created.json()["stateVersion"],
+            "data": {"payload": edited_payload},
+        },
+    )
+
+    assert edited.status_code == 200, edited.text
+    body = edited.json()
+    assert body["version"] == 2
+    assert body["payload"]["goals"] == ["保留祖传书柜"]
+    assert any(
+        item["statement"] == "天然石材工作台超出当前预算档位"
+        for item in body["payload"]["constraints"]
+    )
+    state = client.get(f"/v1/projects/{brief_ready_project}/state", headers=_headers()).json()
+    assert state["projectState"]["briefStale"] is False
+
+
+def test_realign_preserves_user_edited_goals(client, brief_ready_project) -> None:
+    source = client.get(
+        f"/v1/projects/{brief_ready_project}/briefs/latest", headers=_headers()
+    ).json()
+    edited_payload = dict(source["payload"])
+    edited_payload["goals"] = ["保留祖传书柜"]
+    edited = client.patch(
+        f"/v1/projects/{brief_ready_project}/briefs/1",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "edit-goals",
+            "expectedStateVersion": 1,
+            "data": {"payload": edited_payload},
+        },
+    )
+    assert edited.status_code == 200, edited.text
+
+    created = _create_constraint(
+        client,
+        brief_ready_project,
+        version=edited.json()["stateVersion"],
+        attributeId="confirmed-material",
+    )
+    realigned = client.post(
+        f"/v1/projects/{brief_ready_project}/realign",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "realign-goals",
+            "expectedStateVersion": created.json()["stateVersion"],
+            "data": {},
+        },
+    )
+
+    assert realigned.status_code == 200, realigned.text
+    regenerated = client.get(
+        f"/v1/projects/{brief_ready_project}/briefs/latest", headers=_headers()
+    ).json()
+    assert regenerated["version"] == 3
+    assert regenerated["payload"]["goals"] == ["保留祖传书柜"]
+    assert any(
+        item["statement"] == "天然石材工作台超出当前预算档位"
+        for item in regenerated["payload"]["constraints"]
+    )
+
+
+def test_preference_value_change_after_resolution_opens_a_new_conflict(
+    client, ready_project
+) -> None:
+    version = _confirmed_preference(client, ready_project)
+    created = _create_constraint(
+        client,
+        ready_project,
+        version=version,
+        incompatibleWith=["natural stone", "solid oak"],
+    ).json()
+    conflict_id = created["projectState"]["conflicts"][0]["id"]
+    resolved = client.post(
+        f"/v1/projects/{ready_project}/conflicts/{conflict_id}/resolve",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "resolve-1",
+            "expectedStateVersion": created["stateVersion"],
+            "data": {"status": "resolved", "resolution": "允许天然石材作为例外"},
+        },
+    )
+    assert resolved.status_code == 200, resolved.text
+
+    changed = client.patch(
+        f"/v1/projects/{ready_project}/attributes/manual-material",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "to-solid-oak",
+            "expectedStateVersion": resolved.json()["stateVersion"],
+            "data": {"status": "confirmed", "value": "solid oak"},
+        },
+    )
+
+    assert changed.status_code == 200, changed.text
+    conflicts = changed.json()["projectState"]["conflicts"]
+    assert any(c["id"] == conflict_id and c["status"] == "resolved" for c in conflicts)
+    opened = [c for c in conflicts if c["status"] == "open"]
+    assert len(opened) == 1
+    assert "solid oak" in opened[0]["impact"]
