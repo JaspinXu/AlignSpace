@@ -643,18 +643,18 @@ class WorkflowService:
                 raise BriefSchemaError("brief edit requires a payload object")
             client_payload = dict(raw_payload)
             project = client_payload.get("project")
-            if not isinstance(project, dict) or project.get("id") != project_id:
+            if isinstance(project, dict) and project.get("id") not in (None, project_id):
                 raise BriefSchemaError("brief project id must match the route project")
-            if state.brief_stale:
-                # A stale brief is rebuilt from current state first, so a normal edit
-                # cannot persist an outdated constraint set; the request's user-editable
-                # fields are applied on top of the rebuilt content.
-                payload = build_brief_payload(state)
-                goals = client_payload.get("goals")
-                if isinstance(goals, list):
-                    payload["goals"] = goals
-            else:
-                payload = client_payload
+            # System fields always come from authoritative state; only whitelisted
+            # fields may be changed through the brief edit endpoint.
+            payload = build_brief_payload(state)
+            if "goals" in client_payload:
+                goals = client_payload["goals"]
+                if not isinstance(goals, list) or not all(
+                    isinstance(item, str) for item in goals
+                ):
+                    raise BriefSchemaError("brief goals must be a list of strings")
+                payload["goals"] = goals
             next_version = latest.version + 1
             payload["version"] = next_version
             payload["approvals"] = []

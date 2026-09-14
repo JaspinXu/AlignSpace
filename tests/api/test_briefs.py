@@ -110,7 +110,7 @@ def test_invalid_brief_edit_is_rejected(client, brief_ready_project) -> None:
         json={
             "idempotencyKey": "invalid-edit",
             "expectedStateVersion": 1,
-            "data": {"payload": {"schemaVersion": "1.0.0"}},
+            "data": {"payload": []},
         },
     )
 
@@ -140,12 +140,12 @@ def test_brief_edit_cannot_change_project_scope(client, brief_ready_project) -> 
     assert response.json()["error"]["code"] == "BRIEF_SCHEMA_INVALID"
 
 
-def test_incomplete_brief_edit_does_not_enter_approval(client, brief_ready_project) -> None:
+def test_brief_edit_ignores_client_completeness(client, brief_ready_project) -> None:
     original = client.get(
         f"/v1/projects/{brief_ready_project}/briefs/latest",
         headers=_headers(),
     ).json()
-    payload = original["payload"]
+    payload = dict(original["payload"])
     payload["completeness"] = 0.5
 
     response = client.patch(
@@ -158,5 +158,6 @@ def test_incomplete_brief_edit_does_not_enter_approval(client, brief_ready_proje
         },
     )
 
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "BRIEF_REVIEW_FAILED"
+    assert response.status_code == 200, response.text
+    assert response.json()["completeness"] == 0.875
+    assert response.json()["payload"]["completeness"] == 0.875

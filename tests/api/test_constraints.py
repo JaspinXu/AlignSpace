@@ -466,3 +466,73 @@ def test_preference_value_change_after_resolution_opens_a_new_conflict(
     opened = [c for c in conflicts if c["status"] == "open"]
     assert len(opened) == 1
     assert "solid oak" in opened[0]["impact"]
+
+
+def test_brief_edit_cannot_drop_system_constraints(client, brief_ready_project) -> None:
+    source = client.get(
+        f"/v1/projects/{brief_ready_project}/briefs/latest", headers=_headers()
+    ).json()
+    created = _create_constraint(
+        client, brief_ready_project, version=1, attributeId="confirmed-material"
+    )
+    first = client.patch(
+        f"/v1/projects/{brief_ready_project}/briefs/1",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "edit-1",
+            "expectedStateVersion": created.json()["stateVersion"],
+            "data": {"payload": {**source["payload"], "goals": ["用户目标"]}},
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    # A later, non-stale edit submits a payload with no constraints and a low completeness.
+    tampered = dict(first.json()["payload"])
+    tampered["constraints"] = []
+    tampered["completeness"] = 0.1
+    tampered["goals"] = ["用户目标2"]
+    second = client.patch(
+        f"/v1/projects/{brief_ready_project}/briefs/2",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "edit-2",
+            "expectedStateVersion": first.json()["stateVersion"],
+            "data": {"payload": tampered},
+        },
+    )
+
+    assert second.status_code == 200, second.text
+    body = second.json()
+    assert body["version"] == 3
+    assert body["payload"]["goals"] == ["用户目标2"]
+    assert body["payload"]["completeness"] == 0.875
+    assert any(
+        item["statement"] == "天然石材工作台超出当前预算档位"
+        for item in body["payload"]["constraints"]
+    )
+
+
+def test_brief_edit_blocked_by_open_critical_conflict(client, brief_ready_project) -> None:
+    created = _create_constraint(
+        client,
+        brief_ready_project,
+        version=1,
+        severity="critical",
+        attributeId="confirmed-material",
+        incompatibleWith=["confirmed material"],
+    )
+    conflicts = created.json()["projectState"]["conflicts"]
+    assert any(c["status"] == "open" and c["severity"] == "critical" for c in conflicts)
+
+    response = client.patch(
+        f"/v1/projects/{brief_ready_project}/briefs/1",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "edit-critical",
+            "expectedStateVersion": created.json()["stateVersion"],
+            "data": {"payload": {}},
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "BRIEF_REVIEW_FAILED"
