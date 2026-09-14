@@ -2,6 +2,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from jsonschema import Draft202012Validator
 from langgraph.types import Command
@@ -9,11 +10,17 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from alignspace.application.briefing import build_brief_payload, build_brief_version
 from alignspace.application.commands import ActorContext, WriteEnvelope
+from alignspace.domain.constraints import flag_brief_change, reconcile_constraints
 from alignspace.domain.enums import (
     ActorKind,
     AttributeStatus,
     ConflictStatus,
+    ConstraintCategory,
+    ConstraintOwner,
+    ConstraintSeverity,
+    ConstraintVerificationStatus,
     EvidenceSource,
     ProjectStatus,
     Role,
@@ -22,6 +29,7 @@ from alignspace.domain.models import (
     Approval,
     Attribute,
     BriefVersion,
+    Constraint,
     DomainModel,
     Evidence,
     ProjectState,
@@ -34,6 +42,7 @@ from alignspace.domain.patches import (
     UpsertAttribute,
     UpsertBriefVersion,
     UpsertConflict,
+    UpsertConstraint,
     apply_patch,
 )
 from alignspace.domain.policies import (
@@ -229,7 +238,13 @@ class WorkflowService:
                     operations=[UpsertAttribute(attribute=changed)],
                 ),
             )
-            updated = updated.model_copy(update={"completeness": calculate_completeness(updated)})
+            updated = updated.model_copy(
+                update={
+                    "completeness": calculate_completeness(updated),
+                    "conflicts": reconcile_constraints(updated),
+                }
+            )
+            updated = flag_brief_change(updated)
             response = self._response(updated)
             uow.projects.save(updated, expected_version=state.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)
@@ -325,11 +340,270 @@ class WorkflowService:
                     operations=[UpsertConflict(conflict=changed)],
                 ),
             )
+            updated = flag_brief_change(updated)
             response = self._response(updated)
             uow.projects.save(updated, expected_version=state.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)
             uow.commit()
             return response
+
+    def create_constraint(
+        self,
+        project_id: str,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> WorkflowResponse:
+        self._authorize(project_id, actor)
+        self._require_designer(actor)
+        request_hash = self._hash_request("create_constraint", project_id, actor, envelope)
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return WorkflowResponse.model_validate(replay.response_payload)
+            state = uow.projects.load(project_id)
+            self._check_version(state, envelope.expected_state_version)
+            constraint = self._compose_constraint(
+                state, actor, envelope.data, constraint_id=str(uuid4()), existing=None
+            )
+            updated = self._apply_constraint_change(state, constraint)
+            response = self._response(updated)
+            uow.projects.save(updated, expected_version=state.state_version)
+            self._record_replay(uow, project_id, envelope, request_hash, response)
+            uow.commit()
+            return response
+
+    def update_constraint(
+        self,
+        project_id: str,
+        constraint_id: str,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> WorkflowResponse:
+        self._authorize(project_id, actor)
+        self._require_designer(actor)
+        request_hash = self._hash_request(
+            "update_constraint",
+            project_id,
+            actor,
+            envelope,
+            extra={"constraintId": constraint_id},
+        )
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return WorkflowResponse.model_validate(replay.response_payload)
+            state = uow.projects.load(project_id)
+            self._check_version(state, envelope.expected_state_version)
+            existing = next((item for item in state.constraints if item.id == constraint_id), None)
+            if existing is None:
+                raise KeyError(f"constraint {constraint_id} not found")
+            if existing.withdrawn:
+                raise DomainRuleError("withdrawn constraints cannot be edited")
+            constraint = self._compose_constraint(
+                state, actor, envelope.data, constraint_id=constraint_id, existing=existing
+            )
+            updated = self._apply_constraint_change(state, constraint)
+            response = self._response(updated)
+            uow.projects.save(updated, expected_version=state.state_version)
+            self._record_replay(uow, project_id, envelope, request_hash, response)
+            uow.commit()
+            return response
+
+    def withdraw_constraint(
+        self,
+        project_id: str,
+        constraint_id: str,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> WorkflowResponse:
+        self._authorize(project_id, actor)
+        self._require_designer(actor)
+        request_hash = self._hash_request(
+            "withdraw_constraint",
+            project_id,
+            actor,
+            envelope,
+            extra={"constraintId": constraint_id},
+        )
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return WorkflowResponse.model_validate(replay.response_payload)
+            state = uow.projects.load(project_id)
+            self._check_version(state, envelope.expected_state_version)
+            existing = next((item for item in state.constraints if item.id == constraint_id), None)
+            if existing is None:
+                raise KeyError(f"constraint {constraint_id} not found")
+            updated = self._apply_constraint_change(
+                state, existing.model_copy(update={"withdrawn": True})
+            )
+            response = self._response(updated)
+            uow.projects.save(updated, expected_version=state.state_version)
+            self._record_replay(uow, project_id, envelope, request_hash, response)
+            uow.commit()
+            return response
+
+    def list_constraints(self, project_id: str, actor: ActorContext) -> list[Constraint]:
+        return list(self.get_state(project_id, actor).constraints)
+
+    def realign(
+        self,
+        project_id: str,
+        actor: ActorContext,
+        envelope: WriteEnvelope[dict[str, object]],
+    ) -> WorkflowResponse:
+        """Regenerate the brief from the current state after a change invalidated it."""
+        self._authorize(project_id, actor)
+        request_hash = self._hash_request("realign", project_id, actor, envelope)
+        with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+            replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
+            if replay is not None:
+                return WorkflowResponse.model_validate(replay.response_payload)
+            state = uow.projects.load(project_id)
+            self._check_version(state, envelope.expected_state_version)
+            if not can_draft_brief(state):
+                updated = state.model_copy(
+                    update={
+                        "state_version": state.state_version + 1,
+                        "status": ProjectStatus.ALIGNMENT,
+                    }
+                )
+                response = self._response(updated)
+                uow.projects.save(updated, expected_version=state.state_version)
+                self._record_replay(uow, project_id, envelope, request_hash, response)
+                uow.commit()
+                return response
+            brief = build_brief_version(state)
+            self._validate_professional_content(brief.payload)
+            self._validate_brief(brief.payload)
+            updated = apply_patch(
+                state,
+                StatePatch(
+                    expected_state_version=state.state_version,
+                    operations=[UpsertBriefVersion(brief_version=brief)],
+                ),
+            ).model_copy(
+                update={
+                    "approvals": [],
+                    "status": ProjectStatus.AWAITING_APPROVAL,
+                    "brief_stale": False,
+                }
+            )
+            response = self._response(updated)
+            uow.projects.save(updated, expected_version=state.state_version)
+            self._record_replay(uow, project_id, envelope, request_hash, response)
+            uow.commit()
+            return response
+
+    @staticmethod
+    def _require_designer(actor: ActorContext) -> None:
+        if actor.role != Role.DESIGNER:
+            raise AuthorizationError("only a designer can manage constraints")
+
+    def _compose_constraint(
+        self,
+        state: ProjectState,
+        actor: ActorContext,
+        data: dict[str, object],
+        *,
+        constraint_id: str,
+        existing: Constraint | None,
+    ) -> Constraint:
+        def value(key: str, fallback: object) -> object:
+            return data.get(key, fallback)
+
+        raw_category = value("category", existing.category.value if existing else None)
+        if not isinstance(raw_category, str) or not raw_category.strip():
+            raise DomainRuleError("constraint category is required")
+        category = ConstraintCategory(raw_category.strip())
+
+        raw_statement = value("statement", existing.statement if existing else "")
+        if not isinstance(raw_statement, str) or not raw_statement.strip():
+            raise DomainRuleError("constraint statement is required")
+        statement = raw_statement.strip()
+        validate_professional_claim(statement)
+
+        raw_rationale = value("rationale", existing.rationale if existing else "")
+        rationale = raw_rationale.strip() if isinstance(raw_rationale, str) else ""
+        if rationale:
+            validate_professional_claim(rationale)
+
+        severity = ConstraintSeverity(
+            str(value("severity", existing.severity.value if existing else "important"))
+        )
+        raw_applies_to = value("appliesTo", existing.applies_to if existing else "")
+        applies_to = raw_applies_to.strip() if isinstance(raw_applies_to, str) else ""
+        raw_attribute_id = value("attributeId", existing.attribute_id if existing else None)
+        attribute_id = (
+            raw_attribute_id.strip()
+            if isinstance(raw_attribute_id, str) and raw_attribute_id.strip()
+            else None
+        )
+        if attribute_id is not None and not any(
+            item.id == attribute_id for item in state.attributes
+        ):
+            raise ValueError(f"linked preference attribute {attribute_id} not found")
+
+        evidence = list(existing.evidence) if existing else []
+        evidence.append(
+            Evidence(
+                source_type=EvidenceSource.DESIGNER_NOTE,
+                source_id=constraint_id,
+                description="Designer-entered constraint.",
+            )
+        )
+        raw_incompatible = value(
+            "incompatibleWith", existing.incompatible_with if existing else []
+        )
+        if isinstance(raw_incompatible, str):
+            incompatible_with = [item.strip() for item in raw_incompatible.split(",") if item.strip()]
+        elif isinstance(raw_incompatible, list):
+            incompatible_with = [str(item).strip() for item in raw_incompatible if str(item).strip()]
+        else:
+            incompatible_with = []
+        material_changed = existing is not None and any(
+            (
+                existing.statement != statement,
+                existing.severity != severity,
+                existing.applies_to != applies_to,
+                existing.attribute_id != attribute_id,
+                existing.incompatible_with != incompatible_with,
+            )
+        )
+        revision = existing.revision + 1 if material_changed else (existing.revision if existing else 1)
+        return Constraint(
+            id=constraint_id,
+            category=category,
+            statement=statement,
+            rationale=rationale,
+            severity=severity,
+            verification_status=(
+                existing.verification_status
+                if existing
+                else ConstraintVerificationStatus.DESIGNER_ASSERTED
+            ),
+            owner=existing.owner if existing else ConstraintOwner.DESIGNER,
+            evidence=evidence,
+            verified_by=existing.verified_by if existing else None,
+            applies_to=applies_to,
+            attribute_id=attribute_id,
+            proposed_by=existing.proposed_by if existing else actor.actor_id,
+            withdrawn=False,
+            revision=revision,
+            incompatible_with=incompatible_with,
+        )
+
+    @staticmethod
+    def _apply_constraint_change(state: ProjectState, constraint: Constraint) -> ProjectState:
+        updated = apply_patch(
+            state,
+            StatePatch(
+                expected_state_version=state.state_version,
+                operations=[UpsertConstraint(constraint=constraint)],
+            ),
+        )
+        updated = updated.model_copy(update={"conflicts": reconcile_constraints(updated)})
+        return flag_brief_change(updated)
 
     def latest_brief(self, project_id: str, actor: ActorContext) -> BriefView:
         state = self.get_state(project_id, actor)
@@ -367,15 +641,28 @@ class WorkflowService:
             raw_payload = envelope.data.get("payload")
             if not isinstance(raw_payload, dict):
                 raise BriefSchemaError("brief edit requires a payload object")
-            payload = dict(raw_payload)
-            project = payload.get("project")
-            if not isinstance(project, dict) or project.get("id") != project_id:
+            client_payload = dict(raw_payload)
+            project = client_payload.get("project")
+            if isinstance(project, dict) and project.get("id") not in (None, project_id):
                 raise BriefSchemaError("brief project id must match the route project")
+            # System fields always come from authoritative state; only whitelisted
+            # fields may be changed through the brief edit endpoint.
+            payload = build_brief_payload(state)
+            if "goals" in client_payload:
+                goals = client_payload["goals"]
+                if not isinstance(goals, list) or not all(
+                    isinstance(item, str) for item in goals
+                ):
+                    raise BriefSchemaError("brief goals must be a list of strings")
+                payload["goals"] = goals
             next_version = latest.version + 1
             payload["version"] = next_version
             payload["approvals"] = []
             payload.pop("contentHash", None)
-            payload["project"] = {**project, "status": ProjectStatus.AWAITING_APPROVAL.value}
+            payload["project"] = {
+                **payload["project"],
+                "status": ProjectStatus.AWAITING_APPROVAL.value,
+            }
             self._validate_professional_content(payload)
             self._validate_brief(payload)
             completeness = payload.get("completeness")
@@ -398,7 +685,11 @@ class WorkflowService:
                     operations=[UpsertBriefVersion(brief_version=brief)],
                 ),
             ).model_copy(
-                update={"approvals": [], "status": ProjectStatus.AWAITING_APPROVAL}
+                update={
+                    "approvals": [],
+                    "status": ProjectStatus.AWAITING_APPROVAL,
+                    "brief_stale": False,
+                }
             )
             response = self._brief_view(updated, brief)
             uow.projects.save(updated, expected_version=state.state_version)
@@ -431,6 +722,10 @@ class WorkflowService:
             if brief.version != version:
                 raise StaleStateError(
                     f"brief version {version} is stale; latest version is {brief.version}"
+                )
+            if state.brief_stale:
+                raise ApprovalNotAllowedError(
+                    "brief is outdated; regenerate it before approving"
                 )
             submitted_hash = envelope.data.get("contentHash")
             if submitted_hash != brief.content_hash:

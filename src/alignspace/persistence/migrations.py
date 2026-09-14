@@ -43,4 +43,16 @@ def migrate(engine):
             text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
             {"version": 3},
         )
+        project_columns = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(projects)"))
+        }
+        if "brief_stale" not in project_columns:
+            connection.execute(
+                text("ALTER TABLE projects ADD COLUMN brief_stale INTEGER NOT NULL DEFAULT 0")
+            )
+        connection.execute(
+            text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
+            {"version": 4},
+        )
     assert MigrationRow.__tablename__ in Base.metadata.tables

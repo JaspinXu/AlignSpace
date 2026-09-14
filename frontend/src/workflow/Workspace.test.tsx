@@ -441,3 +441,94 @@ describe('real image uploads', () => {
     expect(await screen.findByText('来源图片已删除')).toBeInTheDocument();
   });
 });
+
+describe('designer constraints', () => {
+  it('lets the designer create a constraint and shows the rationale to everyone', async () => {
+    const env = setup('designer', conflictSnapshot('designer'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    expect(await screen.findByText(/理由：/)).toBeInTheDocument();
+
+    await userEvent.type(
+      await screen.findByLabelText('约束内容'),
+      '工作台石材需控制在当前预算档位',
+    );
+    await userEvent.type(screen.getByLabelText('约束理由'), '改用石材效果饰面');
+    await userEvent.click(screen.getByRole('button', { name: '保存约束' }));
+
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    const body = JSON.parse(String(env.writes[0].body));
+    expect(body.data.category).toBe('budget');
+    expect(body.data.statement).toBe('工作台石材需控制在当前预算档位');
+    expect(body.data.rationale).toBe('改用石材效果饰面');
+  });
+
+  it('hides constraint write controls from the homeowner', async () => {
+    const env = setup('homeowner', conflictSnapshot('homeowner'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    expect(await screen.findByText(/理由：/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '保存约束' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^撤销 / })).not.toBeInTheDocument();
+  });
+
+  it('lets the designer withdraw a constraint', async () => {
+    const env = setup('designer', conflictSnapshot('designer'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '撤销 天然石材超出预算' }),
+    );
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    expect(env.writes[0].method).toBe('POST');
+    expect(JSON.parse(String(env.writes[0].body)).data).toEqual({});
+  });
+});
+
+describe('constraint editing and preference revision', () => {
+  it('lets the designer edit an existing constraint', async () => {
+    const env = setup('designer', conflictSnapshot('designer'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '编辑 天然石材超出预算' }),
+    );
+    const statement = screen.getByLabelText('约束内容');
+    await userEvent.clear(statement);
+    await userEvent.type(statement, '天然石材改为关键限制');
+    await userEvent.click(screen.getByRole('button', { name: '更新约束' }));
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    const write = env.writes[0];
+    expect(write.method).toBe('PATCH');
+    const body = JSON.parse(String(write.body));
+    expect(body.data.statement).toBe('天然石材改为关键限制');
+  });
+
+  it('sends declared incompatible values from the constraint form', async () => {
+    const env = setup('designer', conflictSnapshot('designer'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await userEvent.type(await screen.findByLabelText('约束内容'), '新约束');
+    await userEvent.type(screen.getByLabelText('不兼容取值（逗号分隔）'), 'warm ambient, pale oak');
+    await userEvent.click(screen.getByRole('button', { name: '保存约束' }));
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    const body = JSON.parse(String(env.writes[0].body));
+    expect(body.data.incompatibleWith).toEqual(['warm ambient', 'pale oak']);
+  });
+
+  it('lets the homeowner revise an existing confirmed preference', async () => {
+    const env = setup('homeowner', conflictSnapshot('homeowner'));
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await userEvent.selectOptions(
+      await screen.findByLabelText('选择偏好'),
+      'mock-lighting-lighting',
+    );
+    await userEvent.type(screen.getByLabelText('新的取值'), 'warm ambient');
+    await userEvent.click(screen.getByRole('button', { name: '保存偏好修改' }));
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    expect(env.writes[0].method).toBe('PATCH');
+    const body = JSON.parse(String(env.writes[0].body));
+    expect(body.data.value).toBe('warm ambient');
+  });
+});

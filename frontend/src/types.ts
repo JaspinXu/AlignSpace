@@ -66,6 +66,12 @@ export type Constraint = {
   severity: string;
   verificationStatus: string;
   owner: string;
+  appliesTo?: string;
+  attributeId?: string | null;
+  proposedBy?: string;
+  withdrawn?: boolean;
+  revision?: number;
+  incompatibleWith?: string[];
 };
 
 export type Conflict = {
@@ -77,6 +83,7 @@ export type Conflict = {
   resolution?: string | null;
   severity: string;
   resolutionAttempts: number;
+  constraintId?: string | null;
 };
 
 export type Question = {
@@ -117,6 +124,7 @@ export type ProjectState = {
   completeness: number;
   currentNode: string | null;
   waitReason: string | null;
+  briefStale?: boolean;
 };
 
 export type ProjectSnapshot = {

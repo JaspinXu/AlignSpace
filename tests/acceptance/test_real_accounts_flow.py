@@ -126,6 +126,7 @@ class TwoAccountDriver:
 
         explicit = {
             "style": "warm modern",
+            "material": "natural stone",
             "layout": "clear conversational seating",
             "furniture": "compact rounded furniture",
             "mood": "calm and welcoming",
@@ -157,13 +158,40 @@ class TwoAccountDriver:
             headers=self.owner,
             expected=202,
         )
-        assert tradeoff["pendingQuestion"]["id"].startswith("question-conflict-")
+        assert tradeoff["waitReason"] == "designer"
+
+        constraint = self.write(
+            "POST",
+            f"/v1/projects/{self.project_id}/constraints",
+            "constraint-stone-budget",
+            {
+                "category": "budget",
+                "statement": "天然石材工作台超出当前预算档位",
+                "rationale": "改用石材效果饰面可在预算内实现相近观感",
+                "severity": "important",
+                "appliesTo": "worktop",
+                "attributeId": "manual-material",
+                "incompatibleWith": ["natural stone"],
+            },
+            headers=self.designer,
+        )
+        assert constraint["projectState"]["conflicts"][0]["constraintId"]
+
+        resumed = self.write(
+            "POST",
+            f"/v1/projects/{self.project_id}/designer-reviews",
+            "designer-review-1",
+            {"note": "预算约束已录入。"},
+            headers=self.designer,
+            expected=202,
+        )
+        assert resumed["pendingQuestion"]["id"].startswith("question-conflict-")
 
         drafted = self.write(
             "POST",
             (
                 f"/v1/projects/{self.project_id}/questions/"
-                f"{tradeoff['pendingQuestion']['id']}/answer"
+                f"{resumed['pendingQuestion']['id']}/answer"
             ),
             "resolve-conflict",
             {"answer": "Use the lower-cost stone-effect finish."},

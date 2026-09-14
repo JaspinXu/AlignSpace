@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, newIdempotencyKey, prepareWrite } from '../api';
-import type { Asset, Attribute, Conflict, ProjectSnapshot } from '../types';
+import type { Asset, Attribute, Conflict, Constraint, ProjectSnapshot } from '../types';
 
 const BROAD_OPTIONS = [
   { label: '暖色灯光', keyword: 'lighting' },
@@ -20,6 +20,18 @@ const DIMENSIONS = [
   { value: 'furniture', label: '家具' },
   { value: 'mood', label: '氛围' },
   { value: 'function', label: '功能' },
+];
+
+const CONSTRAINT_CATEGORIES = [
+  { value: 'budget', label: '预算' },
+  { value: 'space', label: '空间' },
+  { value: 'function', label: '功能' },
+  { value: 'maintenance', label: '维护' },
+  { value: 'timeline', label: '工期' },
+  { value: 'safety', label: '安全' },
+  { value: 'regulatory', label: '法规' },
+  { value: 'availability', label: '供货' },
+  { value: 'other', label: '其他' },
 ];
 
 const ROLE_LABEL: Record<string, string> = { homeowner: '屋主', designer: '设计师' };
@@ -79,9 +91,18 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   const [conflictResolution, setConflictResolution] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [goalsDraft, setGoalsDraft] = useState('');
+  const [constraintCategory, setConstraintCategory] = useState('budget');
+  const [constraintStatement, setConstraintStatement] = useState('');
+  const [constraintRationale, setConstraintRationale] = useState('');
+  const [constraintSeverity, setConstraintSeverity] = useState('important');
+  const [constraintAppliesTo, setConstraintAppliesTo] = useState('');
+  const [constraintAttributeId, setConstraintAttributeId] = useState('');
+  const [constraintIncompatible, setConstraintIncompatible] = useState('');
+  const [editingConstraintId, setEditingConstraintId] = useState<string | null>(null);
+  const [editAttributeId, setEditAttributeId] = useState('');
+  const [editAttributeValue, setEditAttributeValue] = useState('');
   const goalsDirty = useRef(false);
   const goalsRevision = useRef(0);
-  const attributeId = useRef(`manual-${Math.random().toString(36).slice(2)}`);
 
   const load = useCallback(async () => {
     try {
@@ -156,6 +177,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
 
   const { project, projectState } = snapshot;
   const isHomeowner = project.role === 'homeowner';
+  const isDesigner = project.role === 'designer';
   const openConflict =
     projectState.conflicts.find((conflict) => conflict.status === 'open') ?? null;
   const deletedAssetIds = new Set(project.assets.filter((asset) => asset.deleted).map((asset) => asset.id));
@@ -171,7 +193,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   };
   const goalsMatchBrief = latestBrief && JSON.stringify(goalsDraft.split('\n')
     .map((line) => line.trim()).filter(Boolean)) === JSON.stringify(latestBrief.payload.goals);
-  const canApprove = !goalsDirty.current && Boolean(goalsMatchBrief);
+  const canApprove = !goalsDirty.current && Boolean(goalsMatchBrief) && !projectState.briefStale;
 
   const handleWriteError = async (error: unknown) => {
     if (error instanceof ApiError && error.status === 409) {
@@ -224,14 +246,13 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     try {
       await client.execute(
         prepareWrite(
-          `/v1/projects/${projectId}/attributes/${attributeId.current}`,
+          `/v1/projects/${projectId}/attributes/manual-${dimension}`,
           'PATCH',
           project.stateVersion,
           { targetElement: 'living_room', dimension, value, status: 'confirmed' },
         ),
       );
       setValue('');
-      attributeId.current = `manual-${crypto.randomUUID()}`;
       setNotice('偏好已保存。');
       await load();
     } catch (error) {
@@ -321,6 +342,97 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     }
   };
 
+  const createConstraint = async () => {
+    if (!constraintStatement.trim()) {
+      setNotice('请填写约束内容。');
+      return;
+    }
+    const incompatibleWith = constraintIncompatible
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    try {
+      const path = editingConstraintId
+        ? `/v1/projects/${projectId}/constraints/${editingConstraintId}`
+        : `/v1/projects/${projectId}/constraints`;
+      await client.execute(
+        prepareWrite(path, editingConstraintId ? 'PATCH' : 'POST', project.stateVersion, {
+          category: constraintCategory,
+          statement: constraintStatement,
+          rationale: constraintRationale,
+          severity: constraintSeverity,
+          appliesTo: constraintAppliesTo,
+          attributeId: constraintAttributeId || null,
+          incompatibleWith,
+        }),
+      );
+      const wasEditing = Boolean(editingConstraintId);
+      setEditingConstraintId(null);
+      setConstraintStatement('');
+      setConstraintRationale('');
+      setConstraintIncompatible('');
+      setNotice(
+        wasEditing ? '约束已更新，过时审批已失效。' : '约束已录入，冲突与方案审批已重新计算。',
+      );
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const editConstraint = (constraint: Constraint) => {
+    setEditingConstraintId(constraint.id);
+    setConstraintCategory(constraint.category);
+    setConstraintStatement(constraint.statement);
+    setConstraintRationale(constraint.rationale ?? '');
+    setConstraintSeverity(constraint.severity);
+    setConstraintAppliesTo(constraint.appliesTo ?? '');
+    setConstraintAttributeId(constraint.attributeId ?? '');
+    setConstraintIncompatible((constraint.incompatibleWith ?? []).join(', '));
+  };
+
+  const updateAttribute = async () => {
+    const target = projectState.attributes.find((item) => item.id === editAttributeId);
+    if (!target || !editAttributeValue.trim()) {
+      setNotice('请选择要修改的偏好并填写新内容。');
+      return;
+    }
+    const editable = ['confirmed', 'rejected', 'unresolved', 'not_applicable'];
+    const status = editable.includes(target.status) ? target.status : 'confirmed';
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/attributes/${target.id}`,
+          'PATCH',
+          project.stateVersion,
+          { status, value: editAttributeValue },
+        ),
+      );
+      setEditAttributeValue('');
+      setNotice('偏好已修改，关联冲突与方案已重新检查。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const withdrawConstraint = async (constraint: Constraint) => {
+    try {
+      await client.execute(
+        prepareWrite(
+          `/v1/projects/${projectId}/constraints/${constraint.id}/withdraw`,
+          'POST',
+          project.stateVersion,
+          {},
+        ),
+      );
+      setNotice('约束已撤销。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
   const submitDesignerReview = async () => {
     try {
       await client.execute(
@@ -351,6 +463,18 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
         ),
       );
       setNotice('已批准当前版本。');
+      await load();
+    } catch (error) {
+      await handleWriteError(error);
+    }
+  };
+
+  const realignBrief = async () => {
+    try {
+      await client.execute(
+        prepareWrite(`/v1/projects/${projectId}/realign`, 'POST', project.stateVersion, {}),
+      );
+      setNotice('已根据当前约束重新生成方案。');
       await load();
     } catch (error) {
       await handleWriteError(error);
@@ -554,6 +678,34 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
             </section>
           )}
 
+          {isHomeowner && projectState.attributes.length > 0 && (
+            <section aria-label="修改已有偏好">
+              <h3>修改已有偏好</h3>
+              <label htmlFor="edit-attribute">选择偏好</label>
+              <select
+                id="edit-attribute"
+                value={editAttributeId}
+                onChange={(event) => setEditAttributeId(event.target.value)}
+              >
+                <option value="">（请选择）</option>
+                {projectState.attributes.map((attribute) => (
+                  <option key={attribute.id} value={attribute.id}>
+                    {attribute.dimension}：{attribute.value}（{attribute.status}）
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="edit-attribute-value">新的取值</label>
+              <input
+                id="edit-attribute-value"
+                value={editAttributeValue}
+                onChange={(event) => setEditAttributeValue(event.target.value)}
+              />
+              <button type="button" onClick={() => void updateAttribute()}>
+                保存偏好修改
+              </button>
+            </section>
+          )}
+
           {latestBrief && (
             <section aria-label="设计方案">
               <h3>设计方案</h3>
@@ -576,15 +728,27 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
                 <button type="button" onClick={() => void saveBriefEdit()}>
                   保存方案修改
                 </button>
-                <button
-                  type="button"
-                  disabled={!canApprove}
-                  onClick={() => void approveBrief(latestBrief.version, latestBrief.contentHash)}
-                >
-                  批准此版本
-                </button>
+                {projectState.briefStale ? (
+                  <button type="button" onClick={() => void realignBrief()}>
+                    重新生成方案
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!canApprove}
+                    onClick={() => void approveBrief(latestBrief.version, latestBrief.contentHash)}
+                  >
+                    批准此版本
+                  </button>
+                )}
               </div>
-              {goalsDirty.current && <p className="hint">方案目标有未保存的修改，请先保存再审批。</p>}
+              {projectState.briefStale ? (
+                <p role="status" className="notice">
+                  方案已过时，请重新生成后再审批。
+                </p>
+              ) : (
+                goalsDirty.current && <p className="hint">方案目标有未保存的修改，请先保存再审批。</p>
+              )}
             </section>
           )}
         </main>
@@ -628,10 +792,126 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
           <section>
             <h3>约束</h3>
             <ul>
-              {projectState.constraints.map((constraint) => (
-                <li key={constraint.id}>{constraint.statement}</li>
+              {projectState.constraints.map((constraint: Constraint) => (
+                <li key={constraint.id}>
+                  <strong>{constraint.statement}</strong>
+                  {constraint.withdrawn && <span className="asset-missing">已撤销</span>}
+                  <div className="hint">
+                    {constraint.category} · {constraint.severity}
+                    {constraint.appliesTo ? ` · 作用对象：${constraint.appliesTo}` : ''}
+                    {constraint.attributeId ? ` · 关联偏好：${constraint.attributeId}` : ''}
+                  </div>
+                  {constraint.rationale && <div className="hint">理由：{constraint.rationale}</div>}
+                  {isDesigner && !constraint.withdrawn && (
+                    <span className="actions">
+                      <button
+                        type="button"
+                        aria-label={`编辑 ${constraint.statement}`}
+                        onClick={() => editConstraint(constraint)}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`撤销 ${constraint.statement}`}
+                        onClick={() => void withdrawConstraint(constraint)}
+                      >
+                        撤销
+                      </button>
+                    </span>
+                  )}
+                </li>
               ))}
             </ul>
+            {isDesigner && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void createConstraint();
+                }}
+              >
+                <h4>{editingConstraintId ? '编辑约束' : '新增约束'}</h4>
+                <label htmlFor="constraint-category">约束类别</label>
+                <select
+                  id="constraint-category"
+                  value={constraintCategory}
+                  onChange={(event) => setConstraintCategory(event.target.value)}
+                >
+                  {CONSTRAINT_CATEGORIES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <label htmlFor="constraint-severity">限制性质</label>
+                <select
+                  id="constraint-severity"
+                  value={constraintSeverity}
+                  onChange={(event) => setConstraintSeverity(event.target.value)}
+                >
+                  <option value="advisory">提示</option>
+                  <option value="important">重要</option>
+                  <option value="critical">关键</option>
+                </select>
+                <label htmlFor="constraint-applies-to">作用对象</label>
+                <input
+                  id="constraint-applies-to"
+                  value={constraintAppliesTo}
+                  onChange={(event) => setConstraintAppliesTo(event.target.value)}
+                />
+                <label htmlFor="constraint-attribute">关联偏好</label>
+                <select
+                  id="constraint-attribute"
+                  value={constraintAttributeId}
+                  onChange={(event) => setConstraintAttributeId(event.target.value)}
+                >
+                  <option value="">（不关联）</option>
+                  {projectState.attributes
+                    .filter((attribute) => attribute.status === 'confirmed')
+                    .map((attribute) => (
+                      <option key={attribute.id} value={attribute.id}>
+                        {attribute.dimension}：{attribute.value}
+                      </option>
+                    ))}
+                </select>
+                <label htmlFor="constraint-statement">约束内容</label>
+                <textarea
+                  id="constraint-statement"
+                  value={constraintStatement}
+                  onChange={(event) => setConstraintStatement(event.target.value)}
+                />
+                <label htmlFor="constraint-rationale">约束理由</label>
+                <textarea
+                  id="constraint-rationale"
+                  value={constraintRationale}
+                  onChange={(event) => setConstraintRationale(event.target.value)}
+                />
+                <label htmlFor="constraint-incompatible">不兼容取值（逗号分隔）</label>
+                <input
+                  id="constraint-incompatible"
+                  value={constraintIncompatible}
+                  onChange={(event) => setConstraintIncompatible(event.target.value)}
+                />
+                <div className="actions">
+                  <button type="submit">
+                    {editingConstraintId ? '更新约束' : '保存约束'}
+                  </button>
+                  {editingConstraintId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingConstraintId(null);
+                        setConstraintStatement('');
+                        setConstraintRationale('');
+                        setConstraintIncompatible('');
+                      }}
+                    >
+                      取消编辑
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
           </section>
           <section>
             <h3>冲突</h3>
