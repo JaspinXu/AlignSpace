@@ -86,14 +86,29 @@ export type Conflict = {
   constraintId?: string | null;
 };
 
+export type QuestionOption = {
+  label: string;
+  value?: string | null;
+  assetId?: string | null;
+  targetElement?: string | null;
+  dimension?: string | null;
+  attributeId?: string | null;
+};
+
 export type Question = {
   id: string;
   targetRole: Role;
   text: string;
   rationale: string;
-  options: string[];
+  options: QuestionOption[];
   answer: string | null;
   repetitionFingerprint: string;
+  kind?: 'broad_parts' | 'detail' | 'conflict';
+  assetId?: string | null;
+  targetElement?: string | null;
+  dimension?: string | null;
+  skipped?: boolean;
+  response?: unknown;
 };
 
 export type Approval = {

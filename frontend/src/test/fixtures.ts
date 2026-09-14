@@ -103,7 +103,19 @@ export function snapshot(role: 'homeowner' | 'designer' = 'homeowner'): ProjectS
           deletedAt: null,
         },
       ] },
-    pendingQuestion: { id: 'question-liked-elements', targetRole: 'homeowner', text: 'Which elements?', rationale: 'Discover liked elements.', options: [], answer: null, repetitionFingerprint: 'liked-elements' },
+    pendingQuestion: {
+      id: 'question-liked-elements',
+      targetRole: 'homeowner',
+      text: 'Which elements?',
+      rationale: 'Discover liked elements.',
+      options: [
+        { label: 'wall', assetId: 'a1', targetElement: 'wall' },
+        { label: 'lighting', assetId: 'a1', targetElement: 'lighting' },
+      ],
+      answer: null,
+      repetitionFingerprint: 'liked-elements',
+      kind: 'broad_parts',
+    },
     projectState: {
       projectId: 'p1', stateVersion: 4, status: 'homeowner_review', currentNode: 'wait_homeowner', waitReason: 'homeowner', completeness: 0,
       attributes: [{ id: 'mock-lighting-lighting', targetElement: 'lighting', dimension: 'lighting', value: 'warm ambient', status: 'proposed', confidence: 0.84, actor: 'vision_agent', evidence: [{ sourceType: 'image', sourceId: 'a1', description: 'Mock image observation: lighting lighting' }] }],

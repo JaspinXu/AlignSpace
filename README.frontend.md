@@ -95,11 +95,13 @@ uv run ruff check src tests
   and retries revocation before any cookie-based restore; tokens remain memory-only.
 - Project list, project creation, and joining with a 12-character one-time code.
 - Reloadable `?project=<id>` navigation and browser back/forward support.
-- Role-aware workspace: reference image upload, analysis start, broad
-  question, explicit preferences and revision of an existing preference,
-  confirm/reject of proposed observations, designer constraint create/edit/
-  withdraw with rationale and declared incompatible values, conflict decisions,
-  designer review notes, brief edit, regeneration of a stale brief and dual approval.
+- Role-aware workspace: reference image upload, analysis start, a structured
+  homeowner interview (pick liked parts, then confirm each selected part's
+  observed value as like / not-applicable / custom / skip), explicit preferences
+  and revision of an existing preference, confirm/reject of proposed
+  observations, designer constraint create/edit/withdraw with rationale and
+  declared incompatible values, conflict decisions, designer review notes,
+  brief edit, regeneration of a stale brief and dual approval.
 - Versioned writes keep `idempotencyKey` + `expectedStateVersion`; a 409 keeps
   the typed input, refetches state, and requires a deliberate resubmit with a
   new key. Unsaved brief goals survive newer server versions; save them before
@@ -120,12 +122,18 @@ uv run ruff check src tests
 
 - Vision analysis remains simulated mock output; no object storage or LLM yet.
   Uploaded images are real and stored locally (see the demo status above).
-- Broad answers use a fixed mapping from Chinese sample options to supported
-  English keywords. Arbitrary Chinese free text is not parsed.
+- The interview is structured, not free-text understanding. The broad question
+  lists the parts found in the reference images (image + element); each detail
+  question offers the observed values per image. Structured answers write shared
+  preferences linked to the source image, element and dimension. Skipping creates
+  no preference; "not applicable" records an explicit no-preference. Free text is
+  saved as a note only and is never parsed. Image analysis remains simulated mock
+  output.
 - Brief editing exposes the goals list; other schema fields are not editable
   from the UI yet.
-- Detail answers are recorded verbatim; they do not automatically become
-  structured preferences. Confirm observations or add explicit preferences.
+- Detail preferences are written from structured selections. Confirming an
+  observation keeps its id and image evidence and adds homeowner evidence;
+  changing it later preserves that id. Unselected parts get no record.
 - Active conflict questions are answered by the homeowner to resume the graph;
   the sidebar directs both parties to that task instead of offering a second
   resolution action that would leave the graph paused.

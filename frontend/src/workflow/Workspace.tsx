@@ -2,14 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, newIdempotencyKey, prepareWrite } from '../api';
 import type { Asset, Attribute, Conflict, Constraint, ProjectSnapshot } from '../types';
 
-const BROAD_OPTIONS = [
-  { label: '暖色灯光', keyword: 'lighting' },
-  { label: '木质家具', keyword: 'furniture' },
-  { label: '浅色墙面', keyword: 'colour' },
-  { label: '自然材质', keyword: 'material' },
-  { label: '开阔布局', keyword: 'layout' },
-  { label: '温馨氛围', keyword: 'mood' },
-];
+const BROAD_OPTIONS: { label: string; keyword: string }[] = [];
 
 const DIMENSIONS = [
   { value: 'style', label: '风格' },
@@ -46,11 +39,20 @@ const STATUS_LABEL: Record<string, string> = {
   archived: '已归档',
 };
 
-type QuestionDraft = { text: string; answer: string; selected: string[] };
+type QuestionDraft = {
+  text: string;
+  answer: string;
+  parts: string[];
+  decisions: Record<string, 'confirmed' | 'not_applicable'>;
+  customs: Record<string, string>;
+};
+
+function emptyDraft(text: string): QuestionDraft {
+  return { text, answer: '', parts: [], decisions: {}, customs: {} };
+}
 
 function draftText(draft: QuestionDraft): string {
-  return draft.answer || BROAD_OPTIONS.filter((option) => draft.selected.includes(option.keyword))
-    .map((option) => option.label).join('、');
+  return draft.answer || draft.parts.join('、') || Object.keys(draft.decisions).join('、');
 }
 
 function AssetThumb({ client, projectId, asset }: { client: ApiClient; projectId: string; asset: Asset }) {
@@ -128,9 +130,12 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
 
   const pending = snapshot?.pendingQuestion ?? null;
   const currentDraft = pending ? questionDrafts[pending.id] : undefined;
-  const selected = currentDraft?.selected ?? [];
   const answerDraft = currentDraft?.answer ?? '';
-  const isBroadQuestion = pending?.repetitionFingerprint === 'liked-elements';
+  const partKeys = currentDraft?.parts ?? [];
+  const decisions = currentDraft?.decisions ?? {};
+  const customs = currentDraft?.customs ?? {};
+  const questionKind = pending?.kind ?? 'detail';
+  const isBroadQuestion = questionKind === 'broad_parts';
   const shouldPoll = Boolean(snapshot && (pending || snapshot.projectState.waitReason ||
     snapshot.projectState.status === 'awaiting_approval'));
   useEffect(() => {
@@ -181,13 +186,16 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   const openConflict =
     projectState.conflicts.find((conflict) => conflict.status === 'open') ?? null;
   const deletedAssetIds = new Set(project.assets.filter((asset) => asset.deleted).map((asset) => asset.id));
+  const assetName = (assetId?: string | null) =>
+    project.assets.find((asset) => asset.id === assetId)?.originalFilename ??
+    (assetId ? `图片 ${assetId.slice(0, 6)}` : '图片');
 
   const updateQuestionDraft = (change: Partial<QuestionDraft>) => {
     if (!pending) return;
     setQuestionDrafts((current) => ({
       ...current,
       [pending.id]: {
-        ...(current[pending.id] ?? { text: pending.text, answer: '', selected: [] }), ...change,
+        ...(current[pending.id] ?? emptyDraft(pending.text)), ...change,
       },
     }));
   };
@@ -204,31 +212,22 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     setNotice(error instanceof ApiError ? error.message : '提交失败，请重试。');
   };
 
-  const submitAnswer = async () => {
+  const submitQuestionData = async (data: Record<string, unknown>) => {
     if (!pending) return;
-    const keywords = BROAD_OPTIONS.filter((option) => selected.includes(option.keyword)).map(
-      (option) => option.keyword,
-    );
-    const answer = isBroadQuestion
-      ? (keywords.length ? `I also like the ${keywords.join(', ')}` : '')
-      : answerDraft.trim();
-    if (!answer) {
-      setNotice(isBroadQuestion ? '请先选择至少一个喜欢的部分。' : '请填写您的回答。');
-      return;
-    }
+    const questionId = pending.id;
     try {
       await client.execute(
         prepareWrite(
-          `/v1/projects/${projectId}/questions/${pending.id}/answer`,
+          `/v1/projects/${projectId}/questions/${questionId}/answer`,
           'POST',
           project.stateVersion,
-          { answer },
+          data,
         ),
       );
       setQuestionDrafts((current) => {
-        if (current[pending.id] !== currentDraft) return current;
+        if (current[questionId] !== currentDraft) return current;
         const next = { ...current };
-        delete next[pending.id];
+        delete next[questionId];
         return next;
       });
       setNotice('回答已提交。');
@@ -236,6 +235,46 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
     } catch (error) {
       await handleWriteError(error);
     }
+  };
+
+  const submitAnswer = async () => {
+    if (!pending) return;
+    const note = answerDraft.trim();
+    if (questionKind === 'broad_parts') {
+      const parts = pending.options
+        .filter(
+          (option) =>
+            option.assetId &&
+            option.targetElement &&
+            partKeys.includes(`${option.assetId}::${option.targetElement}`),
+        )
+        .map((option) => ({ assetId: option.assetId, targetElement: option.targetElement }));
+      if (!parts.length && !note) {
+        setNotice('请选择喜欢的部位，或点击跳过。');
+        return;
+      }
+      await submitQuestionData({ parts, ...(note ? { answer: note } : {}) });
+      return;
+    }
+    const selection = pending.options
+      .filter((option) => option.attributeId && decisions[option.attributeId])
+      .map((option) => ({
+        attributeId: option.attributeId,
+        assetId: option.assetId,
+        targetElement: option.targetElement,
+        dimension: option.dimension,
+        decision: decisions[option.attributeId as string],
+        value: customs[option.attributeId as string] || option.value,
+      }));
+    if (!selection.length && !note) {
+      setNotice('请选择取值或“不在意”，或点击跳过。');
+      return;
+    }
+    await submitQuestionData({ selection, ...(note ? { answer: note } : {}) });
+  };
+
+  const skipQuestion = async () => {
+    await submitQuestionData({ skipped: true });
   };
 
   const savePreference = async () => {
@@ -551,34 +590,100 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
           {pending && pending.targetRole === 'homeowner' && isHomeowner && (
             <section aria-label={isBroadQuestion ? '广泛偏好问题' : '当前问题'}>
               <p className="question-text">{pending.text}</p>
-              {isBroadQuestion ? <>
-              <p className="question-hint">
-                演示模式：请选择受支持的样本选项，系统会映射为后端可识别的内容。
-              </p>
-              <fieldset>
-                <legend className="sr-only">喜欢的部分</legend>
-                {BROAD_OPTIONS.map((option) => (
-                  <label key={option.keyword} className="option">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(option.keyword)}
-                      onChange={(event) => updateQuestionDraft({ selected: event.target.checked
-                        ? [...selected, option.keyword]
-                        : selected.filter((item) => item !== option.keyword) })}
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </fieldset>
-              </> : <>
-                <label htmlFor="question-answer">您的回答</label>
-                <textarea id="question-answer" value={answerDraft}
-                  onChange={(event) => updateQuestionDraft({ answer: event.target.value })} />
-                <p className="hint">回答将记录在项目中；具体偏好请在共享状态中确认或通过“显式偏好”填写。</p>
-              </>}
-              <button type="button" onClick={() => void submitAnswer()}>
-                提交回答
-              </button>
+              {isBroadQuestion ? (
+                <>
+                  <p className="question-hint">
+                    选择希望保留的部位；部位指参考图片中的元素，不代表整张图片。
+                  </p>
+                  <fieldset>
+                    <legend className="sr-only">喜欢的部位</legend>
+                    {pending.options.map((option) => {
+                      const key = `${option.assetId}::${option.targetElement}`;
+                      return (
+                        <label key={key} className="option">
+                          <input
+                            type="checkbox"
+                            checked={partKeys.includes(key)}
+                            onChange={(event) =>
+                              updateQuestionDraft({
+                                parts: event.target.checked
+                                  ? [...partKeys, key]
+                                  : partKeys.filter((item) => item !== key),
+                              })
+                            }
+                          />
+                          {assetName(option.assetId)} · {option.targetElement}
+                        </label>
+                      );
+                    })}
+                  </fieldset>
+                </>
+              ) : (
+                <>
+                  <p className="question-hint">
+                    {pending.targetElement && pending.dimension
+                      ? `「${pending.targetElement}」的${pending.dimension}：选择你喜欢的取值，或标记“不在意”。`
+                      : '请阅读说明并给出你的决定。'}
+                  </p>
+                  <fieldset>
+                    <legend className="sr-only">部位属性取值</legend>
+                    {pending.options.map((option) => {
+                      const id = option.attributeId ?? '';
+                      return (
+                        <div key={id} className="option">
+                          <span>
+                            {assetName(option.assetId)} · {option.label}
+                          </span>
+                          <button
+                            type="button"
+                            aria-pressed={decisions[id] === 'confirmed'}
+                            onClick={() =>
+                              updateQuestionDraft({
+                                decisions: { ...decisions, [id]: 'confirmed' },
+                              })
+                            }
+                          >
+                            喜欢
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={decisions[id] === 'not_applicable'}
+                            onClick={() =>
+                              updateQuestionDraft({
+                                decisions: { ...decisions, [id]: 'not_applicable' },
+                              })
+                            }
+                          >
+                            不在意
+                          </button>
+                          <input
+                            aria-label={`自定义取值 ${id}`}
+                            placeholder="自定义取值"
+                            value={customs[id] ?? ''}
+                            onChange={(event) =>
+                              updateQuestionDraft({
+                                customs: { ...customs, [id]: event.target.value },
+                              })
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                  </fieldset>
+                </>
+              )}
+              <label htmlFor="question-answer">您的回答</label>
+              <textarea id="question-answer" value={answerDraft}
+                onChange={(event) => updateQuestionDraft({ answer: event.target.value })} />
+              <p className="hint">备注仅作为文字保存，系统不会自动理解其含义。</p>
+              <div className="actions">
+                <button type="button" onClick={() => void submitAnswer()}>
+                  提交回答
+                </button>
+                <button type="button" onClick={() => void skipQuestion()}>
+                  跳过
+                </button>
+              </div>
             </section>
           )}
 
@@ -761,7 +866,8 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
               {projectState.attributes.map((attribute: Attribute) => (
                 <li key={attribute.id}>
                   <span>
-                    {attribute.dimension}：{attribute.value}（{attribute.status}）
+                    {assetName(attribute.evidence.find((item) => item.sourceType === 'image')?.sourceId)} ·{' '}
+                    {attribute.targetElement} · {attribute.dimension}：{attribute.value}（{attribute.status}）
                   </span>
                   {attribute.evidence.some(
                     (evidence) =>

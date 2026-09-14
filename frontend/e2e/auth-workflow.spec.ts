@@ -94,21 +94,29 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     await expect(owner.getByRole('img', { name: 'to-delete.png', exact: true })).toHaveCount(0);
     await expect(owner.getByText('已删除', { exact: true })).toBeVisible();
     await write(owner, '启动分析', '/analysis-runs', 202);
-    await owner.getByRole('checkbox', { name: '暖色灯光' }).check();
+    const parts = owner.getByRole('checkbox');
+    const partCount = await parts.count();
+    for (let index = 0; index < partCount; index++) await parts.nth(index).check();
     await write(owner, '提交回答', '/answer', 202);
-    await expect(owner.getByLabel('您的回答')).toBeVisible();
 
-    for (const value of ['warm beige', 'natural oak', 'pale oak', 'warm ambient']) {
-      const confirm = owner.getByRole('button', { name: `确认 ${value}`, exact: true });
-      while (await confirm.count()) {
-        const before = await confirm.count();
-        const response = owner.waitForResponse((r) => r.request().method() === 'PATCH');
-        await confirm.first().click();
-        expect((await response).status()).toBe(200);
-        await expect.poll(async () => confirm.count()).toBeLessThan(before);
-      }
-      await expect(confirm).toHaveCount(0);
+
+    // Answer each per-part detail question by confirming the observed value.
+    for (let index = 0; index < 12; index++) {
+      const likes = owner.getByRole('button', { name: '喜欢', exact: true });
+      const waiting = owner.getByText('等待设计师反馈');
+      await expect
+        .poll(async () => (await likes.count()) > 0 || (await waiting.count()) > 0)
+        .toBe(true);
+      if ((await likes.count()) === 0) break;
+      const answered = owner.waitForResponse(
+        (r) => r.url().endsWith('/answer') && r.request().method() !== 'GET',
+      );
+      const likeCount = await likes.count();
+      for (let j = 0; j < likeCount; j++) await likes.nth(j).click();
+      await owner.getByRole('button', { name: '提交回答', exact: true }).click();
+      expect((await answered).status()).toBe(202);
     }
+
     for (const [dimension, value] of [
       ['style', 'warm modern'], ['material', 'natural stone'],
       ['layout', 'clear conversational seating'],
@@ -121,8 +129,6 @@ test('two real accounts complete a shared brief, retain stale input and restore 
       await expect(owner.getByLabel('偏好内容')).toHaveValue('');
       await expect(owner.locator('.sidebar')).toContainText(value);
     }
-    await owner.getByLabel('您的回答').fill('Warm ambient lighting around 2700K');
-    await write(owner, '提交回答', '/answer', 202);
     await expect(owner.getByText('等待设计师反馈')).toBeVisible();
 
     // Designer enters a real constraint linked to a confirmed preference.

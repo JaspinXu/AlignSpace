@@ -138,7 +138,14 @@ class ProjectResourceService:
             self._authorize_in_session(session, project_id, actor)
             state = ProjectRepository(session).load(project_id)
             view = self._project_view(session, project, actor.role)
-            pending = next((item for item in state.questions if item.answer is None), None)
+            pending = next(
+                (
+                    item
+                    for item in state.questions
+                    if item.answer is None and not item.skipped and item.response is None
+                ),
+                None,
+            )
             return ProjectSnapshot(project=view, project_state=state, pending_question=pending)
 
     def delete(self, project_id: str, actor: ActorContext) -> None:
