@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from alignspace.application.commands import ActorContext, WriteEnvelope
 from alignspace.application.service import AuthorizationError
-from alignspace.domain.enums import Role
+from alignspace.domain.constraints import flag_brief_change, reconcile_constraints
+from alignspace.domain.enums import AttributeStatus, EvidenceSource, Role
 from alignspace.domain.models import DomainModel, NonBlankString, ProjectState, Question
-from alignspace.domain.policies import StaleStateError
+from alignspace.domain.policies import StaleStateError, calculate_completeness
 from alignspace.persistence.database import read_transaction
 from alignspace.persistence.repository import ProjectRepository, canonical_request_hash
 from alignspace.persistence.tables import ImageAssetRow, ProjectMemberRow, ProjectRow
@@ -289,7 +290,28 @@ class ProjectResourceService:
             storage_key = asset.payload["storage_key"]
             asset.payload = {**asset.payload, "storage_key": None}
             asset.deleted_at = int(time.time())
-            updated = state.model_copy(update={"state_version": state.state_version + 1})
+            remaining = [
+                item
+                for item in state.attributes
+                if not (
+                    item.status == AttributeStatus.PROPOSED
+                    and any(
+                        evidence.source_type == EvidenceSource.IMAGE
+                        and evidence.source_id == asset_id
+                        for evidence in item.evidence
+                    )
+                )
+            ]
+            updated = state.model_copy(
+                update={"state_version": state.state_version + 1, "attributes": remaining}
+            )
+            updated = updated.model_copy(
+                update={
+                    "conflicts": reconcile_constraints(updated),
+                    "completeness": calculate_completeness(updated),
+                }
+            )
+            updated = flag_brief_change(updated)
             uow.projects.save(updated, expected_version=state.state_version)
             response = AssetDeleteView(id=asset_id, state_version=updated.state_version)
             self._record_replay(uow, project_id, envelope, request_hash, response)

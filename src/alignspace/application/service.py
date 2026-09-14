@@ -258,7 +258,14 @@ class WorkflowService:
 
     def next_question(self, project_id: str, actor: ActorContext) -> Question:
         state = self.get_state(project_id, actor)
-        question = next((item for item in state.questions if item.answer is None), None)
+        question = next(
+            (
+                item
+                for item in state.questions
+                if item.answer is None and not item.skipped and item.response is None
+            ),
+            None,
+        )
         if question is None:
             raise KeyError("pending question not found")
         return question
@@ -273,9 +280,13 @@ class WorkflowService:
         self._authorize(project_id, actor)
         if actor.role != Role.HOMEOWNER:
             raise AuthorizationError("actor cannot answer homeowner task")
-        answer = envelope.data.get("answer")
-        if not isinstance(answer, str) or not answer.strip():
-            raise ValueError("homeowner answer must be a non-blank string")
+        data = envelope.data
+        has_note = isinstance(data.get("answer"), str) and bool(str(data["answer"]).strip())
+        has_parts = isinstance(data.get("parts"), list) and bool(data["parts"])
+        has_selection = isinstance(data.get("selection"), list) and bool(data["selection"])
+        skipped = data.get("skipped") is True
+        if not (has_note or has_parts or has_selection or skipped):
+            raise ValueError("homeowner answer requires a note, parts, selection or skip")
         action = f"answer_question:{question_id}"
         request_hash = self._hash_request(
             action,

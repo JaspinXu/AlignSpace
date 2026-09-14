@@ -410,17 +410,38 @@ class WorkflowDriver:
             ),
             project_id,
             "answer-liked-elements",
-            {"answer": "I also like the warm lighting"},
+            {
+                "parts": [
+                    {
+                        "assetId": option["assetId"],
+                        "targetElement": option["targetElement"],
+                    }
+                    for option in started["pendingQuestion"]["options"]
+                ]
+            },
             expected_status=202,
         )
 
-        for attribute in broad["projectState"]["attributes"]:
-            self._write(
-                "PATCH",
-                f"/v1/projects/{project_id}/attributes/{attribute['id']}",
+        for _ in range(10):
+            pending = broad.get("pendingQuestion")
+            if not pending or pending.get("kind") != "detail":
+                break
+            broad = self._write(
+                "POST",
+                f"/v1/projects/{project_id}/questions/{pending['id']}/answer",
                 project_id,
-                f"confirm-{attribute['id']}",
-                {"status": "confirmed", "value": attribute["value"]},
+                f"detail-{pending['id']}",
+                {
+                    "selection": [
+                        {
+                            "attributeId": option["attributeId"],
+                            "decision": "confirmed",
+                            "value": option["value"],
+                        }
+                        for option in pending["options"]
+                    ]
+                },
+                expected_status=202,
             )
 
         explicit_preferences = {
@@ -445,20 +466,7 @@ class WorkflowDriver:
                 },
             )
 
-        detail = self.client.get(
-            f"/v1/projects/{project_id}/questions/next",
-            headers=self.homeowner_headers,
-        )
-        assert detail.status_code == 200, detail.text
-        tradeoff = self._write(
-            "POST",
-            f"/v1/projects/{project_id}/questions/{detail.json()['id']}/answer",
-            project_id,
-            "answer-lighting-detail",
-            {"answer": "Warm ambient lighting around 2700K"},
-            expected_status=202,
-        )
-        assert tradeoff["waitReason"] == "designer"
+        assert broad["waitReason"] == "designer"
 
         constraint = self._write(
             "POST",

@@ -76,14 +76,25 @@ def test_homeowner_agent_asks_broad_question_before_detail() -> None:
     answered = broad.state.model_copy(
         update={
             "questions": [
-                broad.state.questions[-1].model_copy(update={"answer": "warm lighting"})
+                broad.state.questions[-1].model_copy(
+                    update={
+                        "response": {
+                            "skipped": False,
+                            "parts": [{"assetId": "asset-1", "targetElement": "lighting"}],
+                            "selection": [],
+                            "answer": None,
+                        }
+                    }
+                )
             ]
         }
     )
     detail = agents.homeowner.run(answered)
 
-    assert detail.state.questions[-1].repetition_fingerprint != "liked-elements"
-    assert "lighting" in detail.state.questions[-1].repetition_fingerprint
+    assert (
+        detail.state.questions[-1].repetition_fingerprint
+        == "detail:lighting:lighting"
+    )
     assert detail.state.questions[-1].target_role == Role.HOMEOWNER
 
 

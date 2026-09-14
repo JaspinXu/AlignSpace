@@ -16,6 +16,7 @@ from alignspace.domain.enums import (
     ConstraintVerificationStatus,
     EvidenceSource,
     ProjectStatus,
+    QuestionKind,
     Role,
 )
 
@@ -93,14 +94,29 @@ class Constraint(DomainModel):
         return self
 
 
+class QuestionOption(DomainModel):
+    label: str
+    value: str | None = None
+    asset_id: str | None = None
+    target_element: str | None = None
+    dimension: str | None = None
+    attribute_id: str | None = None
+
+
 class Question(DomainModel):
     id: str
     target_role: Role
     text: str
     rationale: str = ""
-    options: list[str] = Field(default_factory=list)
+    options: list[QuestionOption] = Field(default_factory=list)
     answer: str | None = None
     repetition_fingerprint: str = ""
+    kind: QuestionKind = QuestionKind.DETAIL
+    asset_id: str | None = None
+    target_element: str | None = None
+    dimension: str | None = None
+    skipped: bool = False
+    response: dict[str, object] | None = None
 
 
 class Conflict(DomainModel):

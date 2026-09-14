@@ -25,6 +25,7 @@ from alignspace.domain.models import (
     Evidence,
     ProjectState,
     Question,
+    QuestionOption,
     calculate_brief_content_hash,
 )
 from alignspace.persistence.database import create_engine_and_session
@@ -89,7 +90,7 @@ def _complete_state() -> ProjectState:
                 target_role=Role.HOMEOWNER,
                 text="Which timber tone do you prefer?",
                 rationale="Resolve the material direction",
-                options=["oak", "walnut"],
+                options=[QuestionOption(label="oak"), QuestionOption(label="walnut")],
                 answer="oak",
                 repetition_fingerprint="timber-tone",
             )

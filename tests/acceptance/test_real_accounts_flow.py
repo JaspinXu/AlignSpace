@@ -111,17 +111,38 @@ class TwoAccountDriver:
             "POST",
             f"/v1/projects/{self.project_id}/questions/{started['pendingQuestion']['id']}/answer",
             "answer-broad",
-            {"answer": "I also like the warm lighting"},
+            {
+                "parts": [
+                    {
+                        "assetId": option["assetId"],
+                        "targetElement": option["targetElement"],
+                    }
+                    for option in started["pendingQuestion"]["options"]
+                ]
+            },
             headers=self.owner,
             expected=202,
         )
-        for attribute in broad["projectState"]["attributes"]:
-            self.write(
-                "PATCH",
-                f"/v1/projects/{self.project_id}/attributes/{attribute['id']}",
-                f"confirm-{attribute['id']}",
-                {"status": "confirmed", "value": attribute["value"]},
+        for _ in range(10):
+            pending = broad.get("pendingQuestion")
+            if not pending or pending.get("kind") != "detail":
+                break
+            broad = self.write(
+                "POST",
+                f"/v1/projects/{self.project_id}/questions/{pending['id']}/answer",
+                f"detail-{pending['id']}",
+                {
+                    "selection": [
+                        {
+                            "attributeId": option["attributeId"],
+                            "decision": "confirmed",
+                            "value": option["value"],
+                        }
+                        for option in pending["options"]
+                    ]
+                },
                 headers=self.owner,
+                expected=202,
             )
 
         explicit = {
@@ -146,19 +167,7 @@ class TwoAccountDriver:
                 headers=self.owner,
             )
 
-        detail = self.api.get(
-            f"/v1/projects/{self.project_id}/questions/next", headers=self.owner
-        )
-        assert detail.status_code == 200, detail.text
-        tradeoff = self.write(
-            "POST",
-            f"/v1/projects/{self.project_id}/questions/{detail.json()['id']}/answer",
-            "answer-detail",
-            {"answer": "Warm ambient lighting around 2700K"},
-            headers=self.owner,
-            expected=202,
-        )
-        assert tradeoff["waitReason"] == "designer"
+        assert broad["waitReason"] == "designer"
 
         constraint = self.write(
             "POST",

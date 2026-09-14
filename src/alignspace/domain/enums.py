@@ -44,6 +44,12 @@ class Role(str, Enum):
     DESIGNER = "designer"
 
 
+class QuestionKind(str, Enum):
+    BROAD_PARTS = "broad_parts"
+    DETAIL = "detail"
+    CONFLICT = "conflict"
+
+
 class ConstraintCategory(str, Enum):
     BUDGET = "budget"
     SPACE = "space"
