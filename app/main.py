@@ -164,6 +164,10 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
         response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: https://d1hy6t2xeg0mdl.cloudfront.net https://api-neo.qanvast.com; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         if request.url.path.startswith('/api/'):
             response.headers['Cache-Control'] = 'no-store'
+        elif request.url.path.startswith('/assets/') or request.url.path == '/':
+            # Revalidate every asset: without this the browser may keep serving
+            # a heuristically cached stylesheet or script after a deployment.
+            response.headers['Cache-Control'] = 'no-cache'
         if new_session:
             response.set_cookie('alignspace_session', token, httponly=True, samesite='strict',
                 secure=os.getenv('ALIGNSPACE_SECURE_COOKIES','false').lower() == 'true', max_age=604800)
@@ -217,7 +221,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
 
     @application.get("/api/projects")
     def list_projects(request: Request) -> list[dict[str, Any]]:
-        allowed = set(application.state.access.projects(request.state.session))
+        allowed = application.state.access.projects(request.state.session)
         return [
             {
                 "id": item["id"],
@@ -226,8 +230,7 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
                 "updatedAt": item["updatedAt"],
                 "readiness": item["readiness"],
             }
-            for item in store(request).list()
-            if item['id'] in allowed
+            for item in store(request).list(allowed)
         ]
 
     @application.post("/api/projects", status_code=201)

@@ -25,6 +25,8 @@ class AccessStore:
                     PRIMARY KEY(project_id, role), UNIQUE(project_id, session_hash));
                 CREATE TABLE IF NOT EXISTS invitations (
                     token_hash TEXT PRIMARY KEY, project_id TEXT, expires REAL, used INTEGER DEFAULT 0);
+                CREATE INDEX IF NOT EXISTS memberships_session ON memberships(session_hash);
+                CREATE INDEX IF NOT EXISTS invitations_project ON invitations(project_id);
             ''')
 
     def register(self, project_id, token):

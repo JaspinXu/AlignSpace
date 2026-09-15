@@ -6,6 +6,7 @@ import os
 import sqlite3
 import threading
 import time
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Callable
 
@@ -63,6 +64,12 @@ class ProjectStore:
                 CREATE TABLE IF NOT EXISTS analysis_runs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT,
                     created REAL, status TEXT, metrics_json TEXT);
+                CREATE INDEX IF NOT EXISTS analysis_runs_project
+                    ON analysis_runs(project_id, created DESC);
+                CREATE INDEX IF NOT EXISTS analysis_runs_created
+                    ON analysis_runs(created DESC);
+                CREATE INDEX IF NOT EXISTS projects_updated
+                    ON projects(updated_at DESC);
                 """
             )
 
@@ -91,11 +98,18 @@ class ProjectStore:
             raise ProjectNotFoundError(project_id)
         return json.loads(row["state_json"])
 
-    def list(self) -> list[dict[str, Any]]:
+    def list(self, project_ids: Iterable[str] | None = None) -> list[dict[str, Any]]:
+        """Pass project_ids to avoid deserialising projects the caller cannot see."""
+        if project_ids is None:
+            query, parameters = "SELECT state_json FROM projects ORDER BY updated_at DESC", ()
+        else:
+            parameters = tuple(dict.fromkeys(project_ids))
+            if not parameters:
+                return []
+            placeholders = ",".join("?" * len(parameters))
+            query = f"SELECT state_json FROM projects WHERE id IN ({placeholders}) ORDER BY updated_at DESC"
         with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT state_json FROM projects ORDER BY updated_at DESC"
-            ).fetchall()
+            rows = connection.execute(query, parameters).fetchall()
         return [json.loads(row["state_json"]) for row in rows]
 
     def mutate(

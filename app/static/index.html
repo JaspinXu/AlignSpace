@@ -71,7 +71,7 @@
         <div class="process-step"><span>03 / ALIGN</span><h3>Leave on the same page.</h3><p>Review and approve one shared brief. A thoughtful starting point for your space.</p></div>
       </section>
       <section id="start-project" class="project-entry" aria-labelledby="start-title">
-      <div class="entry-copy"><p class="eyebrow">YOUR NEXT CHAPTER</p><h2>A space that feels <br>like <em>you.</em></h2><p>You don’t need the right design words.<br>Just a place to start.</p><div class="material-palette" aria-hidden="true"><span class="linen"></span><span class="oak"></span><span class="olive"></span><span class="stone"></span></div><span class="palette-caption">LINEN / OAK / OLIVE / STONE</span><div class="entry-note"><span aria-hidden="true">↗</span><p>Every suggestion is yours to keep, change or leave behind.</p></div></div>
+      <div class="entry-copy"><p class="eyebrow">YOUR NEXT CHAPTER</p><h2>A space that feels <br>like <em>you.</em></h2><p>You don’t need the right design words.<br>Just a place to start.</p><div class="material-palette" aria-hidden="true"><span class="linen"></span><span class="oak"></span><span class="olive"></span><span class="stone"></span></div><div class="entry-note"><span aria-hidden="true">↗</span><p>Every suggestion is yours to keep, change or leave behind.</p></div></div>
       <div class="start-card">
         <div>
           <p class="eyebrow">Start a living-room project</p>
@@ -108,15 +108,15 @@
       <div id="decision-ribbon" class="decision-ribbon" aria-label="Your confirmed design preferences"></div>
 
       <section class="onboarding-strip" aria-label="Your next step"><div><span id="viewer-role" class="eyebrow"></span><h2 id="next-step-title"></h2><p id="next-step-help" class="muted"></p></div><div><button id="invite-button" class="button ghost" type="button">Invite my designer</button><button id="refresh-button" class="button ghost" type="button">Refresh shared changes</button></div><input id="invite-link" readonly hidden aria-label="Private designer invitation link"></section>
-      <nav class="tabs" aria-label="Workspace views">
-        <button class="tab active" data-tab="alignment" type="button">Build your brief</button>
-        <button class="tab" data-tab="brief" type="button">Shared brief</button>
-        <button class="tab" data-tab="activity" type="button">History & usage</button>
-      </nav>
+      <div class="tabs" role="tablist" aria-label="Workspace views">
+        <button class="tab active" id="alignment-tab" role="tab" aria-selected="true" aria-controls="alignment-panel" data-tab="alignment" type="button">Build your brief</button>
+        <button class="tab" id="brief-tab" role="tab" aria-selected="false" aria-controls="brief-panel" data-tab="brief" type="button">Shared brief</button>
+        <button class="tab" id="activity-tab" role="tab" aria-selected="false" aria-controls="activity-panel" data-tab="activity" type="button">History & usage</button>
+      </div>
 
       <div id="notice" class="notice" role="status" hidden></div>
 
-      <section id="alignment-panel" class="tab-panel">
+      <section id="alignment-panel" class="tab-panel" role="tabpanel" aria-labelledby="alignment-tab">
         <div class="workspace-grid">
           <div class="main-column">
             <article id="question-card" class="question-card"></article>
@@ -181,7 +181,7 @@
         </div>
       </section>
 
-      <section id="brief-panel" class="tab-panel" hidden>
+      <section id="brief-panel" class="tab-panel" role="tabpanel" aria-labelledby="brief-tab" hidden>
         <div class="brief-layout">
           <article class="panel brief-paper">
             <div class="panel-heading">
@@ -209,7 +209,7 @@
         </div>
       </section>
 
-      <section id="activity-panel" class="tab-panel" hidden>
+      <section id="activity-panel" class="tab-panel" role="tabpanel" aria-labelledby="activity-tab" hidden>
         <article class="panel">
           <div class="panel-heading"><div><p class="eyebrow">Append-only record</p><h2>Project activity</h2></div></div>
           <p class="muted">Workflow entries record state changes. Model runs below show actual inference; other messages are rule-based coordination.</p><div id="usage-list"></div>

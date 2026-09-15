@@ -162,12 +162,16 @@ class Discovery:
             db.execute('DELETE FROM inspiration_previews WHERE id NOT IN (SELECT id FROM inspiration_previews ORDER BY fetched DESC LIMIT 1000)')
 
     def find(self, ids):
-        found = {p['id']: p for p in self.seed['projects'] if p['id'] in ids}
+        wanted = tuple(dict.fromkeys(ids))
+        if not wanted:
+            return {}
+        found = {p['id']: p for p in self.seed['projects'] if p['id'] in wanted}
         with sqlite3.connect(self.database_path) as db:
-            for id in ids:
-                row = db.execute('SELECT preview_json FROM inspiration_previews WHERE id=?', (id,)).fetchone()
-                if row:
-                    found[id] = json.loads(row[0])
+            rows = db.execute(
+                f"SELECT id, preview_json FROM inspiration_previews WHERE id IN ({','.join('?' * len(wanted))})",
+                wanted).fetchall()
+        # A remembered live preview is newer than the checked-in seed copy.
+        found.update({row[0]: json.loads(row[1]) for row in rows})
         return found
 
     def search(self, query='', style='All', kind='All'):

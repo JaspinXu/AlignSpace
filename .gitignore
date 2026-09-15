@@ -19,3 +19,4 @@ htmlcov/
 tmp/
 **/.ipynb_checkpoints/
 .ruff_cache/
+.playwright-mcp/

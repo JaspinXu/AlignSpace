@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import re
+from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
@@ -195,48 +196,51 @@ def _ranked_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
 def _entropy(values: list[str]) -> float:
     if not values:
         return 0.0
-    counts = {value: values.count(value) for value in set(values)}
     total = len(values)
-    return -sum((count / total) * math.log2(count / total) for count in counts.values())
+    return -sum((count / total) * math.log2(count / total) for count in Counter(values).values())
 
 
 def next_question(state: dict[str, Any], role: str | None = None) -> dict[str, Any] | None:
     if state["questionCount"] >= state["maxQuestions"] or (role and state.get("interviewPaused", {}).get(role)):
         return None
-    answered = {a["questionId"] for a in state["answers"] if not a.get("detail") or a.get("basis") == _confirmed_map(state).get(a["dimension"])}
-    scored: list[tuple[float, dict[str, Any]]] = []
+    # The confirmed map is fixed for this call; rebuilding it per candidate made
+    # question selection quadratic in the size of the question bank.
+    confirmed = _confirmed_map(state)
+    answers = state["answers"]
+    answered = {a["questionId"] for a in answers if not a.get("detail") or a.get("basis") == confirmed.get(a["dimension"])}
+    scored: list[tuple[float, float, dict[str, Any]]] = []
     open_conflict_dimensions = {
         conflict.get("dimension")
         for conflict in state["conflicts"]
         if conflict["status"] == "open" and conflict.get("dimension")
     }
     for question in [*QUESTION_BANK, *interview.DETAIL_QUESTIONS]:
-        if question.get("detail") and not interview.eligible(question, _confirmed_map(state), state["answers"]):
+        detail = question.get("detail")
+        if detail and not interview.eligible(question, confirmed, answers):
             continue
         if role and question['target'] != role:
             continue
-        if question["id"] in answered or (not question.get("detail") and question['dimension'] in _confirmed_map(state)):
+        dimension = question["dimension"]
+        if question["id"] in answered or (not detail and dimension in confirmed):
             continue
-        values = question["options"]
-        information_gain = _entropy(values)
-        conflict_bonus = 0.7 if question["dimension"] in open_conflict_dimensions else 0
-        coverage_bonus = 0.25 if question["dimension"] not in _confirmed_map(state) else 0
+        information_gain = _entropy(question["options"])
+        conflict_bonus = 0.7 if dimension in open_conflict_dimensions else 0
+        coverage_bonus = 0.25 if dimension not in confirmed else 0
         score = information_gain * question["impact"] + conflict_bonus + coverage_bonus
-        if not question.get("detail"):
+        if not detail:
             score += 5  # Resolve missing shared vocabulary before optional details.
         elif question.get("after"):
             score += 2
         elif "*" not in question["requires"]:
             score += 1  # A conditional follow-up narrows an actual prior choice.
-        scored.append((score, question))
+        scored.append((score, information_gain, question))
     if not scored:
         return None
-    score, selected = max(scored, key=lambda pair: (pair[0], pair[1]["impact"]))
-    options = selected["options"]
+    score, information_gain, selected = max(scored, key=lambda item: (item[0], item[2]["impact"]))
     return {
         **deepcopy(selected),
-        "options": options + ["not_sure"],
-        "informationGain": round(_entropy(options), 3),
+        "options": selected["options"] + ["not_sure"],
+        "informationGain": round(information_gain, 3),
         "selectionScore": round(score, 3),
         "sequence": state["questionCount"] + 1,
         "selectionMethod": "option-entropy heuristic; not measured information gain",

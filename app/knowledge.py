@@ -40,22 +40,31 @@ ALIASES = {
 STOP = set('a an the and or of to for in on is it with as by from this that be at per'.split())
 
 
+@lru_cache(maxsize=512)
 def tokens(text):
-    return [t for t in re.findall(r'[a-z0-9]+|[\u4e00-\u9fff]+', text.lower()) if t not in STOP]
+    """Cached, so the result is shared: immutable by contract."""
+    return tuple(t for t in re.findall(r'[a-z0-9]+|[\u4e00-\u9fff]+', text.lower()) if t not in STOP)
+
+
+def _matches(lowered, phrase):
+    """Word-boundary match against text the caller has already lower-cased."""
+    return bool(re.search(r'(?<![a-z0-9])' + re.escape(phrase.lower()) + r'(?![a-z0-9])', lowered))
 
 
 def contains(text, phrase):
-    return bool(re.search(r'(?<![a-z0-9])' + re.escape(phrase.lower()) + r'(?![a-z0-9])', text.lower()))
+    return _matches(text.lower(), phrase)
 
 
+@lru_cache(maxsize=512)
 def expand(text):
+    lowered = text.lower()
     terms = [text.replace('_', ' ')]
     for value, aliases in ALIASES.items():
-        if contains(text, value) or any(contains(text, a) for a in aliases):
+        if _matches(lowered, value) or any(_matches(lowered, a) for a in aliases):
             terms.extend(aliases)
     # AAT is a broader material concept, never an oak species/style identity.
     for record in terminology():
-        if any(contains(text, a) for a in record['queryAliases']):
+        if any(_matches(lowered, a) for a in record['queryAliases']):
             terms.append(record['preferredLabel'])
     return ' '.join(terms)
 
@@ -84,9 +93,9 @@ def retrieve(query, limit=3, excluded_terms=()):
     average = sum(sum(c.values()) for c in counts) / max(1, len(counts))
     ranked = []
     for record, count in zip(records, counts):
-        content = record['title'] + ' ' + record['text']
+        content = (record['title'] + ' ' + record['text']).lower()
         # Conservative: even an incidental excluded material suppresses the excerpt.
-        if any(contains(content, phrase) for phrase in excluded_terms if phrase):
+        if any(_matches(content, phrase) for phrase in excluded_terms if phrase):
             continue
         overlap = query_tokens & count.keys()
         score = sum(math.log(1 + (len(records) - frequency[t] + .5) / (frequency[t] + .5)) *
@@ -111,8 +120,9 @@ def exclusions(state):
     phrases = list(state.get('antiPreferences', []))
     values = [c.get('incompatibleValue', '') for c in state.get('constraints', []) if not c.get('waived')]
     for text in [*phrases, *values]:
+        lowered = text.lower()
         for value, aliases in ALIASES.items():
-            if contains(text, value.replace('_', ' ')) or contains(text, value) or any(contains(text, a) for a in aliases):
+            if _matches(lowered, value.replace('_', ' ')) or _matches(lowered, value) or any(_matches(lowered, a) for a in aliases):
                 phrases.extend(aliases)
     return phrases
 
@@ -122,11 +132,13 @@ def directions(state):
     # Goals/notes may include dislikes or hypotheticals. Use confirmed values only.
     query = ' '.join(v for v in confirmed.values() if v != 'no_fixed_style')
     records = retrieve(query, excluded_terms=exclusions(state)) if query else []
+    # Tokenise each confirmed value and each excerpt once, not once per pairing.
+    value_tokens = {dimension: set(tokens(expand(value))) for dimension, value in confirmed.items()}
     results = []
     for record in records:
+        record_tokens = set(tokens(record['text'] + ' ' + record['title']))
         results.append({**record, 'kind': 'knowledge_reference',
-            'relevantDimensions': [d for d, v in confirmed.items()
-                if set(tokens(expand(v))) & set(tokens(record['text'] + ' ' + record['title']))],
+            'relevantDimensions': [d for d, terms in value_tokens.items() if terms & record_tokens],
             'unassessed': ['Site fit', 'Maintenance suitability', 'Singapore compliance']})
     return results
 

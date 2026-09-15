@@ -101,7 +101,6 @@ function render() {
   $("#project-name").textContent = project.name;
   $("#project-meta").textContent = `${human(project.housingType || "Living room")} · Brief v${project.briefVersion}`;
   $("#stage-label").textContent = project.readiness.stage;
-  const readiness = Math.round(project.readiness.score * 100);
   $("#readiness-label").textContent = `${project.attributes.filter(a => a.status === "confirmed").length}/8 decisions confirmed`;
   $("#progress-bar").style.width = `${project.readiness.coverage * 100}%`;
   const confirmed = project.attributes.filter(a => a.status === 'confirmed');
@@ -121,7 +120,7 @@ function render() {
 }
 
 function bilingual(en, zh) {
-  return `<span data-en="${escapeHtml(en).replaceAll('"', '&quot;')}" data-zh="${escapeHtml(zh || en).replaceAll('"', '&quot;')}">${escapeHtml(en)}</span>`;
+  return `<span data-en="${escapeHtml(en)}" data-zh="${escapeHtml(zh || en)}">${escapeHtml(en)}</span>`;
 }
 async function interviewAction(action) {
   try {
@@ -276,10 +275,11 @@ async function loadAudit() {
   } catch (error) { notify(error.message, true); }
 }
 
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+// String replacement rather than a throwaway element: render() calls this
+// hundreds of times per pass, and quotes must be escaped for attribute values.
 function escapeHtml(value) {
-  const div = document.createElement("div");
-  div.textContent = value ?? "";
-  return div.innerHTML;
+  return String(value ?? "").replace(/[&<>"']/g, character => HTML_ESCAPES[character]);
 }
 
 async function loadSavedProjects() {
@@ -438,8 +438,9 @@ $("#export-button").addEventListener("click", () => {
 function selectTab(name) {
   state.activeTab = name;
   $$('.tab').forEach(item => {
-    item.classList.toggle('active', item.dataset.tab === name);
-    item.setAttribute('aria-pressed', String(item.dataset.tab === name));
+    const selected = item.dataset.tab === name;
+    item.classList.toggle('active', selected);
+    item.setAttribute('aria-selected', String(selected));
   });
   $$('.tab-panel').forEach(panel => { panel.hidden = panel.id !== `${state.activeTab}-panel`; });
   if (state.activeTab === "activity" && state.project) loadAudit();
