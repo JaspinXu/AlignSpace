@@ -14,7 +14,7 @@
   3. `8248afe` test/fix: cover concurrent collaboration and session recovery
   4. `1f65b55` feat: add verified offline backup and restore tools
   5. `bb41246` docs: add internal trial runbook and verified handoff
-  6. 本轮修复提交：离线备份校验加固、协作与重启覆盖补齐（见提交历史）
+  6. `fix: harden backup validation and extend trial coverage`（本轮修复与覆盖补齐）
 - 迁移版本：v5。工作区状态：干净；**未合并、未推送、未部署、未调用外部付费模型**。
 
 ## 2. 任务 A–D 完成情况
