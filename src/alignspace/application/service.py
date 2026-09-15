@@ -25,6 +25,7 @@ from alignspace.domain.enums import (
     ProjectStatus,
     Role,
 )
+from alignspace.domain.interview import validate_interview_response
 from alignspace.domain.models import (
     Approval,
     Attribute,
@@ -301,6 +302,9 @@ class WorkflowService:
         pending = self.next_question(project_id, actor)
         if pending.id != question_id:
             raise KeyError(f"question {question_id} is not the pending question")
+        state = self.get_state(project_id, actor)
+        active_asset_ids = {item["id"] for item in self._active_assets(project_id)}
+        validate_interview_response(state, pending, envelope.data, active_asset_ids)
         return self.resume(
             project_id,
             actor,
@@ -794,7 +798,10 @@ class WorkflowService:
             self._check_version(current, envelope.expected_state_version)
             if resume:
                 self._reconcile_checkpoint(config, current)
-                graph_input: object = Command(resume=envelope.data)
+                graph_input: object = Command(
+                    resume=envelope.data,
+                    update={"assets": self._active_assets(project_id)},
+                )
             else:
                 graph_input = {
                     "project_id": project_id,

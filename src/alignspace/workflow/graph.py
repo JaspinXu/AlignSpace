@@ -59,8 +59,9 @@ def build_graph(agents: AgentBundle, checkpointer: object):
         )
         if question is None:
             return {"next_action": NextAction.ASK_HOMEOWNER.value}
+        active = {item["id"] for item in workflow_state.get("assets", [])}
         try:
-            updated = apply_interview_response(state, question, data)
+            updated = apply_interview_response(state, question, data, active)
         except InterviewResponseError:
             return {"next_action": NextAction.ASK_HOMEOWNER.value}
         return {"project_state": _dump(updated), "pending_question": {}}

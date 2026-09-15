@@ -180,3 +180,115 @@ def test_deleting_a_source_image_drops_its_proposed_observations(
         if evidence["sourceType"] == "image"
     )
     assert started["pendingQuestion"]["id"]
+
+
+def test_deleting_a_source_image_retires_its_question_options(
+    client, analysis_ready_project
+) -> None:
+    started = _start(client, analysis_ready_project)
+    _broad, detail, option = _first_detail(client, analysis_ready_project, started)
+    state = _state(client, analysis_ready_project)
+
+    deleted = client.request(
+        "DELETE",
+        f"/v1/projects/{analysis_ready_project}/assets/{option['assetId']}",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "delete-detail-source",
+            "expectedStateVersion": state["stateVersion"],
+            "data": {},
+        },
+    )
+    assert deleted.status_code == 200, deleted.text
+
+    after = _state(client, analysis_ready_project)
+    question = next(item for item in after["questions"] if item["id"] == detail["id"])
+    assert option["assetId"] not in {item["assetId"] for item in question["options"]}
+
+    stale = _answer(
+        client,
+        analysis_ready_project,
+        detail["id"],
+        {
+            "selection": [
+                {
+                    "attributeId": option["attributeId"],
+                    "decision": "confirmed",
+                    "value": option["value"],
+                }
+            ]
+        },
+        key="stale-option",
+        version=after["stateVersion"],
+    )
+    assert stale.status_code == 400, stale.text
+    current = _state(client, analysis_ready_project)
+    assert all(item["id"] != option["attributeId"] for item in current["attributes"])
+
+
+def test_answer_rejects_a_selection_from_another_question(
+    client, analysis_ready_project
+) -> None:
+    started = _start(client, analysis_ready_project)
+    state = _state(client, analysis_ready_project)
+    wall = next(
+        item
+        for item in state["attributes"]
+        if item["status"] == "proposed" and item["targetElement"] == "wall"
+    )
+    broad, detail, _ = _first_detail(client, analysis_ready_project, started)
+    assert detail["targetElement"] != "wall"
+
+    response = _answer(
+        client,
+        analysis_ready_project,
+        detail["id"],
+        {
+            "selection": [
+                {"attributeId": wall["id"], "decision": "confirmed", "value": wall["value"]}
+            ]
+        },
+        key="unrelated",
+        version=broad["stateVersion"],
+    )
+
+    assert response.status_code == 400, response.text
+    after = _state(client, analysis_ready_project)
+    assert _record(after, wall["id"])["status"] == "proposed"
+
+
+def test_new_preference_without_attribute_id_keeps_image_evidence(
+    client, analysis_ready_project
+) -> None:
+    started = _start(client, analysis_ready_project)
+    broad, detail, option = _first_detail(client, analysis_ready_project, started)
+
+    answered = _answer(
+        client,
+        analysis_ready_project,
+        detail["id"],
+        {
+            "selection": [
+                {
+                    "assetId": option["assetId"],
+                    "targetElement": option["targetElement"],
+                    "dimension": option["dimension"],
+                    "decision": "confirmed",
+                    "value": "custom value",
+                }
+            ]
+        },
+        key="new-preference",
+        version=broad["stateVersion"],
+    )
+
+    assert answered.status_code == 202, answered.text
+    record = _record(
+        answered.json()["projectState"],
+        f"pref-{option['assetId']}-{option['targetElement']}-{option['dimension']}",
+    )
+    assert any(
+        item["sourceType"] == "image" and item["sourceId"] == option["assetId"]
+        for item in record["evidence"]
+    )
+    assert any(item["sourceType"] == "homeowner_answer" for item in record["evidence"])

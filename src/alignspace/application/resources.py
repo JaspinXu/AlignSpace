@@ -309,8 +309,15 @@ class ProjectResourceService:
                     )
                 )
             ]
+            remaining_questions = [
+                _without_asset_options(question, asset_id) for question in state.questions
+            ]
             updated = state.model_copy(
-                update={"state_version": state.state_version + 1, "attributes": remaining}
+                update={
+                    "state_version": state.state_version + 1,
+                    "attributes": remaining,
+                    "questions": remaining_questions,
+                }
             )
             updated = updated.model_copy(
                 update={
@@ -466,3 +473,17 @@ class ProjectResourceService:
             response_payload=response.model_dump(mode="json", by_alias=True),
             resulting_version=response.state_version,
         )
+
+
+def _without_asset_options(question: Question, asset_id: str) -> Question:
+    """Drop options that reference a deleted image; retire a pending question that
+    loses every option so a stale option can never rewrite a preference."""
+    if not question.options:
+        return question
+    options = [option for option in question.options if option.asset_id != asset_id]
+    if len(options) == len(question.options):
+        return question
+    pending = question.answer is None and not question.skipped and question.response is None
+    if options:
+        return question.model_copy(update={"options": options})
+    return question.model_copy(update={"options": [], "skipped": pending or question.skipped})

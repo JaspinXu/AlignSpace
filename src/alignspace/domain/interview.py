@@ -1,9 +1,10 @@
 """Apply a structured homeowner interview answer to the shared state.
 
 A confirmed/rejected/not_applicable selection is written into shared preferences
-(attributes). Free text is kept only as a note and is never parsed. Preferences
-keep their id and evidence when updated, and any resulting change re-checks
-designer constraints, brief staleness and approvals.
+(attributes), validated against the current question and the still-active source
+images. Free text is kept only as a note and is never parsed. Preferences keep
+their id and evidence when updated, and any resulting change re-checks designer
+constraints, brief staleness and approvals.
 """
 
 from alignspace.domain.constraints import flag_brief_change, reconcile_constraints
@@ -33,11 +34,73 @@ class InterviewResponseError(ValueError):
 
 
 def apply_interview_response(
-    state: ProjectState, question: Question, data: dict[str, object]
+    state: ProjectState,
+    question: Question,
+    data: dict[str, object],
+    active_asset_ids: set[str] | None = None,
 ) -> ProjectState:
     if question.kind == QuestionKind.CONFLICT or question.id.startswith("question-conflict-"):
         return _resolve_conflict_question(state, question, data)
+    validate_interview_response(state, question, data, active_asset_ids)
     return _apply_preference_answer(state, question, data)
+
+
+def validate_interview_response(
+    state: ProjectState,
+    question: Question,
+    data: dict[str, object],
+    active_asset_ids: set[str] | None = None,
+) -> None:
+    """Reject answers that do not belong to the current question or whose source
+    image is gone, so a stale option can never rewrite an unrelated preference."""
+    if data.get("skipped") is True:
+        return
+    if question.kind == QuestionKind.BROAD_PARTS:
+        allowed_parts = {(option.asset_id, option.target_element) for option in question.options}
+        for item in data.get("parts") or []:
+            if not isinstance(item, dict):
+                raise InterviewResponseError("parts items must be objects")
+            key = (item.get("assetId"), item.get("targetElement"))
+            if key not in allowed_parts:
+                raise InterviewResponseError("selected part is not part of the current question")
+            _require_active(key[0], active_asset_ids)
+        return
+
+    selection = data.get("selection") or []
+    if not isinstance(selection, list):
+        raise InterviewResponseError("selection must be a list")
+    by_id = {option.attribute_id: option for option in question.options if option.attribute_id}
+    by_triple = {
+        (option.asset_id, option.target_element, option.dimension): option
+        for option in question.options
+    }
+    for item in selection:
+        if not isinstance(item, dict):
+            raise InterviewResponseError("selection items must be objects")
+        attribute_id = item.get("attributeId")
+        if isinstance(attribute_id, str) and attribute_id:
+            option = by_id.get(attribute_id)
+            if option is None:
+                raise InterviewResponseError("selection is not part of the current question")
+            asset_id = item.get("assetId") or option.asset_id
+        else:
+            triple = (
+                item.get("assetId") or question.asset_id,
+                item.get("targetElement") or question.target_element,
+                item.get("dimension") or question.dimension,
+            )
+            option = by_triple.get(triple)
+            if option is None:
+                raise InterviewResponseError("selection is not part of the current question")
+            asset_id = option.asset_id
+        _require_active(asset_id, active_asset_ids)
+
+
+def _require_active(asset_id: object, active_asset_ids: set[str] | None) -> None:
+    if active_asset_ids is None or asset_id is None:
+        return
+    if asset_id not in active_asset_ids:
+        raise InterviewResponseError("the source image for this selection is no longer available")
 
 
 def _apply_preference_answer(
@@ -47,8 +110,6 @@ def _apply_preference_answer(
     selection = data.get("selection") or []
     parts = data.get("parts") or []
     note = data.get("answer")
-    if not isinstance(selection, list):
-        raise InterviewResponseError("selection must be a list")
     if not skipped and not selection and not parts and not (
         isinstance(note, str) and note.strip()
     ):
@@ -104,6 +165,14 @@ def _upsert_from_selection(
     validate_professional_claim(value)
 
     evidence = list(existing.evidence) if existing else []
+    if existing is None and asset_id and not _has_image_evidence(evidence, asset_id):
+        evidence.append(
+            Evidence(
+                source_type=EvidenceSource.IMAGE,
+                source_id=asset_id,
+                description=f"Homeowner preference for {target} {dimension}.",
+            )
+        )
     evidence.append(
         Evidence(
             source_type=EvidenceSource.HOMEOWNER_ANSWER,
@@ -169,6 +238,13 @@ def _image_source(attribute: Attribute | None) -> str | None:
             if evidence.source_type == EvidenceSource.IMAGE
         ),
         None,
+    )
+
+
+def _has_image_evidence(evidence: list[Evidence], asset_id: str) -> bool:
+    return any(
+        item.source_type == EvidenceSource.IMAGE and item.source_id == asset_id
+        for item in evidence
     )
 
 
