@@ -76,7 +76,11 @@ The acceptance drives registration, password login, code-based joining, reload i
 project URL, broad/detail/conflict answers, separate explicit preferences,
 brief edits, a real stale-write 409 with retained input, same-version dual
 approval, and cross-tab logout. It also checks mobile overflow and captures
-desktop/mobile workspace screenshots. No test identity bypass is used.
+desktop/mobile workspace screenshots. No test identity bypass is used. A second
+spec, `e2e/collaboration-resilience.spec.ts`, adds real two-tab and two-role
+scenarios: concurrent constraint edits (409 with preserved input), a stale tab
+that must not answer the next question, approval invalidation followed by
+regeneration, and logout propagation across tabs.
 
 Backend suites:
 

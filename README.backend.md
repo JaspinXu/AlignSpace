@@ -35,6 +35,8 @@ uv run uvicorn alignspace.main:app --reload
 
 业务接口使用真实 Bearer 身份，屋主创建项目后通过一次性项目码邀请设计师。前端启动及双账户浏览器验收见 [前端运行说明](README.frontend.md)。
 
+离线一致性备份与恢复见 [本地备份恢复手册](docs/runbooks/local-backup-restore.zh-CN.md)（`scripts/backup_local.py`、`scripts/restore_local.py`）；内部模拟试用见 [内部试用手册](docs/runbooks/internal-trial.zh-CN.md)。
+
 ## 验证
 
 ```bash
