@@ -1,3 +1,6 @@
+import pytest
+
+
 def _headers(actor_id: str = "homeowner-1", role: str = "homeowner") -> dict[str, str]:
     return {"X-Actor-Id": actor_id, "X-Actor-Role": role}
 
@@ -440,3 +443,95 @@ def test_delete_idempotent_retry_returns_the_advanced_version(
     assert client.get(
         f"/v1/projects/{analysis_ready_project}/questions/next", headers=_headers()
     ).status_code == 200
+
+
+def _pending_detail_over_two_parts(client, project_id: str) -> tuple[dict, str, int]:
+    started = _start(client, project_id)
+    options = started["pendingQuestion"]["options"]
+    first = options[0]
+    second = next(
+        item
+        for item in options
+        if item["assetId"] != first["assetId"] and item["targetElement"] != first["targetElement"]
+    )
+    broad = _answer(
+        client,
+        project_id,
+        started["pendingQuestion"]["id"],
+        {
+            "parts": [
+                {"assetId": first["assetId"], "targetElement": first["targetElement"]},
+                {"assetId": second["assetId"], "targetElement": second["targetElement"]},
+            ]
+        },
+        key="broad",
+        version=started["stateVersion"],
+    )
+    detail = broad.json()["pendingQuestion"]
+    return detail, detail["options"][0]["assetId"], _state(client, project_id)["stateVersion"]
+
+
+def test_delete_retry_resumes_after_a_failed_advance(
+    client, analysis_ready_project, monkeypatch
+) -> None:
+    _detail, asset_to_delete, version = _pending_detail_over_two_parts(
+        client, analysis_ready_project
+    )
+    container = client.app.state.container
+    original = container.workflow.advance_interview
+    calls = {"count": 0}
+
+    def flaky(project_id: str, actor) -> object:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("injected advance failure")
+        return original(project_id, actor)
+
+    monkeypatch.setattr(container.workflow, "advance_interview", flaky)
+    url = f"/v1/projects/{analysis_ready_project}/assets/{asset_to_delete}"
+    envelope = {"idempotencyKey": "delete-flaky", "expectedStateVersion": version, "data": {}}
+
+    with pytest.raises(RuntimeError):
+        client.request("DELETE", url, headers=_headers(), json=envelope)
+    retry = client.request("DELETE", url, headers=_headers(), json=envelope)
+    assert retry.status_code == 200, retry.text
+    assert retry.json()["stateVersion"] == _state(client, analysis_ready_project)["stateVersion"]
+    assert (
+        client.get(
+            f"/v1/projects/{analysis_ready_project}/questions/next", headers=_headers()
+        ).status_code
+        == 200
+    )
+    assert calls["count"] == 2
+
+
+def test_delete_retry_finalises_after_a_failed_response_save(
+    client, analysis_ready_project, monkeypatch
+) -> None:
+    from alignspace.persistence.repository import IdempotencyRepository
+
+    _detail, asset_to_delete, version = _pending_detail_over_two_parts(
+        client, analysis_ready_project
+    )
+    original = IdempotencyRepository.replace_response
+    calls = {"count": 0}
+
+    def flaky(self, *args: object, **kwargs: object) -> object:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("injected finalise failure")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(IdempotencyRepository, "replace_response", flaky)
+    url = f"/v1/projects/{analysis_ready_project}/assets/{asset_to_delete}"
+    envelope = {"idempotencyKey": "delete-finalise", "expectedStateVersion": version, "data": {}}
+
+    with pytest.raises(RuntimeError):
+        client.request("DELETE", url, headers=_headers(), json=envelope)
+    advanced_version = _state(client, analysis_ready_project)["stateVersion"]
+    retry = client.request("DELETE", url, headers=_headers(), json=envelope)
+    assert retry.status_code == 200, retry.text
+    assert retry.json()["stateVersion"] == advanced_version
+    # No double advancement.
+    assert _state(client, analysis_ready_project)["stateVersion"] == advanced_version
+    assert calls["count"] == 2

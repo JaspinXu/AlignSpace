@@ -289,62 +289,76 @@ class ProjectResourceService:
             if actor.role != Role.HOMEOWNER:
                 raise AuthorizationError("only the homeowner can manage reference assets")
             replay = uow.idempotency.lookup(project_id, envelope.idempotency_key, request_hash)
-            if replay is not None:
+            if replay is not None and replay.completed:
                 return AssetDeleteView.model_validate(replay.response_payload)
-            state = uow.projects.load(project_id)
-            self._check_version(state, envelope.expected_state_version)
-            asset = uow.session.get(ImageAssetRow, (project_id, asset_id))
-            if asset is None or asset.deleted_at is not None:
-                raise KeyError(f"asset {asset_id} not found")
-            storage_key = asset.payload["storage_key"]
-            asset.payload = {**asset.payload, "storage_key": None}
-            asset.deleted_at = int(time.time())
-            remaining = [
-                item
-                for item in state.attributes
-                if not (
-                    item.status == AttributeStatus.PROPOSED
-                    and any(
-                        evidence.source_type == EvidenceSource.IMAGE
-                        and evidence.source_id == asset_id
-                        for evidence in item.evidence
+            if replay is None:
+                state = uow.projects.load(project_id)
+                self._check_version(state, envelope.expected_state_version)
+                asset = uow.session.get(ImageAssetRow, (project_id, asset_id))
+                if asset is None or asset.deleted_at is not None:
+                    raise KeyError(f"asset {asset_id} not found")
+                storage_key = asset.payload["storage_key"]
+                asset.payload = {**asset.payload, "storage_key": None}
+                asset.deleted_at = int(time.time())
+                remaining = [
+                    item
+                    for item in state.attributes
+                    if not (
+                        item.status == AttributeStatus.PROPOSED
+                        and any(
+                            evidence.source_type == EvidenceSource.IMAGE
+                            and evidence.source_id == asset_id
+                            for evidence in item.evidence
+                        )
                     )
+                ]
+                remaining_questions = [
+                    _without_asset_options(question, asset_id) for question in state.questions
+                ]
+                updated = state.model_copy(
+                    update={
+                        "state_version": state.state_version + 1,
+                        "attributes": remaining,
+                        "questions": remaining_questions,
+                    }
                 )
-            ]
-            remaining_questions = [
-                _without_asset_options(question, asset_id) for question in state.questions
-            ]
-            updated = state.model_copy(
-                update={
-                    "state_version": state.state_version + 1,
-                    "attributes": remaining,
-                    "questions": remaining_questions,
-                }
-            )
-            updated = updated.model_copy(
-                update={
-                    "conflicts": reconcile_constraints(updated),
-                    "completeness": calculate_completeness(updated),
-                }
-            )
-            updated = flag_brief_change(updated)
-            uow.projects.save(updated, expected_version=state.state_version)
-            response = AssetDeleteView(id=asset_id, state_version=updated.state_version)
-            self._record_replay(uow, project_id, envelope, request_hash, response)
-            uow.commit()
-        self._gc_storage_key(storage_key)
+                updated = updated.model_copy(
+                    update={
+                        "conflicts": reconcile_constraints(updated),
+                        "completeness": calculate_completeness(updated),
+                    }
+                )
+                updated = flag_brief_change(updated)
+                uow.projects.save(updated, expected_version=state.state_version)
+                response = AssetDeleteView(id=asset_id, state_version=updated.state_version)
+                uow.idempotency.record(
+                    project_id=project_id,
+                    key=envelope.idempotency_key,
+                    request_hash=request_hash,
+                    response_payload=response.model_dump(mode="json", by_alias=True),
+                    resulting_version=response.state_version,
+                    completed=advance is None,
+                )
+                uow.commit()
+                self._gc_storage_key(storage_key)
+            else:
+                # Pending replay: the delete is already committed; resume the rest.
+                response = AssetDeleteView.model_validate(replay.response_payload)
         if advance is not None:
-            advanced = advance(project_id, actor)
-            if advanced is not None:
-                response = AssetDeleteView(id=asset_id, state_version=advanced.state_version)
-                with SqlAlchemyUnitOfWork(self._session_factory) as uow:
-                    uow.idempotency.replace_response(
-                        project_id,
-                        envelope.idempotency_key,
-                        response.model_dump(mode="json", by_alias=True),
-                        response.state_version,
-                    )
-                    uow.commit()
+            advance(project_id, actor)
+            with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+                response = AssetDeleteView(
+                    id=asset_id,
+                    state_version=uow.projects.load(project_id).state_version,
+                )
+                uow.idempotency.replace_response(
+                    project_id,
+                    envelope.idempotency_key,
+                    response.model_dump(mode="json", by_alias=True),
+                    response.state_version,
+                    completed=True,
+                )
+                uow.commit()
         return response
 
     def _gc_storage_key(self, storage_key: str) -> None:

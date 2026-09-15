@@ -55,4 +55,20 @@ def migrate(engine):
             text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
             {"version": 4},
         )
+        idempotency_columns = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(idempotency_records)"))
+        }
+        if "completed" not in idempotency_columns:
+            # Existing rows were written by operations that completed atomically.
+            connection.execute(
+                text(
+                    "ALTER TABLE idempotency_records "
+                    "ADD COLUMN completed INTEGER NOT NULL DEFAULT 1"
+                )
+            )
+        connection.execute(
+            text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
+            {"version": 5},
+        )
     assert MigrationRow.__tablename__ in Base.metadata.tables
