@@ -461,6 +461,38 @@ class WorkflowService:
     def list_constraints(self, project_id: str, actor: ActorContext) -> list[Constraint]:
         return list(self.get_state(project_id, actor).constraints)
 
+    def advance_interview(
+        self, project_id: str, actor: ActorContext
+    ) -> ProjectState | None:
+        """Advance the workflow when a source change retired the pending question."""
+        state = self.get_state(project_id, actor)
+        if state.wait_reason != "homeowner":
+            return None
+        pending = next(
+            (
+                item
+                for item in state.questions
+                if item.answer is None and not item.skipped and item.response is None
+            ),
+            None,
+        )
+        if pending is not None:
+            return None
+        config = {"configurable": {"thread_id": project_id}}
+        if not self._graph.get_state(config).next:
+            return None
+        self.resume(
+            project_id,
+            actor,
+            "homeowner",
+            WriteEnvelope(
+                idempotency_key=str(uuid4()),
+                expected_state_version=state.state_version,
+                data={"skipped": True},
+            ),
+        )
+        return self.get_state(project_id, actor)
+
     def realign(
         self,
         project_id: str,

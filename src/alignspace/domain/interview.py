@@ -56,6 +56,10 @@ def validate_interview_response(
     if data.get("skipped") is True:
         return
     if question.kind == QuestionKind.BROAD_PARTS:
+        if data.get("selection"):
+            raise InterviewResponseError(
+                "broad questions accept parts, not preference selections"
+            )
         allowed_parts = {(option.asset_id, option.target_element) for option in question.options}
         for item in data.get("parts") or []:
             if not isinstance(item, dict):
@@ -66,6 +70,8 @@ def validate_interview_response(
             _require_active(key[0], active_asset_ids)
         return
 
+    if data.get("parts"):
+        raise InterviewResponseError("detail questions accept a selection, not parts")
     selection = data.get("selection") or []
     if not isinstance(selection, list):
         raise InterviewResponseError("selection must be a list")

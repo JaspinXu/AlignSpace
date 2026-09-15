@@ -292,3 +292,104 @@ def test_new_preference_without_attribute_id_keeps_image_evidence(
         for item in record["evidence"]
     )
     assert any(item["sourceType"] == "homeowner_answer" for item in record["evidence"])
+
+
+def test_broad_question_rejects_a_preference_selection(client, analysis_ready_project) -> None:
+    started = _start(client, analysis_ready_project)
+    option = started["pendingQuestion"]["options"][0]
+
+    with_selection = _answer(
+        client,
+        analysis_ready_project,
+        started["pendingQuestion"]["id"],
+        {
+            "selection": [
+                {
+                    "assetId": option["assetId"],
+                    "targetElement": option["targetElement"],
+                    "dimension": "colour",
+                    "decision": "confirmed",
+                    "value": "injected",
+                }
+            ]
+        },
+        key="broad-selection",
+        version=started["stateVersion"],
+    )
+    assert with_selection.status_code == 400, with_selection.text
+
+    unknown_asset = _answer(
+        client,
+        analysis_ready_project,
+        started["pendingQuestion"]["id"],
+        {"parts": [{"assetId": "does-not-exist", "targetElement": option["targetElement"]}]},
+        key="broad-bad-asset",
+        version=started["stateVersion"],
+    )
+    assert unknown_asset.status_code == 400, unknown_asset.text
+
+    state = _state(client, analysis_ready_project)
+    assert all(item["status"] != "confirmed" for item in state["attributes"])
+
+
+def test_detail_question_rejects_parts(client, analysis_ready_project) -> None:
+    started = _start(client, analysis_ready_project)
+    broad, detail, option = _first_detail(client, analysis_ready_project, started)
+
+    response = _answer(
+        client,
+        analysis_ready_project,
+        detail["id"],
+        {"parts": [{"assetId": option["assetId"], "targetElement": option["targetElement"]}]},
+        key="detail-parts",
+        version=broad["stateVersion"],
+    )
+    assert response.status_code == 400, response.text
+
+
+def test_retiring_the_current_question_advances_to_the_next(
+    client, analysis_ready_project
+) -> None:
+    started = _start(client, analysis_ready_project)
+    options = started["pendingQuestion"]["options"]
+    first = options[0]
+    second = next(
+        item
+        for item in options
+        if item["assetId"] != first["assetId"] and item["targetElement"] != first["targetElement"]
+    )
+    broad = _answer(
+        client,
+        analysis_ready_project,
+        started["pendingQuestion"]["id"],
+        {
+            "parts": [
+                {"assetId": first["assetId"], "targetElement": first["targetElement"]},
+                {"assetId": second["assetId"], "targetElement": second["targetElement"]},
+            ]
+        },
+        key="broad",
+        version=started["stateVersion"],
+    )
+    assert broad.status_code == 202, broad.text
+    detail = broad.json()["pendingQuestion"]
+    asset_to_delete = detail["options"][0]["assetId"]
+    state = _state(client, analysis_ready_project)
+
+    deleted = client.request(
+        "DELETE",
+        f"/v1/projects/{analysis_ready_project}/assets/{asset_to_delete}",
+        headers=_headers(),
+        json={
+            "idempotencyKey": "delete-only-source",
+            "expectedStateVersion": state["stateVersion"],
+            "data": {},
+        },
+    )
+    assert deleted.status_code == 200, deleted.text
+
+    following = client.get(
+        f"/v1/projects/{analysis_ready_project}/questions/next", headers=_headers()
+    )
+    assert following.status_code == 200, following.text
+    assert following.json()["id"] != detail["id"]

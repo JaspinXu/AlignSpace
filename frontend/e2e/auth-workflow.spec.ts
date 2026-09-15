@@ -103,18 +103,24 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     // Answer each per-part detail question by confirming the observed value.
     for (let index = 0; index < 12; index++) {
       const likes = owner.getByRole('button', { name: '喜欢', exact: true });
-      const waiting = owner.getByText('等待设计师反馈');
-      await expect
-        .poll(async () => (await likes.count()) > 0 || (await waiting.count()) > 0)
-        .toBe(true);
       if ((await likes.count()) === 0) break;
+      const likeCount = await likes.count();
+      for (let j = 0; j < likeCount; j++) await likes.nth(j).click();
       const answered = owner.waitForResponse(
         (r) => r.url().endsWith('/answer') && r.request().method() !== 'GET',
       );
-      const likeCount = await likes.count();
-      for (let j = 0; j < likeCount; j++) await likes.nth(j).click();
       await owner.getByRole('button', { name: '提交回答', exact: true }).click();
-      expect((await answered).status()).toBe(202);
+      const response = await answered;
+      expect(response.status(), await response.text()).toBe(202);
+      const body = await response.json();
+      if (body.waitReason === 'homeowner' && body.pendingQuestion) {
+        await owner
+          .getByText(body.pendingQuestion.text, { exact: true })
+          .waitFor({ timeout: 15000 });
+      } else {
+        await owner.getByText('等待设计师反馈').waitFor({ timeout: 15000 });
+        break;
+      }
     }
 
     for (const [dimension, value] of [
