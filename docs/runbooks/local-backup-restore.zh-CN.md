@@ -107,6 +107,9 @@ restored assets:     <DST>/assets
 | `output already exists` / `destination already exists` | 目标必须不存在；换一个新的绝对路径 |
 | `output must not overlap the source data` | 备份/恢复目标不能位于源数据内部或包含源数据 |
 | `manifest ... hash mismatch` / `size mismatch` | 备份文件被改动或损坏；不要恢复，改用其它备份 |
+| `backup files do not match the manifest` | 备份存在未登记、缺失或重复的文件；不要恢复，改用其它备份 |
+| `symlinks are not supported` | 数据或资产目录含符号链接；请改用实体文件与目录后重新备份 |
+| `destination must not overlap the backup directory` | 恢复目标不能位于备份目录内部（或相反）；换一个独立目录 |
 | `database.sqlite3 failed its integrity check` | 备份中的数据库损坏；不要恢复 |
 | 恢复后登录失败或会话异常 | 使用了不同密钥；按第 5 节处理会话，不要把密钥写进备份或 Git |
 

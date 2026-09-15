@@ -104,12 +104,32 @@ def migration_version(path: Path) -> int:
         connection.close()
 
 
+def walk_files(root: Path) -> list[Path]:
+    """List files under ``root`` without following symlinks; reject any symlink."""
+    files_found: list[Path] = []
+    for base, directories, files in os.walk(root):
+        base_path = Path(base)
+        for name in directories:
+            item = base_path / name
+            if item.is_symlink():
+                raise TrialDataError(f"symlinks are not supported: {item}")
+        for name in files:
+            item = base_path / name
+            if item.is_symlink():
+                raise TrialDataError(f"symlinks are not supported: {item}")
+            files_found.append(item)
+    return files_found
+
+
 def copy_tree(source: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     for root, directories, files in os.walk(source):
         root_path = Path(root)
         if root_path.is_symlink():
             raise TrialDataError(f"symlinks are not supported: {root_path}")
+        for name in directories:
+            if (root_path / name).is_symlink():
+                raise TrialDataError(f"symlinks are not supported: {root_path / name}")
         relative = root_path.relative_to(source)
         (destination / relative).mkdir(parents=True, exist_ok=True)
         for name in files:
@@ -120,9 +140,7 @@ def copy_tree(source: Path, destination: Path) -> None:
 
 def build_manifest(staging: Path, migration: int) -> dict[str, object]:
     files = []
-    for path in sorted(staging.rglob("*")):
-        if not path.is_file():
-            continue
+    for path in sorted(walk_files(staging)):
         relative = path.relative_to(staging).as_posix()
         files.append(
             {
@@ -163,12 +181,14 @@ def read_manifest(backup: Path) -> dict[str, object]:
 def verify_manifest(backup: Path, manifest: dict[str, object]) -> None:
     files = manifest["files"]
     assert isinstance(files, list)
+    listed: list[str] = []
     for entry in files:
         if not isinstance(entry, dict):
             raise TrialDataError("manifest entries must be objects")
         relative = entry.get("path")
         if not isinstance(relative, str) or not relative:
             raise TrialDataError("manifest path must be a non-empty string")
+        listed.append(relative)
         item = Path(relative)
         if item.is_absolute() or ".." in item.parts:
             raise TrialDataError(f"manifest path escapes the backup: {relative}")
@@ -178,10 +198,17 @@ def verify_manifest(backup: Path, manifest: dict[str, object]) -> None:
             raise TrialDataError(f"size mismatch: {relative}")
         if sha256_file(target) != entry.get("sha256"):
             raise TrialDataError(f"hash mismatch: {relative}")
-    for name in (DATABASE_NAME, CHECKPOINT_NAME):
-        require_existing_file(backup / name)
-    if not (backup / ASSETS_NAME).is_dir():
-        raise TrialDataError("backup is missing the assets directory")
+    if len(listed) != len(set(listed)):
+        raise TrialDataError("manifest lists a path more than once")
+    if DATABASE_NAME not in listed or CHECKPOINT_NAME not in listed:
+        raise TrialDataError("manifest must list both databases")
+    actual = {
+        path.relative_to(backup).as_posix()
+        for path in walk_files(backup)
+        if path.name != MANIFEST_NAME
+    }
+    if actual != set(listed):
+        raise TrialDataError("backup files do not match the manifest")
 
 
 def backup(
@@ -206,7 +233,9 @@ def backup(
     if not output.parent.is_dir():
         raise TrialDataError("output parent must exist")
     for source in (database, checkpoint, assets):
-        if is_within(output, source) or is_within(source, output):
+        if is_within(output.resolve(), source.resolve()) or is_within(
+            source.resolve(), output.resolve()
+        ):
             raise TrialDataError("output must not overlap the source data")
 
     staging = output.parent / f"{output.name}.incomplete-{os.getpid()}"
@@ -239,6 +268,12 @@ def restore(backup_dir: Path, destination: Path) -> Path:
         raise TrialDataError(f"destination already exists: {destination}")
     if not destination.parent.is_dir():
         raise TrialDataError("destination parent must exist")
+    resolved_backup = backup_dir.resolve()
+    resolved_destination = destination.resolve()
+    if is_within(resolved_destination, resolved_backup) or is_within(
+        resolved_backup, resolved_destination
+    ):
+        raise TrialDataError("destination must not overlap the backup directory")
     manifest = read_manifest(backup_dir)
     verify_manifest(backup_dir, manifest)
     for name in (DATABASE_NAME, CHECKPOINT_NAME):

@@ -114,3 +114,12 @@ def test_registration_and_login_are_throttled(auth_client):
     )
     assert limited.status_code == 429
     assert "Retry-After" in limited.headers
+
+
+def test_register_ip_limit_is_configurable(monkeypatch):
+    from alignspace.auth.config import AuthConfig
+
+    monkeypatch.delenv("ALIGNSPACE_REGISTER_IP_LIMIT", raising=False)
+    assert AuthConfig.from_env().register_ip_limit == 10
+    monkeypatch.setenv("ALIGNSPACE_REGISTER_IP_LIMIT", "100")
+    assert AuthConfig.from_env().register_ip_limit == 100

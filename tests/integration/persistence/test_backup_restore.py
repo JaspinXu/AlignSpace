@@ -335,3 +335,105 @@ def test_backup_and_restore_reject_corruption(tmp_path, monkeypatch):
 
     after = {p.name: p.read_bytes() for p in live.database.parent.rglob("*") if p.is_file()}
     assert after == before
+
+
+def _seed_one_asset(client):
+    owner = _register(client, "owner@example.com")
+    project = client.post(
+        "/v1/projects", headers=_auth(owner),
+        json={"roomType": "living_room", "budgetBand": "15k_to_30k_sgd", "consent": True},
+    ).json()
+    upload = client.post(
+        f"/v1/projects/{project['id']}/assets", headers=_auth(owner),
+        data={"expectedStateVersion": "0", "idempotencyKey": "a"},
+        files={"file": ("room.png", _image_bytes(), "image/png")},
+    )
+    assert upload.status_code == 201, upload.text
+    return project
+
+
+def _valid_backup(tmp_path, monkeypatch) -> Path:
+    live = App(tmp_path / "live" / "db.sqlite3", tmp_path / "live" / "cp.sqlite3", tmp_path / "live" / "assets")
+    live.database.parent.mkdir(parents=True)
+    client = live.start(monkeypatch)
+    _seed_one_asset(client)
+    live.stop()
+    backup_dir = tmp_path / "backup"
+    assert _run(
+        "backup_local.py",
+        "--database", str(live.database),
+        "--checkpoint", str(live.checkpoint),
+        "--assets", str(live.assets),
+        "--output", str(backup_dir),
+        "--confirm-stopped",
+    ).returncode == 0
+    return backup_dir
+
+
+def test_backup_rejects_symlinked_directory(tmp_path, monkeypatch):
+    live = App(tmp_path / "live" / "db.sqlite3", tmp_path / "live" / "cp.sqlite3", tmp_path / "live" / "assets")
+    live.database.parent.mkdir(parents=True)
+    client = live.start(monkeypatch)
+    _seed_one_asset(client)
+    live.stop()
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "hidden.png").write_bytes(b"hidden")
+    (live.assets / "linked").symlink_to(outside, target_is_directory=True)
+
+    backup_dir = tmp_path / "backup"
+    result = _run(
+        "backup_local.py",
+        "--database", str(live.database),
+        "--checkpoint", str(live.checkpoint),
+        "--assets", str(live.assets),
+        "--output", str(backup_dir),
+        "--confirm-stopped",
+    )
+    assert result.returncode == 1
+    assert "symlink" in result.stderr.lower()
+    assert not backup_dir.exists()
+
+
+def test_restore_rejects_files_that_do_not_match_the_manifest(tmp_path, monkeypatch):
+    import shutil
+
+    backup_dir = _valid_backup(tmp_path, monkeypatch)
+
+    # An unregistered file (entry removed from the manifest) must be rejected.
+    unregistered = tmp_path / "unregistered"
+    shutil.copytree(backup_dir, unregistered)
+    manifest = json.loads((unregistered / "manifest.json").read_text())
+    entry = next(item for item in manifest["files"] if item["path"].startswith("assets/"))
+    manifest["files"] = [item for item in manifest["files"] if item["path"] != entry["path"]]
+    (unregistered / "manifest.json").write_text(json.dumps(manifest))
+    (unregistered / entry["path"]).write_bytes(b"changed")
+    assert _run(
+        "restore_local.py", "--backup", str(unregistered), "--destination", str(tmp_path / "r1")
+    ).returncode == 1
+    assert not (tmp_path / "r1").exists()
+
+    # A database missing from the manifest must be rejected.
+    missing = tmp_path / "missing"
+    shutil.copytree(backup_dir, missing)
+    manifest = json.loads((missing / "manifest.json").read_text())
+    manifest["files"] = [
+        item for item in manifest["files"] if item["path"] != "checkpoints.sqlite3"
+    ]
+    (missing / "manifest.json").write_text(json.dumps(manifest))
+    assert _run(
+        "restore_local.py", "--backup", str(missing), "--destination", str(tmp_path / "r2")
+    ).returncode == 1
+    assert not (tmp_path / "r2").exists()
+
+
+def test_restore_rejects_a_destination_inside_the_backup(tmp_path, monkeypatch):
+    backup_dir = _valid_backup(tmp_path, monkeypatch)
+    result = _run(
+        "restore_local.py",
+        "--backup", str(backup_dir),
+        "--destination", str(backup_dir / "inner"),
+    )
+    assert result.returncode == 1
+    assert not (backup_dir / "inner").exists()

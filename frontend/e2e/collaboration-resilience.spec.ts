@@ -34,6 +34,20 @@ async function submitConstraint(page: Page, statement: string): Promise<Response
   return response;
 }
 
+async function updateConstraint(
+  page: Page,
+  editLabel: string,
+  statement: string,
+): Promise<Response> {
+  await page.getByRole('button', { name: `编辑 ${editLabel}`, exact: true }).click();
+  await page.getByLabel('约束内容').fill(statement);
+  const response = page.waitForResponse(
+    (r) => r.url().includes('/constraints/') && r.request().method() === 'PATCH',
+  );
+  await page.getByRole('button', { name: '更新约束', exact: true }).click();
+  return response;
+}
+
 test('concurrent constraint edits keep the stale tab input and allow a resubmit', async ({
   browser,
 }) => {
@@ -131,4 +145,95 @@ test('logging out in one tab ends the session in the other tab', async ({ browse
   // Reloading must not restore a session that was revoked in the other tab.
   await second.reload();
   await expect(second.getByLabel('邮箱', { exact: true })).toBeVisible();
+});
+
+test('editing the same constraint from two tabs keeps the stale input and resubmits', async ({
+  browser,
+}) => {
+  const { designerContext, owner, designer } = await bootstrap(browser);
+  await toDesignerWait(owner);
+  const tabA = designer;
+  await tabA.reload();
+  const created = await submitConstraint(tabA, '并发约束');
+  expect((await created).status()).toBe(200);
+
+  const tabB = await designerContext.newPage();
+  await tabB.goto(tabA.url());
+  await expect(tabB.getByRole('heading', { name: '当前任务' })).toBeVisible();
+  await expect(tabB.locator('.sidebar')).toContainText('并发约束');
+
+  const first = await updateConstraint(tabA, '并发约束', '并发约束 A 版');
+  expect((await first).status()).toBe(200);
+
+  const second = await updateConstraint(tabB, '并发约束', '并发约束 B 版');
+  expect((await second).status()).toBe(409);
+  await expect(tabB.getByText(/输入已保留/)).toBeVisible();
+  await expect(tabB.getByLabel('约束内容')).toHaveValue('并发约束 B 版');
+
+  await expect(tabB.locator('.sidebar')).toContainText('并发约束 A 版');
+  const retried = await updateConstraint(tabB, '并发约束 A 版', '并发约束 B 版');
+  expect((await retried).status()).toBe(200);
+  await expect(tabB.locator('.sidebar')).toContainText('并发约束 B 版');
+});
+
+test('deleting a question source image lets another tab reach the next step', async ({
+  browser,
+}) => {
+  const { ownerContext, owner } = await bootstrap(browser);
+  await write(owner, '启动分析', '/analysis-runs', 202);
+  const tabA = owner;
+  const tabB = await ownerContext.newPage();
+  await tabB.goto(tabA.url());
+  await expect(tabB.getByRole('heading', { name: '当前任务' })).toBeVisible();
+
+  // Select two parts on different images so two detail groups exist.
+  await tabA.getByRole('checkbox').nth(0).check();
+  await tabA.getByRole('checkbox').nth(5).check();
+  const broad = tabA.waitForResponse(
+    (r) => r.url().endsWith('/answer') && r.request().method() !== 'GET',
+  );
+  await tabA.getByRole('button', { name: '提交回答', exact: true }).click();
+  expect((await broad).status()).toBe(202);
+  await expect(tabA.getByRole('button', { name: '喜欢', exact: true }).first()).toBeVisible();
+
+  const label = await tabA.locator('.option span').first().innerText();
+  const imageName = label.split(' · ')[0];
+  const deletion = tabA.waitForResponse(
+    (r) => r.request().method() === 'DELETE' && r.url().includes('/assets/'),
+  );
+  tabA.once('dialog', (dialog) => dialog.accept());
+  await tabA.getByRole('button', { name: `删除 ${imageName}`, exact: true }).click();
+  expect((await deletion).status()).toBe(200);
+
+  // The other tab refreshes into the next valid question, not the deleted image.
+  await tabB.reload();
+  await expect(tabB.getByRole('button', { name: '喜欢', exact: true }).first()).toBeVisible();
+  expect(await tabB.locator('fieldset').innerText()).not.toContain(imageName);
+});
+
+test('a refresh response arriving after logout cannot restore the session', async ({ browser }) => {
+  const { ownerContext, owner } = await bootstrap(browser);
+  const second = await ownerContext.newPage();
+  await second.goto(owner.url());
+  await expect(second.getByRole('heading', { name: '当前任务' })).toBeVisible();
+
+  let refreshStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    refreshStarted = resolve;
+  });
+  await owner.route('**/auth/refresh', async (route) => {
+    const response = await route.fetch();
+    refreshStarted();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.fulfill({ response });
+  });
+
+  await owner.reload();
+  await started;
+  await second.getByRole('button', { name: '退出登录' }).click();
+  await expect(owner.getByLabel('邮箱', { exact: true })).toBeVisible();
+
+  // A late refresh response must not resurrect the revoked session.
+  await owner.reload();
+  await expect(owner.getByLabel('邮箱', { exact: true })).toBeVisible();
 });

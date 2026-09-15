@@ -76,6 +76,10 @@ def _version(client, project_id, user):
     return response.json()["stateVersion"]
 
 
+def _project_state(client, project_id, user):
+    return client.get(f"/v1/projects/{project_id}/state", headers=_auth(user)).json()["projectState"]
+
+
 def _write(client, method, path, project_id, user, key, data, expected=(200, 201)):
     response = client.request(
         method,
@@ -276,21 +280,6 @@ def test_restart_at_designer_wait_continues(trial):
     client = trial.start()
     owner, designer, project_id = _bootstrap(client)
     _to_designer_wait(client, project_id, owner)
-    before = client.get(f"/v1/projects/{project_id}/state", headers=_auth(owner)).json()[
-        "projectState"
-    ]
-    trial.stop()
-
-    client = trial.start()
-    owner = _login(client, "owner@example.com")
-    designer = _login(client, "designer@example.com")
-    after = client.get(f"/v1/projects/{project_id}/state", headers=_auth(owner)).json()[
-        "projectState"
-    ]
-    assert after["waitReason"] == "designer"
-    assert after["stateVersion"] == before["stateVersion"]
-    assert len(after["attributes"]) == len(before["attributes"])
-
     _write(
         client,
         "POST",
@@ -305,6 +294,22 @@ def test_restart_at_designer_wait_continues(trial):
             "appliesTo": "living_room",
         },
     )
+    before = _project_state(client, project_id, owner)
+    trial.stop()
+
+    client = trial.start()
+    owner = _login(client, "owner@example.com")
+    designer = _login(client, "designer@example.com")
+    after = _project_state(client, project_id, owner)
+    assert after["waitReason"] == "designer"
+    assert after["stateVersion"] == before["stateVersion"]
+    assert sorted(after["attributes"], key=lambda item: item["id"]) == sorted(
+        before["attributes"], key=lambda item: item["id"]
+    )
+    assert sorted(after["constraints"], key=lambda item: item["id"]) == sorted(
+        before["constraints"], key=lambda item: item["id"]
+    )
+
     reviewed = _write(
         client,
         "POST",
@@ -449,3 +454,119 @@ def test_answer_retry_after_restart_returns_the_same_result(trial):
         "projectState"
     ]
     assert state["stateVersion"] == first.json()["stateVersion"]
+
+
+def test_delete_finalise_failure_completes_after_restart(trial, monkeypatch):
+    from alignspace.persistence.repository import IdempotencyRepository
+
+    client = trial.start()
+    owner, _designer, project_id = _bootstrap(client)
+    started = _start_analysis(client, project_id, owner)
+    options = started["pendingQuestion"]["options"]
+    first = options[0]
+    second = next(
+        option
+        for option in options
+        if option["assetId"] != first["assetId"]
+        and option["targetElement"] != first["targetElement"]
+    )
+    broad = _write(
+        client,
+        "POST",
+        f"/v1/projects/{project_id}/questions/{started['pendingQuestion']['id']}/answer",
+        project_id,
+        owner,
+        "answer-broad",
+        {
+            "parts": [
+                {"assetId": first["assetId"], "targetElement": first["targetElement"]},
+                {"assetId": second["assetId"], "targetElement": second["targetElement"]},
+            ]
+        },
+        expected=(202,),
+    )
+    asset_to_delete = broad["pendingQuestion"]["options"][0]["assetId"]
+    envelope = {
+        "idempotencyKey": "delete-finalise-restart",
+        "expectedStateVersion": _version(client, project_id, owner),
+        "data": {},
+    }
+    url = f"/v1/projects/{project_id}/assets/{asset_to_delete}"
+
+    original = IdempotencyRepository.replace_response
+    calls = {"count": 0}
+
+    def flaky(self, *args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("injected finalise failure")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(IdempotencyRepository, "replace_response", flaky)
+    with pytest.raises(RuntimeError):
+        client.request("DELETE", url, headers=_auth(owner), json=envelope)
+    advanced = _version(client, project_id, owner)
+    trial.stop()
+
+    client = trial.start()
+    owner = _login(client, "owner@example.com")
+    retried = client.request("DELETE", url, headers=_auth(owner), json=envelope)
+    assert retried.status_code == 200, retried.text
+    assert retried.json()["stateVersion"] == advanced
+    state = _project_state(client, project_id, owner)
+    assert state["stateVersion"] == advanced
+    questions = len(state["questions"])
+
+    # A completed replay must not advance again or add versions/questions.
+    replay = client.request("DELETE", url, headers=_auth(owner), json=envelope)
+    assert replay.json() == retried.json()
+    after = _project_state(client, project_id, owner)
+    assert after["stateVersion"] == advanced
+    assert len(after["questions"]) == questions
+
+
+def test_restart_preserves_multiple_brief_versions(trial):
+    client = trial.start()
+    owner, designer, project_id = _bootstrap(client)
+    _to_awaiting_approval(client, project_id, owner, designer)
+    latest = client.get(
+        f"/v1/projects/{project_id}/briefs/latest", headers=_auth(owner)
+    ).json()
+    payload = dict(latest["payload"])
+    payload["goals"] = ["保留祖传书柜"]
+    edited = _write(
+        client,
+        "PATCH",
+        f"/v1/projects/{project_id}/briefs/{latest['version']}",
+        project_id,
+        owner,
+        "edit-1",
+        {"payload": payload},
+    )
+    assert edited["version"] == 2
+    before = _project_state(client, project_id, owner)
+    trial.stop()
+
+    client = trial.start()
+    owner = _login(client, "owner@example.com")
+    after = _project_state(client, project_id, owner)
+    assert len(after["briefVersions"]) == 2
+    assert sorted((item["version"], item["contentHash"]) for item in after["briefVersions"]) == sorted(
+        (item["version"], item["contentHash"]) for item in before["briefVersions"]
+    )
+    assert sorted(item["id"] for item in after["attributes"]) == sorted(
+        item["id"] for item in before["attributes"]
+    )
+    assert sorted(item["value"] for item in after["attributes"]) == sorted(
+        item["value"] for item in before["attributes"]
+    )
+    assert sorted(item["status"] for item in after["attributes"]) == sorted(
+        item["status"] for item in before["attributes"]
+    )
+    assert sorted(item["statement"] for item in after["constraints"]) == sorted(
+        item["statement"] for item in before["constraints"]
+    )
+    restored = client.get(
+        f"/v1/projects/{project_id}/briefs/latest", headers=_auth(owner)
+    ).json()
+    assert restored["payload"]["goals"] == ["保留祖传书柜"]
