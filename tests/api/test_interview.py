@@ -393,3 +393,50 @@ def test_retiring_the_current_question_advances_to_the_next(
     )
     assert following.status_code == 200, following.text
     assert following.json()["id"] != detail["id"]
+
+
+def test_delete_idempotent_retry_returns_the_advanced_version(
+    client, analysis_ready_project
+) -> None:
+    started = _start(client, analysis_ready_project)
+    options = started["pendingQuestion"]["options"]
+    first = options[0]
+    second = next(
+        item
+        for item in options
+        if item["assetId"] != first["assetId"] and item["targetElement"] != first["targetElement"]
+    )
+    broad = _answer(
+        client,
+        analysis_ready_project,
+        started["pendingQuestion"]["id"],
+        {
+            "parts": [
+                {"assetId": first["assetId"], "targetElement": first["targetElement"]},
+                {"assetId": second["assetId"], "targetElement": second["targetElement"]},
+            ]
+        },
+        key="broad",
+        version=started["stateVersion"],
+    )
+    detail = broad.json()["pendingQuestion"]
+    asset_to_delete = detail["options"][0]["assetId"]
+    state = _state(client, analysis_ready_project)
+    envelope = {
+        "idempotencyKey": "delete-once",
+        "expectedStateVersion": state["stateVersion"],
+        "data": {},
+    }
+    url = f"/v1/projects/{analysis_ready_project}/assets/{asset_to_delete}"
+
+    deleted = client.request("DELETE", url, headers=_headers(), json=envelope)
+    retried = client.request("DELETE", url, headers=_headers(), json=envelope)
+
+    assert deleted.status_code == 200, deleted.text
+    assert retried.status_code == 200, retried.text
+    assert retried.json() == deleted.json()
+    current = _state(client, analysis_ready_project)
+    assert current["stateVersion"] == deleted.json()["stateVersion"]
+    assert client.get(
+        f"/v1/projects/{analysis_ready_project}/questions/next", headers=_headers()
+    ).status_code == 200

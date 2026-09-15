@@ -85,6 +85,27 @@ class IdempotencyRepository:
             )
         )
 
+    def replace_response(
+        self,
+        project_id: str,
+        key: str,
+        response_payload: dict[str, object],
+        resulting_version: int,
+    ) -> None:
+        """Update a stored idempotent response when a later step (e.g. workflow
+        advancement) changed the final state version the caller must receive."""
+        self._session.execute(
+            update(IdempotencyRecordRow)
+            .where(
+                IdempotencyRecordRow.project_id == project_id,
+                IdempotencyRecordRow.key == key,
+            )
+            .values(
+                response_payload=response_payload,
+                resulting_version=resulting_version,
+            )
+        )
+
 
 class ProjectRepository:
     def __init__(self, session: Session) -> None:

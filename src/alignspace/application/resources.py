@@ -274,6 +274,8 @@ class ProjectResourceService:
         asset_id: str,
         actor: ActorContext,
         envelope: WriteEnvelope[dict[str, object]],
+        *,
+        advance: Callable[[str, ActorContext], ProjectState | None] | None = None,
     ) -> AssetDeleteView:
         request_hash = self._request_hash(
             "delete_asset",
@@ -331,6 +333,18 @@ class ProjectResourceService:
             self._record_replay(uow, project_id, envelope, request_hash, response)
             uow.commit()
         self._gc_storage_key(storage_key)
+        if advance is not None:
+            advanced = advance(project_id, actor)
+            if advanced is not None:
+                response = AssetDeleteView(id=asset_id, state_version=advanced.state_version)
+                with SqlAlchemyUnitOfWork(self._session_factory) as uow:
+                    uow.idempotency.replace_response(
+                        project_id,
+                        envelope.idempotency_key,
+                        response.model_dump(mode="json", by_alias=True),
+                        response.state_version,
+                    )
+                    uow.commit()
         return response
 
     def _gc_storage_key(self, storage_key: str) -> None:

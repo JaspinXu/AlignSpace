@@ -120,11 +120,13 @@ def delete_asset(
     actor: Actor,
     container: Container,
 ) -> AssetDeleteView:
-    result = container.resources.delete_asset(project_id, asset_id, actor, envelope)
-    advanced = container.workflow.advance_interview(project_id, actor)
-    if advanced is not None:
-        return AssetDeleteView(id=result.id, state_version=advanced.state_version)
-    return result
+    return container.resources.delete_asset(
+        project_id,
+        asset_id,
+        actor,
+        envelope,
+        advance=lambda pid, act: container.workflow.advance_interview(pid, act),
+    )
 
 
 @router.patch(
