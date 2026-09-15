@@ -65,6 +65,17 @@ def test_homeowner_answer_resumes_the_pending_question(client, analysis_ready_pr
         json={"idempotencyKey": "run-1", "expectedStateVersion": 3, "data": {}},
     ).json()
     question_id = started["pendingQuestion"]["id"]
+    part = next(
+        option
+        for option in started["pendingQuestion"]["options"]
+        if option["targetElement"] == "lighting"
+    )
+    answer_data = {
+        "parts": [
+            {"assetId": part["assetId"], "targetElement": part["targetElement"]}
+        ]
+    }
+    detail_id = "question-detail-lighting-lighting"
 
     answered = client.post(
         f"/v1/projects/{project_id}/questions/{question_id}/answer",
@@ -72,13 +83,13 @@ def test_homeowner_answer_resumes_the_pending_question(client, analysis_ready_pr
         json={
             "idempotencyKey": "answer-1",
             "expectedStateVersion": started["stateVersion"],
-            "data": {"answer": "I also like the warm lighting"},
+            "data": answer_data,
         },
     )
 
     assert answered.status_code == 202
     assert answered.json()["stateVersion"] == started["stateVersion"] + 1
-    assert answered.json()["pendingQuestion"]["id"] == "question-lighting-lighting"
+    assert answered.json()["pendingQuestion"]["id"] == detail_id
 
     replay = client.post(
         f"/v1/projects/{project_id}/questions/{question_id}/answer",
@@ -86,19 +97,19 @@ def test_homeowner_answer_resumes_the_pending_question(client, analysis_ready_pr
         json={
             "idempotencyKey": "answer-1",
             "expectedStateVersion": started["stateVersion"],
-            "data": {"answer": "I also like the warm lighting"},
+            "data": answer_data,
         },
     )
     assert replay.status_code == 202
     assert replay.json() == answered.json()
 
     wrong_target = client.post(
-        f"/v1/projects/{project_id}/questions/question-lighting-lighting/answer",
+        f"/v1/projects/{project_id}/questions/{detail_id}/answer",
         headers=_headers(),
         json={
             "idempotencyKey": "answer-1",
             "expectedStateVersion": started["stateVersion"],
-            "data": {"answer": "I also like the warm lighting"},
+            "data": answer_data,
         },
     )
     assert wrong_target.status_code == 409

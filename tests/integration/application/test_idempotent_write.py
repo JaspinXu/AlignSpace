@@ -52,7 +52,10 @@ def test_homeowner_can_resume_pending_question(service) -> None:
         WriteEnvelope(
             idempotency_key="answer",
             expected_state_version=first.state_version,
-            data={"answer": "I also like the warm lighting"},
+            data={
+                "answer": "I also like the warm lighting",
+                "parts": [{"assetId": "asset-1", "targetElement": "wall"}],
+            },
         ),
     )
 

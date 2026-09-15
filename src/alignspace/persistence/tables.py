@@ -138,3 +138,4 @@ class IdempotencyRecordRow(Base):
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     response_payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     resulting_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -3,16 +3,10 @@ from langgraph.types import interrupt
 
 from alignspace.agents.contracts import AgentBundle, AssetRef
 from alignspace.application.briefing import build_brief_version
-from alignspace.domain.enums import ConflictStatus, NextAction, ProjectStatus, ReviewDecision
+from alignspace.domain.enums import NextAction, ProjectStatus, ReviewDecision
+from alignspace.domain.interview import InterviewResponseError, apply_interview_response
 from alignspace.domain.models import ProjectState
-from alignspace.domain.patches import (
-    StatePatch,
-    UpsertBriefVersion,
-    UpsertConflict,
-    UpsertQuestion,
-    apply_patch,
-)
-from alignspace.domain.policies import record_conflict_attempt
+from alignspace.domain.patches import StatePatch, UpsertBriefVersion, apply_patch
 from alignspace.workflow.state import WorkflowState
 
 
@@ -58,33 +52,18 @@ def build_graph(agents: AgentBundle, checkpointer: object):
                 "pendingQuestion": pending,
             }
         )
-        answer = response.get("answer") if isinstance(response, dict) else str(response)
-        if not isinstance(answer, str) or not answer.strip():
-            return {"next_action": NextAction.ASK_HOMEOWNER.value}
+        data = response if isinstance(response, dict) else {"answer": str(response)}
         state = _project_state(workflow_state)
-        question = next(item for item in state.questions if item.id == pending["id"])
-        operations = [
-            UpsertQuestion(question=question.model_copy(update={"answer": answer.strip()}))
-        ]
-        conflict_prefix = "question-conflict-"
-        if question.id.startswith(conflict_prefix):
-            conflict_id = question.id.removeprefix(conflict_prefix)
-            conflict = next(item for item in state.conflicts if item.id == conflict_id)
-            attempted = record_conflict_attempt(conflict)
-            operations.append(
-                UpsertConflict(
-                    conflict=attempted.model_copy(
-                        update={
-                            "status": ConflictStatus.RESOLVED,
-                            "resolution": answer.strip(),
-                        }
-                    )
-                )
-            )
-        updated = apply_patch(
-            state,
-            StatePatch(expected_state_version=state.state_version, operations=operations),
+        question = next(
+            (item for item in state.questions if item.id == pending["id"]), None
         )
+        if question is None:
+            return {"next_action": NextAction.ASK_HOMEOWNER.value}
+        active = {item["id"] for item in workflow_state.get("assets", [])}
+        try:
+            updated = apply_interview_response(state, question, data, active)
+        except InterviewResponseError:
+            return {"next_action": NextAction.ASK_HOMEOWNER.value}
         return {"project_state": _dump(updated), "pending_question": {}}
 
     def designer_review(workflow_state: WorkflowState) -> WorkflowState:

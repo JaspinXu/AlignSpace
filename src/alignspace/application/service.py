@@ -25,6 +25,7 @@ from alignspace.domain.enums import (
     ProjectStatus,
     Role,
 )
+from alignspace.domain.interview import validate_interview_response
 from alignspace.domain.models import (
     Approval,
     Attribute,
@@ -258,7 +259,14 @@ class WorkflowService:
 
     def next_question(self, project_id: str, actor: ActorContext) -> Question:
         state = self.get_state(project_id, actor)
-        question = next((item for item in state.questions if item.answer is None), None)
+        question = next(
+            (
+                item
+                for item in state.questions
+                if item.answer is None and not item.skipped and item.response is None
+            ),
+            None,
+        )
         if question is None:
             raise KeyError("pending question not found")
         return question
@@ -273,9 +281,13 @@ class WorkflowService:
         self._authorize(project_id, actor)
         if actor.role != Role.HOMEOWNER:
             raise AuthorizationError("actor cannot answer homeowner task")
-        answer = envelope.data.get("answer")
-        if not isinstance(answer, str) or not answer.strip():
-            raise ValueError("homeowner answer must be a non-blank string")
+        data = envelope.data
+        has_note = isinstance(data.get("answer"), str) and bool(str(data["answer"]).strip())
+        has_parts = isinstance(data.get("parts"), list) and bool(data["parts"])
+        has_selection = isinstance(data.get("selection"), list) and bool(data["selection"])
+        skipped = data.get("skipped") is True
+        if not (has_note or has_parts or has_selection or skipped):
+            raise ValueError("homeowner answer requires a note, parts, selection or skip")
         action = f"answer_question:{question_id}"
         request_hash = self._hash_request(
             action,
@@ -290,6 +302,9 @@ class WorkflowService:
         pending = self.next_question(project_id, actor)
         if pending.id != question_id:
             raise KeyError(f"question {question_id} is not the pending question")
+        state = self.get_state(project_id, actor)
+        active_asset_ids = {item["id"] for item in self._active_assets(project_id)}
+        validate_interview_response(state, pending, envelope.data, active_asset_ids)
         return self.resume(
             project_id,
             actor,
@@ -445,6 +460,38 @@ class WorkflowService:
 
     def list_constraints(self, project_id: str, actor: ActorContext) -> list[Constraint]:
         return list(self.get_state(project_id, actor).constraints)
+
+    def advance_interview(
+        self, project_id: str, actor: ActorContext
+    ) -> ProjectState | None:
+        """Advance the workflow when a source change retired the pending question."""
+        state = self.get_state(project_id, actor)
+        if state.wait_reason != "homeowner":
+            return None
+        pending = next(
+            (
+                item
+                for item in state.questions
+                if item.answer is None and not item.skipped and item.response is None
+            ),
+            None,
+        )
+        if pending is not None:
+            return None
+        config = {"configurable": {"thread_id": project_id}}
+        if not self._graph.get_state(config).next:
+            return None
+        self.resume(
+            project_id,
+            actor,
+            "homeowner",
+            WriteEnvelope(
+                idempotency_key=str(uuid4()),
+                expected_state_version=state.state_version,
+                data={"skipped": True},
+            ),
+        )
+        return self.get_state(project_id, actor)
 
     def realign(
         self,
@@ -783,7 +830,10 @@ class WorkflowService:
             self._check_version(current, envelope.expected_state_version)
             if resume:
                 self._reconcile_checkpoint(config, current)
-                graph_input: object = Command(resume=envelope.data)
+                graph_input: object = Command(
+                    resume=envelope.data,
+                    update={"assets": self._active_assets(project_id)},
+                )
             else:
                 graph_input = {
                     "project_id": project_id,

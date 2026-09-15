@@ -47,7 +47,10 @@ function setup(
 function detailSnapshot(): ProjectSnapshot {
   const base = snapshot();
   return { ...base, pendingQuestion: { ...base.pendingQuestion!, id: 'detail-lighting',
-    repetitionFingerprint: 'detail:lighting', text: '您喜欢什么样的灯光？' } };
+    repetitionFingerprint: 'detail:lighting', text: '您喜欢什么样的灯光？', kind: 'detail',
+    targetElement: 'lighting', dimension: 'lighting',
+    options: [{ label: 'lighting · lighting · warm ambient', value: 'warm ambient', assetId: 'a1',
+      targetElement: 'lighting', dimension: 'lighting', attributeId: 'mock-lighting-lighting' }] } };
 }
 
 describe('question draft recovery', () => {
@@ -76,14 +79,14 @@ describe('question draft recovery', () => {
     const env = setup('homeowner', initial);
     await env.client.restore();
     render(<Workspace client={env.client} projectId="p1" />);
-    await userEvent.click(await screen.findByRole('checkbox', { name: /暖色灯光/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: /wall/ }));
     env.setState(detailSnapshot());
     await act(async () => { fireEvent.focus(window); });
-    expect(screen.getByRole('textbox', { name: '未提交的回答：Which elements?' })).toHaveValue('暖色灯光');
+    expect(screen.getByRole('textbox', { name: '未提交的回答：Which elements?' })).toHaveValue('a1::wall');
     expect(screen.getByLabelText('您的回答')).toHaveValue('');
     env.setState(initial);
     await act(async () => { fireEvent.focus(window); });
-    expect(screen.getByRole('checkbox', { name: /暖色灯光/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /wall/ })).toBeChecked();
   });
 
   it.each([false, true])('clears only the submitted question revision (edited during request: %s)', async (edited) => {
@@ -178,14 +181,16 @@ describe('role-aware work area', () => {
       expect(env.fetcher.mock.calls.length).toBe(hidden);
     } finally { vi.useRealTimers(); }
   });
-  it('lets the homeowner select broad preferences and sends supported English keywords', async () => {
+  it('lets the homeowner pick parts and sends structured parts', async () => {
     const env = setup();
     await env.client.restore();
     render(<Workspace client={env.client} projectId="p1" />);
-    await userEvent.click(await screen.findByRole('checkbox', { name: /暖色灯光/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: /lighting/ }));
     await userEvent.click(screen.getByRole('button', { name: '提交回答' }));
     await waitFor(() => expect(env.writes).toHaveLength(1));
-    expect(JSON.parse(String(env.writes[0].body)).data.answer).toContain('lighting');
+    expect(JSON.parse(String(env.writes[0].body)).data.parts).toEqual([
+      { assetId: 'a1', targetElement: 'lighting' },
+    ]);
   });
 
   it('shows a designer the shared state without homeowner answer or sample controls', async () => {
@@ -203,7 +208,7 @@ describe('role-aware work area', () => {
     await env.client.restore();
     render(<Workspace client={env.client} projectId="p1" />);
     await screen.findByRole('heading', { name: '参考图片' });
-    expect(screen.getByText(/room\.png/)).toBeInTheDocument();
+    expect(screen.getAllByText(/room\.png/).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('上传参考图片')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /删除 room\.png/ })).not.toBeInTheDocument();
   });
@@ -530,5 +535,52 @@ describe('constraint editing and preference revision', () => {
     expect(env.writes[0].method).toBe('PATCH');
     const body = JSON.parse(String(env.writes[0].body));
     expect(body.data.value).toBe('warm ambient');
+  });
+});
+
+describe('structured homeowner interview', () => {
+  it('sends a confirmed detail selection together with a note', async () => {
+    const env = setup('homeowner', detailSnapshot());
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await userEvent.click(await screen.findByRole('button', { name: '喜欢' }));
+    await userEvent.type(screen.getByLabelText('您的回答'), '备注文字');
+    await userEvent.click(screen.getByRole('button', { name: '提交回答' }));
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    const body = JSON.parse(String(env.writes[0].body));
+    expect(body.data.selection).toEqual([
+      {
+        attributeId: 'mock-lighting-lighting',
+        assetId: 'a1',
+        targetElement: 'lighting',
+        dimension: 'lighting',
+        decision: 'confirmed',
+        value: 'warm ambient',
+      },
+    ]);
+    expect(body.data.answer).toBe('备注文字');
+  });
+
+  it('marks a detail option as not applicable and skips without preferences', async () => {
+    const env = setup('homeowner', detailSnapshot());
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    await userEvent.click(await screen.findByRole('button', { name: '不在意' }));
+    await userEvent.click(screen.getByRole('button', { name: '提交回答' }));
+    await waitFor(() => expect(env.writes).toHaveLength(1));
+    expect(JSON.parse(String(env.writes[0].body)).data.selection[0].decision).toBe(
+      'not_applicable',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: '跳过' }));
+    await waitFor(() => expect(env.writes).toHaveLength(2));
+    expect(JSON.parse(String(env.writes[1].body)).data.skipped).toBe(true);
+  });
+
+  it('labels the free-text field as a note the system does not parse', async () => {
+    const env = setup('homeowner', detailSnapshot());
+    await env.client.restore();
+    render(<Workspace client={env.client} projectId="p1" />);
+    expect(await screen.findByText(/系统不会自动理解/)).toBeInTheDocument();
   });
 });

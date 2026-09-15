@@ -84,7 +84,7 @@ def test_migration_adds_soft_delete_column_and_is_repeatable(tmp_path):
                 "SELECT version FROM schema_migrations"
             )
         }
-        assert versions == {1, 2, 3, 4}
+        assert versions == {1, 2, 3, 4, 5}
     finally:
         engine.dispose()
 

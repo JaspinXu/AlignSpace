@@ -37,6 +37,7 @@ class IdempotencyConflictError(ValueError):
 class IdempotencyResult:
     response_payload: dict[str, object]
     resulting_version: int
+    completed: bool = True
 
 
 def canonical_request_hash(payload: object) -> str:
@@ -64,6 +65,7 @@ class IdempotencyRepository:
         return IdempotencyResult(
             response_payload=row.response_payload,
             resulting_version=row.resulting_version,
+            completed=row.completed,
         )
 
     def record(
@@ -74,6 +76,7 @@ class IdempotencyRepository:
         request_hash: str,
         response_payload: dict[str, object],
         resulting_version: int,
+        completed: bool = True,
     ) -> None:
         self._session.add(
             IdempotencyRecordRow(
@@ -82,6 +85,31 @@ class IdempotencyRepository:
                 request_hash=request_hash,
                 response_payload=response_payload,
                 resulting_version=resulting_version,
+                completed=completed,
+            )
+        )
+
+    def replace_response(
+        self,
+        project_id: str,
+        key: str,
+        response_payload: dict[str, object],
+        resulting_version: int,
+        *,
+        completed: bool = True,
+    ) -> None:
+        """Update a stored idempotent response when a later step (e.g. workflow
+        advancement) changed the final state version the caller must receive."""
+        self._session.execute(
+            update(IdempotencyRecordRow)
+            .where(
+                IdempotencyRecordRow.project_id == project_id,
+                IdempotencyRecordRow.key == key,
+            )
+            .values(
+                response_payload=response_payload,
+                resulting_version=resulting_version,
+                completed=completed,
             )
         )
 
