@@ -437,3 +437,36 @@ def test_restore_rejects_a_destination_inside_the_backup(tmp_path, monkeypatch):
     )
     assert result.returncode == 1
     assert not (backup_dir / "inner").exists()
+
+
+def test_restore_rejects_an_unregistered_nested_manifest(tmp_path, monkeypatch):
+    import shutil
+
+    backup_dir = _valid_backup(tmp_path, monkeypatch)
+    nested = tmp_path / "nested"
+    shutil.copytree(backup_dir, nested)
+    (nested / "assets" / "manifest.json").write_text("{}")
+
+    assert _run(
+        "restore_local.py", "--backup", str(nested), "--destination", str(tmp_path / "r1")
+    ).returncode == 1
+    assert not (tmp_path / "r1").exists()
+
+
+def test_restore_rejects_a_backup_without_the_assets_directory(tmp_path, monkeypatch):
+    import shutil
+
+    backup_dir = _valid_backup(tmp_path, monkeypatch)
+    stripped = tmp_path / "stripped"
+    shutil.copytree(backup_dir, stripped)
+    shutil.rmtree(stripped / "assets")
+    manifest = json.loads((stripped / "manifest.json").read_text())
+    manifest["files"] = [
+        item for item in manifest["files"] if not item["path"].startswith("assets/")
+    ]
+    (stripped / "manifest.json").write_text(json.dumps(manifest))
+
+    assert _run(
+        "restore_local.py", "--backup", str(stripped), "--destination", str(tmp_path / "r2")
+    ).returncode == 1
+    assert not (tmp_path / "r2").exists()

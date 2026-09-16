@@ -221,11 +221,20 @@ test('a refresh response arriving after logout cannot restore the session', asyn
   const started = new Promise<void>((resolve) => {
     refreshStarted = resolve;
   });
+  let releaseResponse!: () => void;
+  const release = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  let responseDelivered!: () => void;
+  const delivered = new Promise<void>((resolve) => {
+    responseDelivered = resolve;
+  });
   await owner.route('**/auth/refresh', async (route) => {
     const response = await route.fetch();
     refreshStarted();
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await release;
     await route.fulfill({ response });
+    responseDelivered();
   });
 
   await owner.reload();
@@ -233,7 +242,35 @@ test('a refresh response arriving after logout cannot restore the session', asyn
   await second.getByRole('button', { name: '退出登录' }).click();
   await expect(owner.getByLabel('邮箱', { exact: true })).toBeVisible();
 
-  // A late refresh response must not resurrect the revoked session.
+  // Release the in-flight response and wait until the original page received it,
+  // so a reload cannot cancel it before it is processed. A late refresh response
+  // must not resurrect the revoked session.
+  releaseResponse();
+  await delivered;
+  await expect(owner.getByLabel('邮箱', { exact: true })).toBeVisible();
+
   await owner.reload();
   await expect(owner.getByLabel('邮箱', { exact: true })).toBeVisible();
+});
+
+test('skipping a detail question creates no preference and advances', async ({ browser }) => {
+  const { owner } = await bootstrap(browser);
+  await write(owner, '启动分析', '/analysis-runs', 202);
+  const parts = owner.getByRole('checkbox');
+  for (let index = 0; index < (await parts.count()); index++) await parts.nth(index).check();
+  await write(owner, '提交回答', '/answer', 202);
+  await expect(owner.getByRole('button', { name: '喜欢', exact: true }).first()).toBeVisible();
+  const firstText = await owner.locator('.question-text').first().innerText();
+
+  const skipped = owner.waitForResponse(
+    (r) => r.url().endsWith('/answer') && r.request().method() !== 'GET',
+  );
+  await owner.getByRole('button', { name: '跳过', exact: true }).click();
+  expect((await skipped).status()).toBe(202);
+
+  // Skipping must not confirm any preference, and the next question must appear.
+  await expect(owner.locator('.sidebar')).not.toContainText('（confirmed）');
+  await expect
+    .poll(async () => owner.locator('.question-text').first().innerText().catch(() => firstText))
+    .not.toBe(firstText);
 });

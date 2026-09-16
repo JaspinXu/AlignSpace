@@ -205,10 +205,12 @@ def verify_manifest(backup: Path, manifest: dict[str, object]) -> None:
     actual = {
         path.relative_to(backup).as_posix()
         for path in walk_files(backup)
-        if path.name != MANIFEST_NAME
+        if path != backup / MANIFEST_NAME
     }
     if actual != set(listed):
         raise TrialDataError("backup files do not match the manifest")
+    if not (backup / ASSETS_NAME).is_dir():
+        raise TrialDataError("backup is missing the assets directory")
 
 
 def backup(

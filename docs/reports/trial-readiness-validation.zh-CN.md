@@ -15,6 +15,7 @@
   4. `1f65b55` feat: add verified offline backup and restore tools
   5. `bb41246` docs: add internal trial runbook and verified handoff
   6. `fix: harden backup validation and extend trial coverage`（本轮修复与覆盖补齐）
+  7. 本轮收尾修复：清单仅排除根目录清单、恢复 assets 目录检查、竞态用例显式释放响应、新增浏览器跳过用例并更正报告
 - 迁移版本：v5。工作区状态：干净；**未合并、未推送、未部署、未调用外部付费模型**。
 
 ## 2. 任务 A–D 完成情况
@@ -37,6 +38,7 @@
 | 另一标签页改约束后审批失效并重新生成 | `an approval is rejected after another tab changes a constraint, then regenerated` |
 | 旧问题标签页不得写入下一题 | `a stale tab cannot write its old answer into the next question` |
 | 删除待答问题来源图后另一页面恢复下一步 | `deleting a question source image lets another tab reach the next step` |
+| 跳过细化问题不建偏好并继续 | `skipping a detail question creates no preference and advances`（浏览器）+ `test_skipping_the_broad_question_creates_no_preference`（API） |
 | 跨标签页退出 | `logging out in one tab ends the session in the other tab` |
 | 刷新响应晚于退出到达 | `a refresh response arriving after logout cannot restore the session` |
 | 备份完整性/符号链接/清单集合/目标重叠 | `test_backup_restore.py`（6 项） |
@@ -50,8 +52,8 @@
 
 **2. [P2] 恢复清单未校验完整文件集合** — `scripts/_trial_data.py`
 - 根因：只逐个校验清单中列出的文件，未比对实际文件集合，未登记/被改动的文件仍会被复制。
-- 修复：`verify_manifest` 要求清单无重复、两个数据库均在清单中，且实际文件集合与清单**一一对应**。
-- 回归：`test_restore_rejects_files_that_do_not_match_the_manifest`（移出清单的图片、缺失数据库条目均被拒绝）。
+- 修复：`verify_manifest` 要求清单无重复、两个数据库均在清单中，且实际文件集合与清单**一一对应**；**仅排除根目录的 `manifest.json`**（嵌套 `assets/manifest.json` 也参与比对），并恢复 `assets` 目录存在性检查。
+- 回归：`test_restore_rejects_files_that_do_not_match_the_manifest`、`test_restore_rejects_an_unregistered_nested_manifest`、`test_restore_rejects_a_backup_without_the_assets_directory`。
 
 **3. [P2] 恢复目标未禁止与备份重叠** — `scripts/_trial_data.py`
 - 根因：未检查目标与备份目录的包含关系，允许恢复到备份目录内部，存在递归复制风险。
@@ -77,10 +79,10 @@ uv run ruff check src tests scripts    # All checks passed
 ```bash
 npm test        # 58 passed
 npm run build   # 成功
-npm run test:e2e # 连续三次：8 passed (44.4s) / 8 passed (44.5s) / 8 passed (44.3s)
+npm run test:e2e # 连续三次：9 passed (45.2s) / 9 passed (44.7s) / 9 passed (45.1s)
 ```
 
-浏览器套件 8 条 = `auth-workflow`(1) + `collaboration-resilience`(7)。环境失败：无。
+浏览器套件 9 条 = `auth-workflow`(1) + `collaboration-resilience`(8)。环境失败：无。
 
 ## 5. 三类案例的实际执行记录（真实浏览器）
 
@@ -90,7 +92,9 @@ npm run test:e2e # 连续三次：8 passed (44.4s) / 8 passed (44.5s) / 8 passed
 |---|---|---|---|---|---|
 | 一 普通对齐成功 | 屋主+设计师 | 注册/登录 → 创建 → 项目码加入 → 上传 3 图 → 启动分析 → 广选部位 → 逐部位“喜欢” → 显式偏好 → 设计师约束+反馈 → 生成 v1 → 双方批准 | 双人审批 `approved` | `auth-workflow` 通过（26s），含 1600×1200 上传/预览/删除/审批 | 无 |
 | 二 冲突后修改并重新审批 | 屋主+设计师 | 生成方案后设计师改约束 → 旧审批被拒 → 屋主重新生成 v2 → 双方批准 v2 | 409 拒绝旧审批、v2 通过 | `an approval is rejected ... then regenerated` 通过 | 无 |
-| 三 跳过/删除来源图/中断重试/备份恢复 | 屋主（两标签） | 跳过问题不建偏好 → 删除唯一来源图退役问题 → 另一标签刷新到下一步 → 重启后继续 → 备份/恢复后继续 | 不建空记录、不卡流程、恢复后可继续 | `deleting a question source image ...`、`test_restart_*`、`test_offline_backup_restore_and_resume` 均通过 | 无 |
+| 三 跳过/删除来源图/中断重试/备份恢复 | 屋主（两标签） | 跳过细化问题 → 删除唯一来源图退役问题 → 另一标签刷新到下一步；重启后继续；备份/恢复后继续 | 不建空记录、不卡流程、恢复后可继续 | **分别由独立自动化用例覆盖**：跳过=`skipping a detail question creates no preference and advances`（浏览器）+ `test_skipping_the_broad_question_creates_no_preference`（API）；删除与下一步=`deleting a question source image ...`；中断=`test_restart_*`；恢复=`test_offline_backup_restore_and_resume` | 无 |
+
+> 说明：**案例三由多个独立自动化用例组合覆盖，不是一次连续的手工试用会话**；案例一、二为一次连续浏览器流程。执行者为 AI。
 
 未在浏览器中单独重跑的三类案例中的“服务中断”以应用重建测试覆盖（真实关闭并重建应用，而非仅刷新页面）。
 
@@ -110,5 +114,5 @@ npm run test:e2e # 连续三次：8 passed (44.4s) / 8 passed (44.5s) / 8 passed
 
 ## 8. 结论
 
-A–D 已按要求补齐缺陷修复与验收覆盖；后端 243、前端 58、浏览器 8×3 全部通过；工作区干净。
+A–D 已按要求补齐缺陷修复与验收覆盖；后端 243、前端 58、浏览器 9×3 全部通过；工作区干净。
 **明确声明：未合并、未推送、未部署、未调用外部付费模型，等待统一验收。**
