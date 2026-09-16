@@ -33,6 +33,7 @@ export default defineConfig({
         ALIGNSPACE_AUTH_SECRET: randomBytes(32).toString('hex'),
         ALIGNSPACE_DEV: '1',
         ALIGNSPACE_ORIGINS: frontendUrl,
+        ALIGNSPACE_REGISTER_IP_LIMIT: '100',
         ALIGNSPACE_DATABASE_URL: `sqlite:///${join(dataDir, 'accounts.db')}`,
         ALIGNSPACE_CHECKPOINT_PATH: join(dataDir, 'checkpoints.db'),
         ALIGNSPACE_ASSET_DIR: join(dataDir, 'assets'),

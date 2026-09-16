@@ -1,21 +1,24 @@
 # AlignSpace 项目全景与多模型开发交接文档
 
-## 最新接手入口（2026-09-13，优先于下方历史快照）
+## 最新接手入口（2026-09-16，优先于下方历史快照）
+
+> **2026-09-16 追加：试运行保障（A–D）。** 在独立分支 `codex/trial-readiness`（基线 `shawn`@`8deab24`）完成：应用重启后在各等待节点可继续、同键重试与业务副作用一致；多标签页/双角色协作（并发约束 409 保留输入并重新提交、旧回答不写入下一题、另一标签页改约束后审批失效并重新生成、跨标签页退出）；离线一致性备份/恢复到新目录（`scripts/backup_local.py`、`scripts/restore_local.py`，清单含哈希，失败不改原数据）；内部模拟试用与备份手册（`docs/runbooks/`）与验证报告（`docs/reports/trial-readiness-validation.zh-CN.md`）。迁移 v5；本轮修复了离线备份的符号链接遗漏、清单完整集合与目标重叠校验，并将注册按 IP 限流上限改为可配置（`ALIGNSPACE_REGISTER_IP_LIMIT`，默认 10）。
 
 > **2026-09-13 追加：屋主结构化偏好收集与细化问答。** 先对参考图片中的**部位**做广问，再按所选部位细化颜色、材质等；结构化回答（喜欢 / 不在意 / 跳过 + 备注）写入共享偏好，并关联来源图片（`evidence.sourceId`）、部位（`targetElement`）与维度（`dimension`）。跳过不建属性；“不在意”仅对该（部位, 维度）建一条 `not_applicable`；不批量建空记录、不默认喜欢整张图；备注仅保存、不解析。删除来源图片会移除其未确认观察。无新增接口（沿用 `questions/next`、`questions/{id}/answer`、`attributes/{id}`）。
 
 > **2026-09-13 追加：设计师真实约束与协商闭环（含第一轮验收修复）。** 设计师可新增/编辑/撤销约束（类别、作用对象或关联偏好、不兼容取值、内容、理由、限制性质、提出者、确认状态），仅记录实际输入；成员可读。**只有设计师显式声明不兼容取值且关联到已确认偏好时才派生 `preference_vs_constraint` 冲突**；约束实质变更会递增 `revision` 并建立新的待处理冲突、保留历史结论；属性/约束/冲突变化会清空审批并把方案标为 `brief_stale`，需 `POST /realign` 重新生成新版本后才能重新审批；未解决冲突不会被自动标记为已解决。真实流程不再注入固定预算约束（`build_fixture_agents` 仅供隔离测试）。接口：`POST/PATCH /v1/projects/{id}/constraints`、`POST /constraints/{id}/withdraw`、`GET /constraints`、`POST /realign`。迁移 v4 新增 `projects.brief_stale`。
 
-- 主仓库：`/Users/shawn_chen/Documents/GitHub/Design_Inspiration_Agents`。本阶段集成目标是本地 `shawn`，图片开发分支为 `codex/image-upload-storage`；是否已合并请以 `git log` 和 `git status` 为准。没有执行 GitHub push。
+- 主仓库：`/Users/shawn_chen/Documents/GitHub/Design_Inspiration_Agents`。稳定集成基线为本地 `shawn`@`8deab24`；当前试运行保障分支为 `codex/trial-readiness`（未合并）。历史分支 `codex/image-upload-storage`、`codex/authenticated-frontend-ui` 已合并或不再使用。是否已合并请以 `git log` 和 `git status` 为准。没有执行 GitHub push。
 - 认证、成员/一次性项目码、前端账户与协作工作区（A–E）已经完成上一轮本地集成，不要重做。`.worktrees/authenticated-frontend` 是历史工作区，不是当前接手入口。
 - 本轮已实现真实 JPEG/PNG/WebP 上传、受成员权限保护的读取、缩略图与大图入口、屋主软删除、共享图片文件回收、有效图片计数、真实资产来源追溯。单图输入上限 10MB，最多 10 张有效图，分析需要 3–10 张。
 - 验收补强：修正 EXIF 方向后清除元数据，覆盖三种格式和 GPS 测试；并发保存采用独立临时文件；上传与文件回收使用 SQLite 写锁协调，避免误删新引用；限制请求中读取图片字节量；上传网络失败以同键同体重试；浏览器测试和后端测试使用独立图片目录。
-- 数据库迁移当前为 v3：历史无文件 fixture 资产被标记删除，不再计入分析门槛。正常删除请走 API；演示重置、备份或恢复应同时处理数据库、检查点与图片目录。
+- 数据库迁移当前为 v5：v3 墓碑历史无文件 fixture 资产（不计入分析门槛）、v4 新增 `projects.brief_stale`、v5 新增 `idempotency_records.completed`（删除+推进可恢复）。正常删除请走 API；演示重置、备份或恢复应同时处理数据库、检查点与图片目录，见 [本地备份恢复手册](runbooks/local-backup-restore.zh-CN.md)。
 - 本轮验证：后端 193 项、前端 49 项测试通过，TypeScript/Vite 构建与 Ruff 通过；1 条真实双账户浏览器流程通过，覆盖 1600×1200 大图上传、预览、删除及方案双人审批。
 - 设计师约束轮验证（在图片轮之后，含三轮验收修复）：后端 215 项、前端 55 项测试通过，Ruff/构建通过；1 条双账户浏览器流程覆盖“设计师录入约束 → 派生冲突 → 屋主回应 → 生成说明书 → 双方审批 → 审批后修改约束 → 方案过时 → 重新生成 → 双方重新审批”。
 - 屋主访谈轮验证（在约束轮之后）：后端 220 项、前端 58 项测试通过，Ruff/构建通过；双账户浏览器流程改为结构化访谈（广选部位 → 逐部位细化确认/不在意/跳过 → 约束协商 → 审批）。方案编辑（无论是否过时）都以后端权威状态重建系统字段、仅允许改 `goals`，`realign` 保留用户已编辑的 `goals`，冲突身份绑定约束版本与匹配取值。
+- 试运行保障验证（本轮）：后端 243 项、前端 58 项测试通过，Ruff 与构建通过；浏览器套件 9 条连续 3 次通过（`auth-workflow` 1 + `collaboration-resilience` 8），覆盖同一约束并发编辑、删除来源图后另一页面恢复下一步、刷新晚于退出的竞态、重启后内容保全与备份恢复。内部模拟试用与证据见 `docs/reports/trial-readiness-validation.zh-CN.md`。
 - **仍未实现**：真实视觉/语言模型推理、自然语言约束抽取、云部署、装修效果图生成。真实上传不等于真实图像理解；当前每张图仍产生四条固定模拟观察，必须由屋主确认，不能当作模型识别结果。屋主访谈已是结构化选择，不做自由文本理解。
-- **建议下一阶段**：先确定真实多模态 provider 的配置与结构化输出协议，接入 Vision Analyst；保持“观察/推测”与“屋主确认偏好”分离。随后才替换屋主访谈和设计师约束的固定模拟逻辑。供应商、凭据和调用费用需要单独确认，本轮没有外部模型调用。
+- **可能的下一阶段（需用户确认，不是“必须接多模态”）**：若继续，先确定真实多模态 provider 的配置与结构化输出协议并接入 Vision Analyst，保持“观察/推测”与“屋主确认偏好”分离，随后再替换固定模拟的访谈与约束逻辑；也可先评审/合并当前试运行分支。供应商、凭据和调用费用需单独确认，本轮没有外部模型调用。
 - 运行入口：[后端说明](../README.backend.md)、[前端与浏览器验收说明](../README.frontend.md)、[图片阶段规格](superpowers/specs/2026-09-12-real-image-upload-design.md)。
 
 ## 历史快照（以下进度、分支指引和任务清单不再代表现状）

@@ -10,6 +10,7 @@ class AuthConfig:
     secure_cookie: bool = True
     access_seconds: int = 15 * 60
     session_seconds: int = 7 * 24 * 60 * 60
+    register_ip_limit: int = 10
     issuer: str = "alignspace"
     audience: str = "alignspace-api"
 
@@ -23,6 +24,7 @@ class AuthConfig:
                 ).split(",") if item.strip()
             ),
             secure_cookie=os.getenv("ALIGNSPACE_DEV") != "1",
+            register_ip_limit=int(os.getenv("ALIGNSPACE_REGISTER_IP_LIMIT", "10")),
         )
 
     def validate(self):

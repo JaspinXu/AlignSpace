@@ -55,7 +55,7 @@ def _auth_response(request, response, result):
 @router.post("/register", status_code=201, dependencies=[Depends(require_origin)])
 def register(body: RegisterInput, request: Request, response: Response):
     service = request.app.state.container.auth
-    service.throttle("register-ip", request.client.host, limit=10, window=60)
+    service.throttle("register-ip", request.client.host, limit=service.config.register_ip_limit)
     return _auth_response(request, response, service.register(str(body.email), body.password))
 
 
