@@ -14,7 +14,7 @@ Proposes controlled-vocabulary attributes and evidence regions. Cannot infer per
 
 Chooses the lowest-effort, highest-value question. Cannot exceed the question allowance, repeat substantially equivalent questions, pressure users, or reinterpret answers silently.
 
-Candidate score: `0.35 uncertainty + 0.30 impact + 0.20 conflict relevance + 0.10 coverage gap - 0.05 effort - repetition penalty`. Initial hypothesis; tune with data.
+Candidate score: `0.35 uncertainty + 0.30 impact + 0.20 conflict relevance + 0.10 coverage gap - 0.05 effort - repetition penalty`. Initial hypothesis; tune with data. Implemented: core questions use expected entropy removed from the evidence-based belief × impact; see [docs/22](22-bayesian-belief-and-next-action.md). A separate advisory policy suggests one safe next step per role.
 
 ### Designer Agent
 

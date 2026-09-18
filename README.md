@@ -28,6 +28,7 @@ Invitations expire after 24 hours. Browser sessions are possession-based access,
 | Languages | Persistent English / Chinese interface switch, 28 housing choices, bilingual keyword search and note understanding |
 | Design references | Local BM25 retrieval over 22 attributed excerpts from 9 Atelier handbook chapters; confirmed needs, exclusion filtering, expanded on-page definitions and discussion prompts |
 | Alignment | Controlled preference replacement, constraint checks, unresolved-risk blockers and versioned approvals |
+| Belief and next step | Advisory Dirichlet belief per decision from answers, suggestions and saved homes, weighted by evidence quality; hard constraints mask options first. Suggests one safe next action per role (ask, confirm, compare, resolve, approve, wait) and logs what happened next. Never confirms or signs anything |
 | Collaboration | Separate homeowner/designer browser sessions, project isolation, single-use invitations |
 | Reliability | SQLite transactions, stale-version rejection, per-project and global request caps, limited retry, explicit offline fallback |
 | Evidence | Source snapshots in exported briefs and approval hashes; Getty AAT wood concept; audit events, model/prompt version, retrieval IDs and usage |
@@ -37,6 +38,8 @@ Workflow messages are deterministic coordination messages, not autonomous LLM-to
 See [grounded design knowledge notes](docs/20-grounded-design-knowledge.md) for source selection, attribution, retrieval limits and update instructions. The handbook is secondary reference material, not validated Singapore compliance guidance; Getty integration currently covers one verified broader material concept.
 
 See [adaptive interviews and language support](docs/21-adaptive-interviews-and-languages.md) for behavior, translation maintenance and validation.
+
+See [evidence-based belief and suggested next step](docs/22-bayesian-belief-and-next-action.md) for the model, what was adopted from the V7 model note, what was deferred, and the simulation check (`python scripts/simulate_belief.py`).
 
 ## Local setup
 
@@ -85,7 +88,7 @@ See [deployment runbook](docs/15-deployment-runbook.md) for setup and verificati
 python -m pytest -q
 ```
 
-Tests cover approval content hashes, stale edits, negation, preference replacement, source preview handling and avoid filtering, project isolation, role spoofing, invitation replay, consent, image decoding, request caps and model schema boundaries. The [verification report](docs/16-verification-report.md) distinguishes automated evidence from pending user trials.
+Tests cover belief/next-action gates (advisory only, hard constraints first, no false certainty from repeats), approval content hashes, stale edits, negation, preference replacement, source preview handling and avoid filtering, project isolation, role spoofing, invitation replay, consent, image decoding, request caps and model schema boundaries. The [verification report](docs/16-verification-report.md) distinguishes automated evidence from pending user trials.
 
 ## Competition delivery
 

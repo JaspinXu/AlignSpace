@@ -1213,6 +1213,27 @@ dialog::backdrop { background: #1c173575; backdrop-filter: blur(5px); }
 
 .analyse-button { width: 100%; margin-top: 14px; }
 .proposal-list { display: grid; gap: 9px; margin-top: 14px; }
+
+/* Advisory belief and suggested next step */
+.belief-panel { border-color: var(--violet-soft); background: linear-gradient(180deg, var(--violet-tint), var(--surface) 55%); }
+.next-action h3 { margin: 0 0 var(--space-2); font-size: 15px; }
+.next-action .button { margin-top: var(--space-2); }
+.next-action-value { margin: 0 0 var(--space-1); font-weight: 650; color: var(--violet-deep); }
+.next-action-why { margin: var(--space-2) 0 0; color: var(--muted); }
+.belief-details { margin-top: var(--space-4); border-top: 1px solid var(--line); padding-top: var(--space-3); }
+.belief-details summary { cursor: pointer; font-weight: 650; font-size: 13px; }
+.belief-list { display: grid; gap: var(--space-3); margin: var(--space-3) 0; }
+.belief-row small { color: var(--muted); }
+.belief-details > p { font-size: 12px; margin: 0; }
+.belief-head { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 12px; }
+.belief-status { color: var(--muted); }
+.belief-row.confirmed .belief-status { color: #365615; }
+.belief-row.leaning .belief-status { color: var(--violet-deep); font-weight: 650; }
+.belief-row.blocked .belief-status { color: #a33b16; }
+.belief-bar { height: 6px; margin: var(--space-1) 0; border-radius: 99px; background: var(--line-soft); overflow: hidden; }
+.belief-bar span { display: block; height: 100%; border-radius: inherit; background: var(--violet); }
+.belief-row.confirmed .belief-bar span { background: #7bbf2a; }
+.belief-row.blocked .belief-bar span { background: #e0764b; }
 .proposal { padding: 11px; border-radius: var(--radius-sm); background: var(--coral-soft); }
 .proposal p { margin: 0 0 9px; font-size: 12px; }
 .proposal-actions { display: flex; gap: 7px; }

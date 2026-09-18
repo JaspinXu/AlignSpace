@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from app import knowledge, interview
+from app import belief, knowledge, interview
 
 
 DIMENSIONS = (
@@ -131,6 +131,7 @@ def create_project(name: str, housing_type: str | None = None) -> dict[str, Any]
         "references": [],
         "agentMessages": [],
         "approvals": [],
+        "decisionLog": [],
         "createdAt": now_iso(),
         "updatedAt": now_iso(),
     }
@@ -214,6 +215,7 @@ def next_question(state: dict[str, Any], role: str | None = None) -> dict[str, A
         for conflict in state["conflicts"]
         if conflict["status"] == "open" and conflict.get("dimension")
     }
+    dimension_beliefs = (state.get("belief") or {}).get("dimensions", {})
     for question in [*QUESTION_BANK, *interview.DETAIL_QUESTIONS]:
         detail = question.get("detail")
         if detail and not interview.eligible(question, confirmed, answers):
@@ -223,7 +225,10 @@ def next_question(state: dict[str, Any], role: str | None = None) -> dict[str, A
         dimension = question["dimension"]
         if question["id"] in answered or (not detail and dimension in confirmed):
             continue
-        information_gain = _entropy(question["options"])
+        # Core decisions: expected entropy reduction of the evidence-based belief (equals the
+        # option entropy when there is no evidence yet).  Details keep the option-entropy heuristic.
+        posterior = dimension_beliefs.get(dimension) if not detail else None
+        information_gain = posterior["expectedInformationGain"] if posterior else _entropy(question["options"])
         conflict_bonus = 0.7 if dimension in open_conflict_dimensions else 0
         coverage_bonus = 0.25 if dimension not in confirmed else 0
         score = information_gain * question["impact"] + conflict_bonus + coverage_bonus
@@ -243,11 +248,13 @@ def next_question(state: dict[str, Any], role: str | None = None) -> dict[str, A
         "informationGain": round(information_gain, 3),
         "selectionScore": round(score, 3),
         "sequence": state["questionCount"] + 1,
-        "selectionMethod": "option-entropy heuristic; not measured information gain",
+        "selectionMethod": ("expected entropy reduction of the evidence-based belief; uncalibrated" if not selected.get("detail")
+                            else "option-entropy heuristic; not measured information gain"),
     }
 
 
 def answer_question(state: dict[str, Any], question_id: str, role: str, value: str, *, revision: bool = False) -> dict[str, Any]:
+    before = _fresh_snapshot(state)
     if not revision and (state['questionCount'] >= state['maxQuestions'] or state.get("interviewPaused", {}).get(role)):
         raise ValueError('Question limit reached; edit the brief to complete remaining decisions')
     question = next((item for item in [*QUESTION_BANK, *interview.DETAIL_QUESTIONS] if item["id"] == question_id), None)
@@ -317,7 +324,11 @@ def answer_question(state: dict[str, Any], question_id: str, role: str, value: s
         ('No preference was confirmed. You can revisit this decision in the shared brief.' if value == 'not_sure' else 'This optional detail is saved alongside the core decisions in the shared brief.' if question.get('detail') else f"I translated that into a shared {question['dimension']} requirement and will cross-check it against the other side's constraints."),
         "cross_check",
     )
-    return bump_and_recompute(state)
+    state = bump_and_recompute(state)
+    belief.log_outcome(state, before, role, "answer", question["dimension"],
+                       "skipped" if value == "not_sure" else "detail" if question.get("detail") else "confirmed",
+                       questionId=question_id)
+    return state
 
 
 def add_preferences(state: dict[str, Any], goals: list[str], anti_preferences: list[str]) -> dict[str, Any]:
@@ -479,6 +490,7 @@ def analyse_references(state: dict[str, Any]) -> dict[str, Any]:
 def review_attribute(
     state: dict[str, Any], attribute_id: str, decision: str, value: str | None = None
 ) -> dict[str, Any]:
+    before = _fresh_snapshot(state)
     attribute = next((item for item in state["attributes"] if item["id"] == attribute_id), None)
     if not attribute:
         raise ValueError("Attribute not found")
@@ -511,7 +523,9 @@ def review_attribute(
         f"The homeowner {decision}ed the proposed {attribute['dimension']}: {attribute['value'].replace('_', ' ')}.",
         "evidence_review",
     )
-    return bump_and_recompute(state)
+    state = bump_and_recompute(state)
+    belief.log_outcome(state, before, "homeowner", "review", attribute["dimension"], decision + "ed")
+    return state
 
 
 def add_constraint(state: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
@@ -558,6 +572,7 @@ def add_constraint(state: dict[str, Any], data: dict[str, Any]) -> dict[str, Any
 
 
 def resolve_conflict(state: dict[str, Any], conflict_id: str, resolution: str) -> dict[str, Any]:
+    before = _fresh_snapshot(state)
     conflict = next((item for item in state["conflicts"] if item["id"] == conflict_id), None)
     if not conflict:
         raise ValueError("Conflict not found")
@@ -583,7 +598,9 @@ def resolve_conflict(state: dict[str, Any], conflict_id: str, resolution: str) -
         f"Conflict resolved: {resolution.replace('_', ' ')}.",
         "resolution",
     )
-    return bump_and_recompute(state)
+    state = bump_and_recompute(state)
+    belief.log_outcome(state, before, "designer", "resolve", conflict.get("dimension"), resolution)
+    return state
 
 
 def _readiness(state: dict[str, Any]) -> dict[str, Any]:
@@ -640,8 +657,38 @@ def recompute(state: dict[str, Any], *, refresh_knowledge: bool = True) -> dict[
             state["status"] = "alignment"
         else:
             state["status"] = "homeowner_review"
+    refresh_belief(state)
     state["updatedAt"] = now_iso()
     return state
+
+
+def _hard_blocks(state: dict[str, Any]) -> dict[str, set[str]]:
+    """G: options excluded by a must-avoid note or an active designer constraint."""
+    blocked: dict[str, set[str]] = {}
+    for question in QUESTION_BANK:
+        dimension = question["dimension"]
+        for value in question["options"]:
+            if _candidate_exclusions(state, {dimension: value}) or any(
+                    c.get("affectedDimension") == dimension and c.get("incompatibleValue") == value and not c.get("waived")
+                    for c in state["constraints"]):
+                blocked.setdefault(dimension, set()).add(value)
+    return blocked
+
+
+def _fresh_snapshot(state: dict[str, Any]) -> dict[str, Any]:
+    """What the person was shown: the same fresh computation the API presents."""
+    refresh_belief(state)
+    return belief.snapshot(state)
+
+
+def refresh_belief(state: dict[str, Any]) -> None:
+    """Advisory posterior + next-best actions.  Never changes attributes or the signed brief."""
+    options = {q["dimension"]: q["options"] for q in QUESTION_BANK}
+    computed = belief.compute(state, options, _hard_blocks(state))
+    state["belief"] = belief.public(computed)
+    questions = {role: next_question(state, role) for role in ("homeowner", "designer")}
+    owners = {q["dimension"]: q["target"] for q in QUESTION_BANK}
+    state["nextActions"] = belief.next_actions(state, computed, questions, owners)
 
 
 def bump_and_recompute(state: dict[str, Any]) -> dict[str, Any]:
@@ -714,6 +761,7 @@ def build_brief(state: dict[str, Any]) -> dict[str, Any]:
 def approve(state: dict[str, Any], role: str, actor_id: str) -> dict[str, Any]:
     if not state["readiness"]["readyForApproval"]:
         raise ValueError("The brief is not ready: complete the interview and resolve blocking issues")
+    before = _fresh_snapshot(state)
     brief = build_brief(state)
     approval = {
         "role": role,
@@ -732,7 +780,9 @@ def approve(state: dict[str, Any], role: str, actor_id: str) -> dict[str, Any]:
         state["status"] = "awaiting_approval"
     state["stateVersion"] += 1
     state["updatedAt"] = now_iso()
-    return recompute(state, refresh_knowledge=False)
+    state = recompute(state, refresh_knowledge=False)
+    belief.log_outcome(state, before, role, "approve", None, "approved")
+    return state
 
 
 def demo_answers() -> list[tuple[str, str, str]]:

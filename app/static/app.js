@@ -109,6 +109,7 @@ function render() {
   renderGuidance();
   renderMessages();
   renderShortlist();
+  renderBelief();
   renderPreferences();
   renderReferences();
   renderProposals();
@@ -193,6 +194,59 @@ function renderShortlist() {
   if (terms.length) $("#shortlist").innerHTML += `<div class="direction"><h3>Shared terminology</h3>${terms.map(term => `<p><a href="${escapeHtml(term.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(term.preferredLabel)} · Getty AAT ↗</a><br><small>${escapeHtml(term.mappingRelation)}. ${escapeHtml(term.attribution)} · ${escapeHtml(term.license)}</small></p>`).join('')}</div>`;
 }
 
+
+const beliefStatus = {
+  confirmed: ['Confirmed', '已确认'], leaning: ['Leaning — please check', '倾向明显，请确认'],
+  uncertain: ['Still open', '尚未明确'], blocked: ['Blocked by a constraint', '受约束限制'],
+};
+const actionLabels = {
+  ask: ['Go to the question', '前往问题'], confirm: ['Review the suggestion', '查看建议'],
+  invite: ['Create invitation link', '生成邀请链接'], refresh: ['Refresh shared changes', '刷新共享内容'],
+  edit: ['Open the shared brief', '打开共享简报'], resume: ['Continue exploring', '继续探索'],
+  show: ['Add a comparison note', '添加对比说明'], recommend: ['Open the conflict', '查看冲突'],
+  present: ['Open the shared brief', '打开共享简报'], defer: ['Add a note', '添加说明'],
+};
+
+function renderBelief() {
+  const p = state.project;
+  const action = p.nextActions?.[p.viewerRole || 'homeowner'];
+  const box = $('#next-action');
+  if (!action) { box.innerHTML = ''; } else {
+    const compare = action.compare ? `<p class="muted">${human(action.compare[0])} ↔ ${human(action.compare[1])}</p>` : '';
+    const value = action.value ? `<p class="next-action-value">${human(action.dimension)}: ${human(action.value)}</p>` : '';
+    const labelKey = action.resumeInterview ? 'resume' : action.waitingFor ? (p.viewerRole === 'homeowner' ? 'invite' : 'refresh') : action.blocker ? 'edit' : action.action;
+    const [en, zh] = actionLabels[labelKey] || actionLabels.defer;
+    box.innerHTML = `<h3>${escapeHtml(action.title)}</h3>${value}<p class="muted">${escapeHtml(action.reason)}</p>${compare}
+      <button class="button secondary" type="button" id="next-action-button">${bilingual(en, zh)}</button>
+      <p class="next-action-why"><small>${bilingual(`Expected value ${action.expectedReward.toFixed(2)} · uncertainty removed ${action.components.uncertaintyReduction.toFixed(2)} bits · hand-set weights, not learned`, `预期价值 ${action.expectedReward.toFixed(2)} · 预计减少不确定性 ${action.components.uncertaintyReduction.toFixed(2)} 比特 · 权重为人工设定，尚未经数据学习`)}</small></p>`;
+    $('#next-action-button').addEventListener('click', () => followAction(action));
+  }
+  const dims = p.belief?.dimensions || {};
+  $('#belief-list').innerHTML = Object.values(dims).map(entry => {
+    const [en, zh] = beliefStatus[entry.status] || beliefStatus.uncertain;
+    const top = entry.status === 'uncertain' && !entry.evidenceCount ? 'No evidence yet' : human(entry.top);
+    const width = entry.status === 'confirmed' ? 100 : entry.evidenceCount ? Math.round(entry.topProbability * 100) : 0;
+    return `<div class="belief-row ${entry.status}">
+      <div class="belief-head"><strong>${human(entry.dimension)}</strong><span class="belief-status">${bilingual(en, zh)}</span></div>
+      <div class="belief-bar" aria-hidden="true"><span style="width:${width}%"></span></div>
+      <small>${top}${entry.status === 'confirmed' || !entry.evidenceCount ? '' : ` · ${Math.round(entry.topProbability * 100)}%`}</small>
+    </div>`;
+  }).join('');
+}
+
+function followAction(action) {
+  const targets = {ask: '#question-card', confirm: '#proposal-list', recommend: '#conflicts-card', show: '#reference-form', defer: '#reference-form'};
+  if (action.action === 'present' || action.blocker) { selectTab('brief'); return; }
+  if (action.resumeInterview) { interviewAction('continue'); return; }
+  if (action.waitingFor) {
+    if (state.project.viewerRole === 'homeowner' && !$('#invite-button').hidden) $('#invite-button').click();
+    else $('#refresh-button').click();
+    return;
+  }
+  const target = $(targets[action.action]);
+  target?.scrollIntoView({behavior: 'smooth', block: 'center'});
+  if (action.action === 'show' || action.action === 'defer') $('#reference-form input[name="note"]')?.focus({preventScroll: true});
+}
 
 function renderPreferences() {
   const form = $("#preferences-form");

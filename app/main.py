@@ -107,6 +107,9 @@ class ReferenceNoteCreate(BaseModel):
 
 
 def _present(state: dict[str, Any]) -> dict[str, Any]:
+    # Always recompute: the belief is derived and advisory, so a stored copy can be stale after
+    # a code change or as unconfirmed evidence decays.  It is never part of the signed brief.
+    engine.refresh_belief(state)
     return {**state, "nextQuestion": engine.next_question(state), "brief": engine.build_brief(state),
             'questionsByRole':{role:engine.next_question(state,role) for role in ['homeowner','designer']},
             'detailQuestions': [q for q in engine.interview.DETAIL_QUESTIONS if any(a['questionId'] == q['id'] for a in state['answers'])]}

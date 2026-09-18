@@ -18,6 +18,11 @@ Initial release targets:
 - 0 critical unsafe outputs reaching users in release set.
 - ≤10 questions and ≤1 repeated-intent question per case.
 
+## 2a. Belief and next-step checks
+
+- Simulation (`scripts/simulate_belief.py`): top-1 recovery ≥ vote counting; "leaning" precision above overall accuracy. Method check only.
+- Trials: from `decisionLog`, report how often a suggested step was followed, confirm/reject rate for "leaning" suggestions, uncertainty change per interaction, and interactions to approval. Tune weights on a validation split separated by project and time; never on the reporting split.
+
 ## 3. Paired human evaluation
 
 At least five homeowner–designer pairs. After the session, each privately completes a 20-item rubric. Report agreement median/range, sample size, and baseline.
