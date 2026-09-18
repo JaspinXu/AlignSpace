@@ -1,15 +1,15 @@
 # Submission and Readiness Checklist
 
-Updated 13 September 2026. Initial submission is due **28 September, 09:00 SGT** in `#submission`. Required fields are now known; scoring weights and the exact interpretation of the 30-minute video remain open.
+Updated 18 September 2026. Initial submission is due **28 September, 09:00 SGT** in `#submission`. Required fields are now known; scoring weights and the exact interpretation of the 30-minute video remain open.
 
 ## Submission package
 
 - [x] Team: Four Wolf Kings — 8QFDUS2I.
 - [x] Project: AlignSpace — Design Inspiration Agents.
-- [ ] Judge-accessible GitHub repository URL and release identifier.
-- [ ] Video viewing/download URL (do not upload the video to Slack).
-- [ ] PDF write-up with problem, value, implementation and measured evidence.
-- [ ] Public Lightsail deployment URL verified in a signed-out browser.
+- [ ] Judge-accessible GitHub repository URL and release identifier. Code is merged to `main` and tagged `v1.0-rc1`; **repository is still private — make it public (or grant judges access) before posting.**
+- [ ] Video viewing/download URL (do not upload the video to Slack). Captioned golden-path recording and narration script are ready (`docs/23-submission-kit.md`); team narration and upload pending.
+- [ ] PDF write-up with problem, value, implementation and measured evidence. Draft generated: `docs/writeup/AlignSpace-writeup.pdf` (source `writeup.html`, re-render with `python docs/writeup/render_pdf.py`); fill the URL placeholders and trial results before submitting.
+- [ ] Public Lightsail deployment URL verified in a signed-out browser. Use `scripts/deploy_lightsail.sh` (see `docs/15`).
 - [ ] Formal topic-selection record checked by the team.
 - [ ] Owner trial results collected; external user/SME validation clearly distinguished.
 
@@ -37,10 +37,10 @@ Updated 13 September 2026. Initial submission is due **28 September, 09:00 SGT**
 
 ## Repository
 
-- [ ] README includes problem, value, flow, architecture, setup, demo, tests, limits, license.
-- [ ] `.env.example` placeholders only.
-- [ ] No secrets, tokens, private images, participant/customer data in history.
-- [ ] Dependency and asset licenses/provenance documented.
+- [x] README includes problem, value, flow, architecture, setup, demo, tests, limits, license.
+- [x] `.env.example` placeholders only.
+- [x] No secrets, tokens, private images, participant/customer data in history (scanned 18 September: no `.env`, database or key material ever committed).
+- [x] Dependency and asset licenses/provenance documented (MIT `LICENSE` with third-party exclusions; Atelier and Getty attributions in `app/knowledge_data`).
 - [ ] Clean deployment; reproducible tagged release.
 
 ## Product and agent evidence
@@ -50,22 +50,22 @@ Updated 13 September 2026. Initial submission is due **28 September, 09:00 SGT**
 - [ ] Business assumptions exposed; pilot has cohort/metrics/stop criteria.
 - [ ] Each agent has goals/tools/inputs/outputs/forbidden actions.
 - [ ] Canonical state and transition owner clear.
-- [ ] Adaptive decision visible; loops/retries/request counts bounded.
-- [ ] Human approval cannot be bypassed.
+- [x] Adaptive decision visible; loops/retries/request counts bounded.
+- [x] Human approval cannot be bypassed (tests + two-session E2E).
 - [ ] Model/prompt/evaluation versions recorded.
 
 ## Safety and technical
 
 - [ ] Trust boundaries/data stores shown.
 - [ ] Auth, encryption, rates, audit, deletion tested.
-- [ ] Injection, cross-project, malformed output, unsafe advice tested.
+- [x] Injection, cross-project, malformed output, unsafe advice tested.
 - [ ] No open critical finding.
 - [ ] Manual fallback and kill switch.
 - [ ] Observability excludes raw sensitive content.
 
 ## Demo and handoff
 
-- [ ] Synthetic/consented/licensed content.
+- [x] Synthetic/consented/licensed content.
 - [ ] Three clean live runs; backup video/cached output.
 - [ ] Claims labelled fact/finding/hypothesis/target/estimate.
 - [ ] Charts show denominators; links tested signed out.

@@ -260,7 +260,9 @@ function renderReferences() {
 }
 
 function renderProposals() {
-  const proposals = state.project.attributes.filter(item => item.status === "proposed");
+  // A suggestion whose value the person already confirmed elsewhere (e.g. by answering the question) needs no second review.
+  const confirmedKeys = new Set(state.project.attributes.filter(a => a.status === "confirmed").map(a => a.dimension + "|" + a.value));
+  const proposals = state.project.attributes.filter(item => item.status === "proposed" && !confirmedKeys.has(item.dimension + "|" + item.value));
   $("#analyse-button").disabled = !state.project.references.length;
   $("#proposal-list").innerHTML = proposals.map(item => `
     <div class="proposal">

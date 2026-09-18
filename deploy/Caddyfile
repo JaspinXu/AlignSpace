@@ -1,0 +1,7 @@
+# Public entry point for judges. SITE_ADDRESS is set by scripts/deploy_lightsail.sh:
+#   <public-ip>.sslip.io  -> automatic HTTPS certificate (needs ports 80 and 443 open)
+#   :80                   -> plain HTTP fallback
+{$SITE_ADDRESS} {
+	encode gzip
+	reverse_proxy 127.0.0.1:8010
+}

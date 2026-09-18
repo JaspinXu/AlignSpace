@@ -1,0 +1,20 @@
+# systemd unit for the assessed Lightsail instance. Installed by scripts/deploy_lightsail.sh.
+[Unit]
+Description=AlignSpace (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/alignspace/current
+EnvironmentFile=/home/ubuntu/alignspace/shared/.env
+Environment=ALIGNSPACE_DB_PATH=/home/ubuntu/alignspace/shared/data/alignspace.db
+Environment=ALIGNSPACE_UPLOAD_DIR=/home/ubuntu/alignspace/shared/data/uploads
+ExecStart=/home/ubuntu/alignspace/current/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010 --proxy-headers
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

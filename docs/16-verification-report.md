@@ -1,3 +1,15 @@
+# Verification report
+
+## Update — 18 September 2026
+
+- **Automated tests:** 77 passed (`python -m pytest -q`) on Linux and on the owner's Windows machine (Python 3.11). New since 13 September: advisory belief and suggested next step (`tests/test_belief.py`).
+- **Two-session end-to-end run** (`scripts/e2e_golden_path.py`, Chromium, separate homeowner and designer browser contexts, synthetic data, offline analysis mode): **19/19 checks passed**, zero console errors. Result: `docs/evidence/e2e-run.json`; screenshots in `docs/evidence/screenshots/`; exported brief `docs/evidence/approved-brief.example.json` validates against the schema. Checks cover: injected instruction in a note not executed; must-avoid item never proposed; suggestions start unconfirmed; next step suggests inviting the designer; designer role from single-use invitation; designer constraint opens a conflict and blocks approval; designer is pointed to resolve it; readiness after human resolution; homeowner cannot approve as designer; dual approval on one content hash; post-approval edit clears approvals; invitation replay rejected; another session cannot read the project; stale edit rejected (409); role spoofing rejected; decision log recorded; duplicate suggestion hidden after confirmation.
+- **Belief simulation** (`scripts/simulate_belief.py`, synthetic): top-1 recovery 0.71–0.73 vs 0.68–0.70 for vote counting over three seeds. Method check only.
+- **Real saved projects** (copy of the local database, 10 projects): every project receives a sensible next step for each role after the fallback fixes.
+- **Deployment script:** instance-side steps exercised in a container with stubbed systemd; not yet run on the Lightsail instance. The live deployment below predates the belief layer.
+
+Pending: live deployment of the current release and a signed-out URL check; owner trial (`docs/17`); any external homeowner/designer session.
+
 # Verification report — 13 September 2026
 
 ## Automated evidence

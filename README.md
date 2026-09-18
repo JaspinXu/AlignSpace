@@ -80,12 +80,15 @@ Model calls run outside the SQLite write transaction. Results are committed only
 
 For assessment, run the application on one organiser-provided **medium Lightsail instance**. Transfer the code or pull it from Git, install dependencies, configure the backend `.env`, and start the application. The repository does not require a particular domain or web proxy.
 
-See [deployment runbook](docs/15-deployment-runbook.md) for setup and verification. For local Docker use, copy `.env.example` to `.env`, then run `docker compose up --build` (trial port 8000).
+`scripts/deploy_lightsail.sh ubuntu@<ip> <key.pem>` ships the committed release, keeps `.env` and data, and serves it at `https://<ip>.sslip.io` via Caddy. See [deployment runbook](docs/15-deployment-runbook.md) for setup and verification. For local Docker use, copy `.env.example` to `.env`, then run `docker compose up --build` (trial port 8000).
 
 ## Verify
 
 ```sh
 python -m pytest -q
+# Two-session browser run (synthetic data, offline mode): writes docs/evidence/
+ALIGNSPACE_ANALYSIS_MODE=offline ALIGNSPACE_DB_PATH=/tmp/e2e.db python -m uvicorn app.main:app --port 8011
+python scripts/e2e_golden_path.py http://127.0.0.1:8011
 ```
 
 Tests cover belief/next-action gates (advisory only, hard constraints first, no false certainty from repeats), approval content hashes, stale edits, negation, preference replacement, source preview handling and avoid filtering, project isolation, role spoofing, invitation replay, consent, image decoding, request caps and model schema boundaries. The [verification report](docs/16-verification-report.md) distinguishes automated evidence from pending user trials.
@@ -99,10 +102,14 @@ Tests cover belief/next-action gates (advisory only, hard constraints first, no 
 - Use the organiser-provided hosting and inference allocation. Use a single medium instance; do not copy the starter kit's second-instance example.
 - Kiro redemption deadline was 11 September; redeemed credits are valid through 31 October.
 
-See [official context](docs/00-official-context.md) and [submission checklist](docs/12-submission-checklist.md). Reconcile later organiser notices before submission.
+See [official context](docs/00-official-context.md) and [submission checklist](docs/12-submission-checklist.md). The [submission kit](docs/23-submission-kit.md) has the Slack post template, organiser questions, video script and final link check. Reconcile later organiser notices before submission.
 
 ## Scope and remaining evidence
 
 The current release is a trial prototype. No licensed room reference set, external designer evaluation, measured time-saving study, account recovery, deletion/retention automation or production-grade identity verification has been completed. Critical professional constraints stay blocked; the application cannot certify professional safety. See the [user trial worksheet](docs/17-user-trial.md) to collect evidence without representing hypotheses as outcomes.
 
 Architecture and research documents under `docs/` include future design plans. Use this README and the verification report as the current implementation record.
+
+## License
+
+Code is released under the [MIT License](LICENSE). Third-party excerpts, listing metadata and images keep their own terms; see the notes at the end of `LICENSE`.

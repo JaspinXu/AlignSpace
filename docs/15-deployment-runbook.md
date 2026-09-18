@@ -1,5 +1,24 @@
 # Deploy to an Ubuntu Lightsail instance
 
+## Scripted deploy (recommended)
+
+From Git Bash / macOS / Linux, in the repository, with the change committed:
+
+```sh
+scripts/deploy_lightsail.sh ubuntu@<PUBLIC_IP> ~/.ssh/alignspace-lightsail.pem          # HTTPS at https://<PUBLIC_IP>.sslip.io
+scripts/deploy_lightsail.sh ubuntu@<PUBLIC_IP> ~/.ssh/alignspace-lightsail.pem --http   # fallback: http://<PUBLIC_IP>
+```
+
+1. In the Lightsail console, open TCP **80** and **443** (Networking → IPv4 firewall). Nothing else needs to be public; the app listens on 127.0.0.1:8010 behind Caddy.
+2. First run only: the script creates `/home/ubuntu/alignspace/shared/.env` from `.env.example`. SSH in, fill the gateway URL, model and key (`nano`), then `sudo systemctl restart alignspace`.
+3. The script ships `git archive HEAD` only (no local DB, uploads or secrets), installs a versioned release under `releases/<sha>`, keeps `.env` and `data/` in `shared/`, restarts the `alignspace` systemd service and Caddy, checks `/health`, and rolls back to the previous release if the check fails. The three newest releases are kept.
+4. `sslip.io` maps `<ip>.sslip.io` to the instance IP so Caddy can obtain a certificate without a purchased domain. If certificate issuance fails, use `--http` and say so in the submission.
+5. Verify from a signed-out/private browser window, then record the URL and date in `docs/16-verification-report.md`.
+
+Tested on 18 September 2026 by running the instance-side steps in a Linux container with stubbed `systemctl`/`sudo` (first install, health check, `.env` and database preserved on redeploy, secure-cookie switch, Caddy site address). **Not yet run against the real instance.**
+
+## Manual steps (reference)
+
 Develop locally, then run the code on the organiser-provided medium instance for assessment. The steps below use an example directory; adjust the path and SSH identity to the instance you receive.
 
 ## Install and run
