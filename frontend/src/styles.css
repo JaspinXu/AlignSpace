@@ -304,3 +304,14 @@ form {
   }
 }
 .asset-thumb { display: block; width: 120px; max-width: 100%; height: 90px; object-fit: contain; }
+
+.brief-reader {
+  max-width: 900px;
+  margin: 0 auto;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.brief-reader section { border-top: 1px solid var(--line); padding: 1rem 0; }
+.brief-reader li { white-space: pre-wrap; margin-bottom: 0.8rem; }
+.brief-reader select { max-width: 100%; margin-top: 0.5rem; }
+.brief-reader .hash { overflow-wrap: anywhere; }

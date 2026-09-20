@@ -53,6 +53,27 @@ function detailSnapshot(): ProjectSnapshot {
       targetElement: 'lighting', dimension: 'lighting', attributeId: 'mock-lighting-lighting' }] } };
 }
 
+describe('read-only brief entry', () => {
+  it.each(['偏好内容', '约束内容', '您的回答'])('protects unsaved %s before opening the reader', async (label) => {
+    const initial = briefSnapshot(label === '约束内容' ? 'designer' : 'homeowner');
+    if (label === '您的回答') initial.pendingQuestion = detailSnapshot().pendingQuestion;
+    const env = setup(initial.project.role, initial);
+    await env.client.restore();
+    const open = vi.fn();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<Workspace client={env.client} projectId="p1" onOpenBrief={open} />);
+    fireEvent.change(await screen.findByLabelText(label), { target: { value: '未保存的内容' } });
+    await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
+    expect(confirm).toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(label)).toHaveValue('未保存的内容');
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
+    expect(open).toHaveBeenCalledWith(1);
+    confirm.mockRestore();
+  });
+});
+
 describe('question draft recovery', () => {
   it.each(['changes', 'disappears'])('keeps an unsent answer recoverable when the remote question %s', async (transition) => {
     const initial = detailSnapshot();

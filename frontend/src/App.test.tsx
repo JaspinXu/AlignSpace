@@ -3,11 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { ApiClient } from './api';
-import { snapshot } from './test/fixtures';
+import { briefSnapshot, snapshot } from './test/fixtures';
 
 const json = (data: unknown) => new Response(JSON.stringify(data));
-function setup() {
-  const state = snapshot();
+function setup(state = snapshot()) {
   const fetcher = vi.fn<typeof fetch>(async (url) => {
     if (url === '/v1/auth/refresh') return json({ accessToken: 'token', user: { id: 'u1' } });
     if (url === '/v1/projects') return json([state.project]);
@@ -24,6 +23,41 @@ afterEach(() => {
 });
 
 describe('application session and navigation', () => {
+  it('restores a versioned reader link and removes reader parameters when returning', async () => {
+    window.history.replaceState(null, '', '/?project=p1&view=brief&version=1');
+    const env = setup(briefSnapshot());
+    render(<App client={env.client} />);
+    await screen.findByRole('heading', { name: '设计说明书' });
+    expect(await screen.findByText('warm modern')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: '返回工作区' }));
+    await screen.findByRole('heading', { name: '当前任务' });
+    expect(window.location.search).toBe('?project=p1');
+    await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
+    await screen.findByRole('heading', { name: '设计说明书' });
+    expect(window.location.search).toBe('?project=p1&view=brief&version=1');
+    act(() => {
+      window.history.replaceState(null, '', '/?project=p1');
+      fireEvent.popState(window);
+    });
+    await screen.findByRole('heading', { name: '当前任务' });
+  });
+
+  it('preserves dirty goals when reader navigation is cancelled', async () => {
+    window.history.replaceState(null, '', '/?project=p1');
+    const env = setup(briefSnapshot());
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App client={env.client} />);
+    fireEvent.change(await screen.findByLabelText('方案目标'), { target: { value: '未保存目标' } });
+    await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
+    expect(confirm).toHaveBeenCalled();
+    expect(screen.getByLabelText('方案目标')).toHaveValue('未保存目标');
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
+    await screen.findByRole('heading', { name: '设计说明书' });
+    expect(await screen.findByText('warm modern')).toBeVisible();
+    confirm.mockRestore();
+  });
+
   it('restores once across default-client rerenders', async () => {
     const env = setup();
     let refreshes = 0;

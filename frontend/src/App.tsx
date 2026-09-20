@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiClient, ApiError } from './api';
 import type { JoinCode, Project, Role } from './types';
 import { Workspace } from './workflow/Workspace';
+import { BriefDetail } from './briefs/BriefDetail';
 
 const ROLE_LABEL: Record<Role, string> = { homeowner: '屋主', designer: '设计师' };
 const STATUS_LABEL: Record<string, string> = {
@@ -32,8 +33,9 @@ function errorMessage(error: unknown): string {
   return '发生未知错误，请重试。';
 }
 
-function projectFromUrl(): string | null {
-  return new URL(window.location.href).searchParams.get('project');
+function routeFromUrl() {
+  const params = new URL(window.location.href).searchParams;
+  return { projectId: params.get('project'), brief: params.get('view') === 'brief', version: params.get('version') };
 }
 
 export function App({ client: suppliedClient }: { client?: ApiClient }) {
@@ -41,18 +43,31 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
   const [session, setSession] = useState<'loading' | 'anonymous' | 'ready'>('loading');
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState(projectFromUrl);
+  const [route, setRoute] = useState(routeFromUrl);
+  const selectedProjectId = route.projectId;
 
   const openProject = useCallback((projectId: string | null, replace = false) => {
     const url = new URL(window.location.href);
     if (projectId) url.searchParams.set('project', projectId);
     else url.searchParams.delete('project');
+    url.searchParams.delete('view');
+    url.searchParams.delete('version');
     window.history[replace ? 'replaceState' : 'pushState'](null, '', url);
-    setSelectedProjectId(projectId);
+    setRoute(routeFromUrl());
   }, []);
 
+  const openBrief = useCallback((version: number, replace = false) => {
+    const url = new URL(window.location.href);
+    if (!selectedProjectId) return;
+    url.searchParams.set('project', selectedProjectId);
+    url.searchParams.set('view', 'brief');
+    url.searchParams.set('version', String(version));
+    window.history[replace ? 'replaceState' : 'pushState'](null, '', url);
+    setRoute(routeFromUrl());
+  }, [selectedProjectId]);
+
   useEffect(() => {
-    const onPopState = () => setSelectedProjectId(projectFromUrl());
+    const onPopState = () => setRoute(routeFromUrl());
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -132,9 +147,16 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
             退出登录
           </button>
         </nav>
-        <Workspace key={selected.id} client={client} projectId={selected.id} />
+        {route.brief ? <BriefDetail key={`brief-${selected.id}`} client={client} projectId={selected.id}
+          version={route.version} onVersion={openBrief} onBack={() => openProject(selected.id)} />
+          : <Workspace key={selected.id} client={client} projectId={selected.id} onOpenBrief={openBrief} />}
       </div>
     );
+  }
+
+  if (selectedProjectId && route.brief) {
+    return <div className="app-shell"><p role="alert">项目不存在或无权访问。</p>
+      <button type="button" onClick={() => openProject(null)}>返回我的项目</button></div>;
   }
 
   return (

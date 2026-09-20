@@ -82,7 +82,9 @@ function AssetThumb({ client, projectId, asset }: { client: ApiClient; projectId
   ) : null;
 }
 
-export function Workspace({ client, projectId }: { client: ApiClient; projectId: string }) {
+export function Workspace({ client, projectId, onOpenBrief }: {
+  client: ApiClient; projectId: string; onOpenBrief?: (version: number) => void;
+}) {
   const [snapshot, setSnapshot] = useState<ProjectSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -202,6 +204,18 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
   const goalsMatchBrief = latestBrief && JSON.stringify(goalsDraft.split('\n')
     .map((line) => line.trim()).filter(Boolean)) === JSON.stringify(latestBrief.payload.goals);
   const canApprove = !goalsDirty.current && Boolean(goalsMatchBrief) && !projectState.briefStale;
+
+  const openBrief = () => {
+    if (!latestBrief || !onOpenBrief) return;
+    const hasQuestionInput = Object.values(questionDrafts).some((draft) =>
+      draft.answer.trim() || draft.parts.length || Object.keys(draft.decisions).length ||
+      Object.values(draft.customs).some((text) => text.trim()));
+    const hasInput = goalsDirty.current || hasQuestionInput || [value, reviewNote, conflictResolution,
+      constraintStatement, constraintRationale, constraintAppliesTo, constraintAttributeId,
+      constraintIncompatible, editAttributeValue].some((text) => text.trim());
+    if (hasInput && !window.confirm('有未保存的输入，离开后将丢弃。是否继续查看设计说明书？')) return;
+    onOpenBrief(latestBrief.version);
+  };
 
   const handleWriteError = async (error: unknown) => {
     if (error instanceof ApiError && error.status === 409) {
@@ -814,6 +828,7 @@ export function Workspace({ client, projectId }: { client: ApiClient; projectId:
           {latestBrief && (
             <section aria-label="设计方案">
               <h3>设计方案</h3>
+              {onOpenBrief && <button type="button" onClick={openBrief}>查看设计说明书</button>}
               <p>
                 方案版本 v{latestBrief.version} · 完整度{' '}
                 {Math.round(latestBrief.completeness * 100)}%
