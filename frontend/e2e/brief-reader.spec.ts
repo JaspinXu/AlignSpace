@@ -64,6 +64,15 @@ test('both members read immutable brief versions without changing the project', 
     await owner.getByRole('button', { name: '返回工作区' }).click();
     await expect(owner.getByRole('heading', { name: '当前任务' })).toBeVisible();
     await expect(owner).not.toHaveURL(/view=brief/);
+    await owner.getByLabel('方案目标').fill('后退时保留的草稿');
+    owner.once('dialog', (dialog) => dialog.dismiss());
+    await owner.goBack();
+    await expect(owner.getByLabel('方案目标')).toHaveValue('后退时保留的草稿');
+    await expect(owner).not.toHaveURL(/view=brief/);
+    owner.once('dialog', (dialog) => dialog.accept());
+    await owner.goBack();
+    await expect(owner.getByLabel('说明书版本')).toHaveValue('1');
+    expect(writes).toEqual([]);
   } finally {
     await ownerContext.close();
     await designerContext.close();

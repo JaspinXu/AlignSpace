@@ -82,8 +82,9 @@ function AssetThumb({ client, projectId, asset }: { client: ApiClient; projectId
   ) : null;
 }
 
-export function Workspace({ client, projectId, onOpenBrief }: {
+export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard }: {
   client: ApiClient; projectId: string; onOpenBrief?: (version: number) => void;
+  briefLeaveGuard?: { current: (() => boolean) | null };
 }) {
   const [snapshot, setSnapshot] = useState<ProjectSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -161,6 +162,22 @@ export function Workspace({ client, projectId, onOpenBrief }: {
     setGoalsDraft(goals.map((goal) => String(goal)).join('\n'));
   }, [latestBrief?.version, latestBrief?.contentHash]);
 
+  const confirmBriefLeave = () => {
+    const hasQuestionInput = Object.values(questionDrafts).some((draft) =>
+      draft.answer.trim() || draft.parts.length || Object.keys(draft.decisions).length ||
+      Object.values(draft.customs).some((text) => text.trim()));
+    const hasInput = goalsDirty.current || hasQuestionInput || [value, reviewNote, conflictResolution,
+      constraintStatement, constraintRationale, constraintAppliesTo, constraintAttributeId,
+      constraintIncompatible, editAttributeValue].some((text) => text.trim());
+    return !hasInput || window.confirm('有未保存的输入，离开后将丢弃。是否继续查看设计说明书？');
+  };
+
+  useEffect(() => {
+    if (!briefLeaveGuard) return;
+    briefLeaveGuard.current = confirmBriefLeave;
+    return () => { briefLeaveGuard.current = null; };
+  });
+
   if (loadError && !snapshot) {
     return (
       <div className="workspace">
@@ -207,13 +224,7 @@ export function Workspace({ client, projectId, onOpenBrief }: {
 
   const openBrief = () => {
     if (!latestBrief || !onOpenBrief) return;
-    const hasQuestionInput = Object.values(questionDrafts).some((draft) =>
-      draft.answer.trim() || draft.parts.length || Object.keys(draft.decisions).length ||
-      Object.values(draft.customs).some((text) => text.trim()));
-    const hasInput = goalsDirty.current || hasQuestionInput || [value, reviewNote, conflictResolution,
-      constraintStatement, constraintRationale, constraintAppliesTo, constraintAttributeId,
-      constraintIncompatible, editAttributeValue].some((text) => text.trim());
-    if (hasInput && !window.confirm('有未保存的输入，离开后将丢弃。是否继续查看设计说明书？')) return;
+    if (!confirmBriefLeave()) return;
     onOpenBrief(latestBrief.version);
   };
 

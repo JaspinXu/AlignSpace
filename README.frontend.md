@@ -91,6 +91,18 @@ uv run ruff check src tests
 
 ## What the frontend supports today
 
+- Independent read-only design brief reader, opened by “查看设计说明书” in the
+  workspace. Links use `?project=<id>&view=brief&version=<n>`; history navigation
+  and reload preserve the selected version. Content comes from that version's
+  saved payload, not current preferences or constraints. Editing, regeneration
+  and approval remain in the workspace; unsaved input prompts before opening.
+- Approval display matches both version and content hash. Missing historical
+  approvals are labelled unavailable, not “never approved”; stale latest briefs
+  show invalidated approval status. The reader does not export or compare versions.
+  Original image evidence IDs are shown without substituting current images.
+  Template-derived room/budget metadata is not presented as historical fact.
+  Status refresh is manual or on focus; no new background polling is introduced.
+
 - Email/password registration, login, logout, and session restore after reload.
   No email verification and no password recovery in this version.
   Logout clears the local UI immediately. Cookie-mutating auth operations use

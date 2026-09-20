@@ -23,6 +23,24 @@ afterEach(() => {
 });
 
 describe('application session and navigation', () => {
+  it('guards browser history into the reader and preserves the draft on cancellation', async () => {
+    window.history.replaceState(null, '', '/?project=p1&view=brief&version=1');
+    const env = setup(briefSnapshot());
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App client={env.client} />);
+    await userEvent.click(await screen.findByRole('button', { name: '返回工作区' }));
+    fireEvent.change(await screen.findByLabelText('方案目标'), { target: { value: '历史导航未保存目标' } });
+    act(() => window.history.back());
+    await waitFor(() => expect(confirm).toHaveBeenCalled());
+    expect(screen.getByLabelText('方案目标')).toHaveValue('历史导航未保存目标');
+    expect(window.location.search).toBe('?project=p1');
+    confirm.mockReturnValue(true);
+    act(() => window.history.back());
+    await screen.findByRole('heading', { name: '设计说明书' });
+    expect(window.location.search).toBe('?project=p1&view=brief&version=1');
+    confirm.mockRestore();
+  });
+
   it('restores a versioned reader link and removes reader parameters when returning', async () => {
     window.history.replaceState(null, '', '/?project=p1&view=brief&version=1');
     const env = setup(briefSnapshot());

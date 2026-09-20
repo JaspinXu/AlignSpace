@@ -1,6 +1,10 @@
 # AlignSpace 项目全景与多模型开发交接文档
 
-## 最新接手入口（2026-09-16，优先于下方历史快照）
+## 最新接手入口（2026-09-21，优先于下方历史快照）
+
+> **2026-09-21 验证收尾：** 只读说明书页已通过独立审查及修复复核，补齐浏览器历史导航的未保存输入保护。最新实测为后端 245 项、前端 111 项、浏览器 10 项通过，Ruff 与构建通过。证据见 [说明书页验证记录](reports/brief-reader-validation.zh-CN.md)。当前仍在 `codex/brief-reader`，未合并、未推送、未部署；下方旧阶段数字仅作历史记录。
+
+> **2026-09-20 追加：独立只读说明书详情页。** 开发分支 `codex/brief-reader`，从本地 `shawn` @ `0b10ae5`（规格提交；此前试运行保障合并为 `e31d23b`）创建。工作区“查看设计说明书”进入详情，可刷新深链接、选择历史版本、前进后退；正文只读取所选版本快照。编辑、重新生成与审批仍在工作区；有未保存输入时进入阅读页需确认。复用项目 state GET，无新后端接口或迁移。历史审批可能被现有流程清空，因此缺失显示“历史审批记录不可用”，不能据此推断当时未批准。项目模板残留元数据不当作历史事实展示。原图证据显示来源 ID；不新增导出、版本比较、真实模型或部署。规格与实施计划见 `docs/superpowers/specs/2026-09-20-brief-reader-design.md`、`docs/superpowers/plans/2026-09-20-brief-reader-plan.md`。最终提交和集成状态以 Git 为准。
 
 > **2026-09-16 追加：试运行保障（A–D）。** 在独立分支 `codex/trial-readiness`（基线 `shawn`@`8deab24`）完成：应用重启后在各等待节点可继续、同键重试与业务副作用一致；多标签页/双角色协作（并发约束 409 保留输入并重新提交、旧回答不写入下一题、另一标签页改约束后审批失效并重新生成、跨标签页退出）；离线一致性备份/恢复到新目录（`scripts/backup_local.py`、`scripts/restore_local.py`，清单含哈希，失败不改原数据）；内部模拟试用与备份手册（`docs/runbooks/`）与验证报告（`docs/reports/trial-readiness-validation.zh-CN.md`）。迁移 v5；本轮修复了离线备份的符号链接遗漏、清单完整集合与目标重叠校验，并将注册按 IP 限流上限改为可配置（`ALIGNSPACE_REGISTER_IP_LIMIT`，默认 10）。
 
@@ -8,7 +12,7 @@
 
 > **2026-09-13 追加：设计师真实约束与协商闭环（含第一轮验收修复）。** 设计师可新增/编辑/撤销约束（类别、作用对象或关联偏好、不兼容取值、内容、理由、限制性质、提出者、确认状态），仅记录实际输入；成员可读。**只有设计师显式声明不兼容取值且关联到已确认偏好时才派生 `preference_vs_constraint` 冲突**；约束实质变更会递增 `revision` 并建立新的待处理冲突、保留历史结论；属性/约束/冲突变化会清空审批并把方案标为 `brief_stale`，需 `POST /realign` 重新生成新版本后才能重新审批；未解决冲突不会被自动标记为已解决。真实流程不再注入固定预算约束（`build_fixture_agents` 仅供隔离测试）。接口：`POST/PATCH /v1/projects/{id}/constraints`、`POST /constraints/{id}/withdraw`、`GET /constraints`、`POST /realign`。迁移 v4 新增 `projects.brief_stale`。
 
-- 主仓库：`/Users/shawn_chen/Documents/GitHub/Design_Inspiration_Agents`。稳定集成基线为本地 `shawn`@`8deab24`；当前试运行保障分支为 `codex/trial-readiness`（未合并）。历史分支 `codex/image-upload-storage`、`codex/authenticated-frontend-ui` 已合并或不再使用。是否已合并请以 `git log` 和 `git status` 为准。没有执行 GitHub push。
+- 主仓库：`/Users/shawn_chen/Documents/GitHub/Design_Inspiration_Agents`。试运行保障已合并到本地 `shawn` @ `e31d23b`；说明书规格随后提交为 `0b10ae5`。历史功能分支 `codex/trial-readiness` 已清理，当前开发为 `codex/brief-reader`。是否已合并请以 `git log` 和 `git status` 为准。没有执行 GitHub push。
 - 认证、成员/一次性项目码、前端账户与协作工作区（A–E）已经完成上一轮本地集成，不要重做。`.worktrees/authenticated-frontend` 是历史工作区，不是当前接手入口。
 - 本轮已实现真实 JPEG/PNG/WebP 上传、受成员权限保护的读取、缩略图与大图入口、屋主软删除、共享图片文件回收、有效图片计数、真实资产来源追溯。单图输入上限 10MB，最多 10 张有效图，分析需要 3–10 张。
 - 验收补强：修正 EXIF 方向后清除元数据，覆盖三种格式和 GPS 测试；并发保存采用独立临时文件；上传与文件回收使用 SQLite 写锁协调，避免误删新引用；限制请求中读取图片字节量；上传网络失败以同键同体重试；浏览器测试和后端测试使用独立图片目录。

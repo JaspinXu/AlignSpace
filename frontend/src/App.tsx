@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError } from './api';
 import type { JoinCode, Project, Role } from './types';
 import { Workspace } from './workflow/Workspace';
@@ -45,6 +45,7 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [route, setRoute] = useState(routeFromUrl);
   const selectedProjectId = route.projectId;
+  const briefLeaveGuard = useRef<(() => boolean) | null>(null);
 
   const openProject = useCallback((projectId: string | null, replace = false) => {
     const url = new URL(window.location.href);
@@ -67,10 +68,20 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
   }, [selectedProjectId]);
 
   useEffect(() => {
-    const onPopState = () => setRoute(routeFromUrl());
+    const currentUrl = window.location.href;
+    const onPopState = () => {
+      const next = routeFromUrl();
+      if (next.brief && !route.brief && briefLeaveGuard.current && !briefLeaveGuard.current()) {
+        // popstate occurs after navigation. Reinsert the current workspace URL
+        // without remounting it, so cancellation preserves the in-memory draft.
+        window.history.pushState(null, '', currentUrl);
+        return;
+      }
+      setRoute(next);
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [route]);
 
   useEffect(() => client.onSessionEnded(() => {
     openProject(null, true);
@@ -149,7 +160,8 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
         </nav>
         {route.brief ? <BriefDetail key={`brief-${selected.id}`} client={client} projectId={selected.id}
           version={route.version} onVersion={openBrief} onBack={() => openProject(selected.id)} />
-          : <Workspace key={selected.id} client={client} projectId={selected.id} onOpenBrief={openBrief} />}
+          : <Workspace key={selected.id} client={client} projectId={selected.id} onOpenBrief={openBrief}
+              briefLeaveGuard={briefLeaveGuard} />}
       </div>
     );
   }
