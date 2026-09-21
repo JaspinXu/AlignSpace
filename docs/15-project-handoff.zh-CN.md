@@ -2,6 +2,43 @@
 
 ## 最新接手入口（2026-09-21，优先于下方历史快照）
 
+## 下一轮接续入口（2026-09-21，先读这一节）
+
+**任务**：继续完成「图片偏好分析框架 ＋ OpenPlan3D 集成」的**里程碑②、③与交付文档**。
+
+- 分支 `codex/preference-space-integration`，接续点 HEAD **`5eda6ce`**（基线 `5843774`）。已提交 7 个：`1a5d1bc` 规格+计划+领域模型起步、`b4e51aa` 供应商边界+协议核对+权限定稿、`baa54f1` 候选持久化(v6)、`1a14ff5` 候选服务+API、`9f49d96` 前端候选看板、`bc06a21` 里程碑①报告、`5eda6ce` 空间模型+材质目录+空间版本(v7)。
+- **工作区有 6 个他人未提交文件，必须原样保留、不得覆盖或随手提交**：`frontend/e2e/auth-workflow.spec.ts`、`frontend/e2e/flow.ts`、`frontend/src/App.test.tsx`、`frontend/src/App.tsx`、`src/alignspace/auth/routes.py`、`tests/api/test_auth.py`（内容：预算改为自由金额输入 + 注册密码下限 15→8）。浏览器用例 `flow.ts` 目前**依赖**其中的预算字段改动才能通过。
+- 接续时实测基线：后端 **305**、前端 **119**（6 文件）、浏览器 **11**（`npm run test:e2e`，配置用隔离临时目录）、Ruff/构建/`tsc` 均通过。命令：`uv run pytest -q`、`uv run ruff check src tests scripts`、`cd frontend && npm test && npm run build && npx tsc --noEmit && npm run test:e2e`。**不要沿用历史数字，先重跑一次。**
+
+### 已完成的②（可直接复用）
+
+- `src/alignspace/domain/space.py`：`build_rectangular_room()`（后端生成稳定 ID：`room-1` / `floor-room-1` / `wall-room-1-north|east|south|west`）、`SpacePlan` 结构校验（ID 唯一、对象必须引用存在的房间、尺寸 1000–20000mm、房间≤12、对象≤200）、`SpaceVersion`（版本+`content_hash`+`created_by/role/source/previous_version`）、`calculate_space_content_hash()`。
+- `src/alignspace/domain/space_catalog.py`：`match_material(value, target=...)` 三态（EXACT / APPROXIMATE(带 note，需用户确认) / 抛 `UnsupportedMaterialError`）；`supported_options()`；`MATERIAL_OPTIONS` 表（地面 4 项、墙面 1 项，**地面/墙面目录隔离**）。
+- 持久化：`space_versions` 表 + `ProjectState.space_versions` + `UpsertSpaceVersion` 补丁 + repository 读写 + 迁移 **v7**。
+- 已有测试：`tests/unit/domain/test_space_model.py`(11)、`tests/integration/persistence/test_repository.py::test_space_versions_round_trip_through_the_repository`、`test_migrations.py`（版本集合到 7）。
+
+### ②剩余（按序 TDD）
+
+1. `application/space_service.py` + `api/routes/space.py`：`GET /space`、`GET /space/versions`、`POST /space/rooms`（手绘或尺寸）、`PATCH /space/rooms/{id}`、`DELETE /space/rooms/{id}`、`PATCH /space/objects/{id}`。统一走 `WriteEnvelope`（`idempotencyKey`/`expectedStateVersion`），**PATCH 只接受受支持字段白名单，禁止整份 JSON 覆盖**；每次实质修改生成新 `SpaceVersion`（`version+1`、新哈希、`previous_version`），非实质（视角/缩放）不产生版本。
+2. **权限（已由用户确认，不要再问）**：空间草稿**屋主与设计师同等可写**；**删除房间/对象仅限屋主**（403）。项目隔离、角色判定仍走 `get_actor` + 成员关系。
+3. 测试：项目隔离、401/403、并发 409、同键不同内容 409、失败恢复（重启后重载一致）、**历史项目无空间数据仍走原说明书流程**、旧空间审批不得被当作新版本已批准。
+4. 前端 `frontend/src/space/`：`spaceAdapter.ts` + 2D 编辑与 3D 预览入口，接入 `Workspace.tsx`（已有 `PreferenceBoard` 先例）。本地存储**只作草稿**；iframe/跨窗口通信校验来源与协议，**不把令牌放 URL**。
+5. OpenPlan3D（`https://github.com/laanlabs/openPlan3D`）：**拉取并固定上游提交 SHA**，保留 LICENSE 与第三方模型/贴图归属（写入 `docs/references/openplan3d.md` 与 `docs/14-data-and-asset-register.md`），提供本地启动说明，**不依赖也不调用上游云分享/统计/账户**，验收须检查不向任何上游云服务发送项目数据；其只读 MCP 不能替代编辑接口，必须走受控适配层。
+
+### ③全部（迁移 v8）
+
+- `SpaceBinding`：`roomId`/`floorObjectId` + `target=floor` + 已确认 `attributeId`/`candidateId` + `materialOptionId` + `approximation` + `status(active|needs_review|invalidated)`。
+- 闭环：已确认地板偏好 → 绑定房间 → 受支持材质 → 展示预览与适配说明 → 用户确认 → 保存新空间版本 → **重载后保持**。
+- 规则：不支持材质明确报错；近似替代标注并要求确认；未确认的模型输出/设计师意见不得覆盖空间；房间拆分/合并/删除或导入改变身份时绑定转 `needs_review`，**不静默转移**；反向修改空间不得自动改写屋主正式偏好。
+- **联合审批**：区分「确认应用到空间草案」与「双方批准交付方案」；后端必须校验 `briefVersion/hash` **与** `spaceVersion/hash` 都仍有效；旧说明书审批不得当作新空间方案已批准。规则表见规格 `docs/superpowers/specs/2026-09-21-preference-space-integration-design.md` 第 5 节。
+
+### 交付物与硬约束
+
+- 交付：迁移与兼容说明、模型输入输出协议、环境变量示例、DeepSeek 后续配置与真实联调步骤、OpenPlan3D 本地启动说明、上游提交与素材归属清单、更新交接文档、里程碑②③各自的实际运行结果。
+- **不合并、不推送、不部署、不调用外部付费模型**；测试一律使用隔离的临时数据库/检查点/图片目录。
+- 报告需单独标记：**“真实 DeepSeek 联调待用户配置密钥后验收。”** 模拟通过 **≠** 真实识图已验证。
+- 参考：规格 `docs/superpowers/specs/2026-09-21-preference-space-integration-design.md`、计划 `docs/superpowers/plans/2026-09-21-preference-space-integration-plan.md`、里程碑①报告 `docs/reports/preference-candidates-validation.zh-CN.md`、DeepSeek 协议 `docs/references/deepseek.md`。
+
 > **2026-09-21 追加：图片偏好分析框架（里程碑①完成）。** 开发分支 `codex/preference-space-integration`，基线 `codex/brief-reader` @ `5843774`。新增可替换的分析 provider（确定性 mock + 已实现但**本轮未调用**的 DeepSeek 适配器，缺密钥显式失败不降级），以及候选偏好闭环：屋主选图＋自然语言描述 → 模型提出候选（三类事实分离：关注维度／模型推断／屋主确认；不确定材质不编造取值）→ 屋主逐项确认 → 写入**唯一**正式 `Attribute`（`pref-{candidateId}`，重复确认不重复创建）。重新分析不覆盖已确认/人工编辑内容；删除条目保留已确认偏好；删除来源图后未确认候选失效。迁移 **v6**。接口：`POST/GET /v1/projects/{id}/preference-analyses`、`PATCH/DELETE /v1/projects/{id}/design-entries/{eid}`、`PATCH/POST /v1/projects/{id}/candidates/{cid}`（含 confirm/reject）。实测：后端 293、前端 119、浏览器 11 连续 3 次通过，Ruff/构建通过。DeepSeek 协议已抓官方文档核对（`docs/references/deepseek.md`）。证据见 [里程碑①验证报告](reports/preference-candidates-validation.zh-CN.md)。**里程碑②空间持久化、③地板联动、OpenPlan3D 集成尚未开始。** 工作区仍保留他人 6 个未提交文件（预算金额输入＋密码下限），未合并、未推送、未部署。
 
 > **2026-09-21 验证收尾：** 只读说明书页已通过独立审查及修复复核，补齐浏览器历史导航的未保存输入保护。最新实测为后端 245 项、前端 111 项、浏览器 10 项通过，Ruff 与构建通过。证据见 [说明书页验证记录](reports/brief-reader-validation.zh-CN.md)。当前仍在 `codex/brief-reader`，未合并、未推送、未部署；下方旧阶段数字仅作历史记录。
