@@ -45,7 +45,8 @@ function post(type: string, payload: Record<string, unknown> = {}): void {
 export function startAlignSpaceBridge(): void {
   if (!isEmbedded()) return;
 
-  let suppressUntil = 0;
+  let baselineFingerprint: string | null = null;
+  let importing = false;
   let lastFingerprint: string | null = null;
 
   // Read-only introspection plus the two mutations used by automated
@@ -97,8 +98,10 @@ export function startAlignSpaceBridge(): void {
       const project = createDefaultProject('AlignSpace 空间草稿');
       project.floors = [floor];
       project.activeFloorId = floor.id;
-      suppressUntil = Date.now() + 2500;
       lastFingerprint = data.fingerprint ?? null;
+      // Mark the store change caused by this import so it is not echoed back as
+      // a user edit; later user edits are never time-suppressed.
+      importing = true;
       loadProject(project);
       post('alignspace:applied', {
         fingerprint: data.fingerprint,
@@ -111,11 +114,21 @@ export function startAlignSpaceBridge(): void {
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   currentProject.subscribe((project) => {
-    if (!project || Date.now() < suppressUntil) return;
+    if (!project) return;
+    const fingerprint = JSON.stringify(project);
+    if (importing) {
+      // Record the imported state as the baseline; do not echo it as an edit.
+      baselineFingerprint = fingerprint;
+      importing = false;
+      return;
+    }
+    if (fingerprint === baselineFingerprint) return;
+    // Any genuine user edit (even immediately after import) is queued.
+    baselineFingerprint = fingerprint;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       post('alignspace:project', { project: JSON.parse(JSON.stringify(project)) });
-    }, 400);
+    }, 300);
   });
 
   post('alignspace:ready', {});

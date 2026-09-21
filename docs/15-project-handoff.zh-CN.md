@@ -8,11 +8,12 @@
 
 **提交**：里程碑② `87ddc6e`、里程碑③ `f8987a0`、交付文档 `263e4db`、评审修复 `71d09df`、OpenPlan3D 双向桥（见最新 `git log`），均在 `codex/preference-space-integration`。**未合并、未推送、未部署、未调用外部付费模型。**
 
-- 实测（本机隔离临时目录）：后端 **334**、前端 **149**（10 文件）、浏览器 **14**（含真实 OpenPlan3D）、Ruff/构建/`tsc` 通过。命令见下方原任务书。
+- 实测（本机隔离临时目录）：后端 **336**、前端 **156**（10 文件）、浏览器 **15**（含真实 OpenPlan3D 与双人联合审批）、Ruff/构建/`tsc` 通过。命令见下方原任务书。
 - 里程碑②：空间服务与 API（共享可写、删除仅屋主、白名单 PATCH、不可变 `SpaceVersion`）、前端 `spaceAdapter`/`SpaceBoard`。报告 `docs/reports/space-persistence-validation.zh-CN.md`。
 - 里程碑③：`SpaceBinding` + `SpaceApproval`（迁移 v8）、绑定/应用/复核与联合审批、受支持材质映射、房间/偏好变更转 `needs_review`、前端 `BindingPanel`。报告 `docs/reports/space-binding-validation.zh-CN.md`。
 - 评审修复（针对 5 项 P1）：材质进入 3D handoff；`brief_stale` 时联合审批判为失效（保留历史）；手选材质仍需近似确认；复核仅屋主且必须显式选目标房间并重算近似。
-- **OpenPlan3D 真实集成**：`scripts/fetch_openplan3d.sh` 在固定 SHA `d68cadf703578f2cd3a7c77f820e18d342580c32` 上安装双向桥（`vendor/openplan3d/bridge/alignspaceBridge.ts`）并注入 `editor/+page.svelte`；实现 ready→导入（保留权威房间/对象 ID、按 `alignspaceFloorMaterials` 呈现地板材质）→ `currentProject` 变更回传 → 受控 API 落库。网络仅限本地，令牌不入 URL。验收 `frontend/e2e/space-3d.spec.ts` 当日实测通过（未安装上游时自动跳过）。
+- 第二轮评审修复：handoff 保留已保存家具位置（重开三维不重置）；同步以导入基准版本做并发保护，409 保留草稿并可重试；基线指纹区分导入与用户编辑、同步期间排队不丢弃；支持编辑器新增房间/家具与删空、非矩形轮廓经 `PATCH outline` 落库；人字拼等不可渲染铺法显式标注并要求确认。新增双人联合审批浏览器验收。
+- **OpenPlan3D 真实集成**：`scripts/fetch_openplan3d.sh` 在固定 SHA `d68cadf703578f2cd3a7c77f820e18d342580c32` 上安装双向桥（`vendor/openplan3d/bridge/alignspaceBridge.ts`）并注入 `editor/+page.svelte`；实现 ready→导入（保留权威房间/对象 ID、按 `alignspaceFloorMaterials` 呈现地板材质、保留家具位置）→ `currentProject` 变更回传 → 受控 API 落库。网络仅限本地，令牌不入 URL。验收 `frontend/e2e/space-3d.spec.ts` 与 `frontend/e2e/space-joint-approval.spec.ts` 当日实测通过（未安装上游时 3D 用例自动跳过）。
 - 交付文档：`docs/references/preference-space-delivery.zh-CN.md`、`.env.example`、`docs/references/openplan3d.md`、`docs/14-data-and-asset-register.md`。
 - **工作区仍保留 6 个他人未提交文件，未纳入任何提交**（清单见下）。
 - **唯一未完成项**：**真实 DeepSeek 联调待用户配置密钥后验收。** 模拟通过 ≠ 真实识图已验证。

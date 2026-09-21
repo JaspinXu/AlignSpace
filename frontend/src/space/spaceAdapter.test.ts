@@ -6,9 +6,11 @@ import {
   isAllowedPreviewOrigin,
   parseEditorMessage,
   planFingerprint,
+  previewPatternNote,
   roomCorners,
   spaceExtent,
   toOpenPlan3DHandoff,
+  upstreamDiff,
   upstreamPatches,
 } from './spaceAdapter';
 
@@ -152,5 +154,120 @@ describe('spaceAdapter edit-back', () => {
 
   it('produces a stable fingerprint for the same plan', () => {
     expect(planFingerprint(plan())).toBe(planFingerprint(plan()));
+  });
+});
+
+
+const rectWalls = [
+  { id: 'wall-room-a-north', start: { x: 100, y: 200 }, end: { x: 500, y: 200 } },
+  { id: 'wall-room-a-east', start: { x: 500, y: 200 }, end: { x: 500, y: 700 } },
+  { id: 'wall-room-a-south', start: { x: 500, y: 700 }, end: { x: 100, y: 700 } },
+  { id: 'wall-room-a-west', start: { x: 100, y: 700 }, end: { x: 100, y: 200 } },
+];
+
+describe('spaceAdapter edit-back round two', () => {
+  it('keeps a saved object position when rebuilding the handoff', () => {
+    const positioned = plan();
+    positioned.objects[0].geometry = { ...positioned.objects[0].geometry, x: 1500, y: 3500 };
+    const transform = toOpenPlan3DHandoff(positioned).objects[0].transform;
+    expect(transform[12]).toBeCloseTo(1.5);
+    expect(transform[14]).toBeCloseTo(3.5);
+  });
+
+  it('creates a room drawn in the editor', () => {
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls: [
+            { id: 'n1', start: { x: 0, y: 0 }, end: { x: 400, y: 0 } },
+            { id: 'e1', start: { x: 400, y: 0 }, end: { x: 400, y: 500 } },
+            { id: 's1', start: { x: 400, y: 500 }, end: { x: 0, y: 500 } },
+            { id: 'w1', start: { x: 0, y: 500 }, end: { x: 0, y: 0 } },
+          ],
+          rooms: [{ id: 'r', name: '书房', walls: ['n1', 'e1', 's1', 'w1'] }],
+          furniture: [],
+        },
+      ],
+    };
+    const diff = upstreamDiff(upstream, plan(), 'homeowner');
+    expect(diff.ops).toContainEqual({
+      op: 'create_room',
+      name: '书房',
+      origin: { x: 0, y: 0 },
+      size: { width: 4000, depth: 5000 },
+    });
+  });
+
+  it('deletes the last room and object instead of silently keeping them', () => {
+    const empty = { activeFloorId: 'f', floors: [{ id: 'f', walls: [], rooms: [], furniture: [] }] };
+    const diff = upstreamDiff(empty, plan(), 'homeowner');
+    expect(diff.ops).toContainEqual({ op: 'delete_room', roomId: 'room-a' });
+    expect(diff.ops).toContainEqual({ op: 'delete_object', objectId: 'obj-1' });
+  });
+
+  it('sends a polygon outline for a non-rectangular room', () => {
+    const walls = [
+      { id: 'a', start: { x: 0, y: 0 }, end: { x: 400, y: 0 } },
+      { id: 'b', start: { x: 400, y: 0 }, end: { x: 400, y: 200 } },
+      { id: 'c', start: { x: 400, y: 200 }, end: { x: 200, y: 200 } },
+      { id: 'd', start: { x: 200, y: 200 }, end: { x: 200, y: 500 } },
+      { id: 'e', start: { x: 200, y: 500 }, end: { x: 0, y: 500 } },
+      { id: 'f', start: { x: 0, y: 500 }, end: { x: 0, y: 0 } },
+    ];
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls,
+          rooms: [
+            {
+              id: 'r',
+              name: '客厅',
+              walls: ['a', 'b', 'c', 'd', 'e', 'f'],
+              alignspaceRoomId: 'room-a',
+            },
+          ],
+          furniture: [],
+        },
+      ],
+    };
+    const diff = upstreamDiff(upstream, plan(), 'designer');
+    const update = diff.ops.find((op) => op.op === 'update_room') as
+      | Extract<ReturnType<typeof upstreamDiff>['ops'][number], { op: 'update_room' }>
+      | undefined;
+    expect(update?.outline).toHaveLength(6);
+    expect(diff.unsupported).toEqual([]);
+  });
+
+  it('creates furniture added in the editor', () => {
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls: rectWalls,
+          rooms: [{ id: 'r', name: '客厅', walls: rectWalls.map((wall) => wall.id), alignspaceRoomId: 'room-a' }],
+          furniture: [
+            { id: 'new-f', position: { x: 200, y: 200 }, width: 80, depth: 60, height: 80, catalogId: 'sofa' },
+          ],
+        },
+      ],
+    };
+    const diff = upstreamDiff(upstream, plan(), 'designer');
+    expect(diff.ops).toContainEqual({
+      op: 'create_object',
+      roomId: 'room-a',
+      kind: 'furniture',
+      label: 'sofa',
+      geometry: { x: 2000, y: 2000, width: 800, depth: 600, height: 800 },
+    });
+  });
+
+  it('flags a confirmed pattern that the preview cannot render', () => {
+    expect(previewPatternNote('herringbone')).toMatch(/不支持/);
+    expect(previewPatternNote('pale oak')).toBeNull();
   });
 });

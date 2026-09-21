@@ -84,3 +84,24 @@ POST   /v1/projects/{id}/space/approvals                # 联合审批
 追加实测（本机隔离临时目录）：后端 **334**、前端 **149**、浏览器 **14**（含真实 OpenPlan3D）、Ruff/构建/`tsc` 通过。提交 `71d09df` 及后续 3D 集成提交。
 
 > **真实 DeepSeek 联调待用户配置密钥后验收。**
+
+## 9. 第二轮评审修复与双人联合审批浏览器验收（2026-09-21 追加）
+
+| 评审项 | 处理 |
+|---|---|
+| 保存后的家具位置重开三维被重置 | `toOpenPlan3DHandoff` 改用 `geometry.x/y` 重建对象 transform，不再固定房间中心；3D 验收重开编辑器断言位置保持 |
+| 三维旧编辑用最新版本提交、绕过并发保护 | 同步以导入时的 `baseVersionRef` 为基准，每次成功写入推进到本次响应版本；冲突返回 409 时保留草稿、显示重试，不再盲目取最新版本继续提交 |
+| 连续编辑被静默丢弃 | 桥改为“基线指纹”区分导入与用户编辑（取消 2.5s 时间窗）；前端用 `pendingProjectRef` + 排空循环排队而非直接返回 |
+| 原生新增房间/删除最后一个对象未落库 | `upstreamDiff` 对无 `alignspaceRoomId` 的房间创建；移除 `seen.size>0` 删除门槛（仅在成功导入后应用删除），为编辑器新增家具创建对象 |
+| 人字拼“完全匹配”未真实渲染 | 3D 预览无法渲染的铺法（人字拼）在绑定表单显式标注为“不支持/近似”并要求确认；验收不再声称已渲染人字拼 |
+| 非矩形编辑被静默矩形化 | 后端 `PATCH /space/rooms` 新增 `outline` 支持；适配层对非矩形房间发送多边形轮廓，`create_room`/`update_room` 均可落库（新增后端测试） |
+
+追加浏览器验收：
+
+- `frontend/e2e/space-3d.spec.ts`：真实启动上游，导入后重开编辑器断言家具位置一致；移动家具回传落库并重载保持；绑定前确认人字拼未渲染提示。
+- `frontend/e2e/space-joint-approval.spec.ts`：双账户对同一 `briefVersion/hash` 与 `spaceVersion/hash` 联合批准 → 双方已批准；随后设计师改约束使 `brief_stale` → 显示“尚未双方批准”且历史批准保留。
+- `frontend/src/space/SpaceBoard.test.tsx` 新增并发 409 保留草稿 + 重试用例；`spaceAdapter.test.ts` 新增位置保持、新建房间、删空、非矩形轮廓、新建对象、铺法提示用例。
+
+追加实测：后端 **336**、前端 **156**、浏览器 **15**（含真实 OpenPlan3D 与双人联合审批）、Ruff/构建/`tsc` 通过。
+
+> **真实 DeepSeek 联调待用户配置密钥后验收。**

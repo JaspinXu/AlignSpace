@@ -14,7 +14,8 @@ import {
   parseEditorMessage,
   roomCorners,
   spaceExtent,
-  upstreamPatches,
+  previewPatternNote,
+  upstreamDiff,
   type SpaceSyncOp,
 } from './spaceAdapter';
 
@@ -57,12 +58,18 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewNote, setPreviewNote] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncNotes, setSyncNotes] = useState<string[]>([]);
+  const [syncConflict, setSyncConflict] = useState(false);
   const frame = useRef<HTMLIFrameElement | null>(null);
   const planRef = useRef<SpaceSnapshot['plan']>(null);
   const readyRef = useRef(false);
   const syncingRef = useRef(false);
-  const versionRef = useRef(stateVersion);
-  versionRef.current = stateVersion;
+  const hasImportedRef = useRef(false);
+  const conflictRef = useRef(false);
+  const pendingProjectRef = useRef<unknown>(null);
+  // The version the editor state was based on, so a concurrent write returns 409
+  // instead of being silently overwritten.
+  const baseVersionRef = useRef(stateVersion);
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
 
@@ -92,60 +99,124 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   // Older workspaces and unrelated test doubles may not expose a catalogue yet.
   const materialOptions = Array.isArray(materials?.options) ? materials.options : [];
 
-  const applyUpstreamOps = useCallback(
-    async (ops: SpaceSyncOp[]) => {
-      if (ops.length === 0 || syncingRef.current) return;
-      syncingRef.current = true;
-      setSyncing(true);
-      setError(null);
-      try {
-        for (const op of ops) {
-          const current = await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`);
-          const version = Math.max(current.stateVersion, versionRef.current);
-          if (op.op === 'update_room') {
-            const data: Record<string, unknown> = {};
-            if (op.name !== undefined) data.name = op.name;
-            if (op.origin) data.origin = op.origin;
-            if (op.size) data.size = op.size;
-            await client.execute(
-              prepareWrite(`/v1/projects/${projectId}/space/rooms/${op.roomId}`, 'PATCH', version, data),
-            );
-          } else if (op.op === 'create_room') {
-            await client.execute(
-              prepareWrite(`/v1/projects/${projectId}/space/rooms`, 'POST', version, {
-                name: op.name,
-                width: op.size.width,
-                depth: op.size.depth,
-                origin: op.origin,
-              }),
-            );
-          } else if (op.op === 'delete_room') {
-            await client.execute(
-              prepareWrite(`/v1/projects/${projectId}/space/rooms/${op.roomId}`, 'DELETE', version, {}),
-            );
-          } else if (op.op === 'update_object') {
-            await client.execute(
-              prepareWrite(`/v1/projects/${projectId}/space/objects/${op.objectId}`, 'PATCH', version, {
-                geometry: op.geometry,
-              }),
-            );
-          } else if (op.op === 'delete_object') {
-            await client.execute(
-              prepareWrite(`/v1/projects/${projectId}/space/objects/${op.objectId}`, 'DELETE', version, {}),
-            );
-          }
-        }
-        setSnapshot(await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`));
-        onChangedRef.current?.();
-      } catch (caught) {
-        setError(messageOf(caught));
-      } finally {
-        syncingRef.current = false;
-        setSyncing(false);
+  const buildWrite = useCallback(
+    (op: SpaceSyncOp, version: number) => {
+      if (op.op === 'update_room') {
+        const data: Record<string, unknown> = {};
+        if (op.name !== undefined) data.name = op.name;
+        if (op.origin) data.origin = op.origin;
+        if (op.size) data.size = op.size;
+        if (op.outline) data.outline = op.outline;
+        return prepareWrite(`/v1/projects/${projectId}/space/rooms/${op.roomId}`, 'PATCH', version, data);
       }
+      if (op.op === 'create_room') {
+        const data: Record<string, unknown> = {
+          name: op.name,
+          width: op.size.width,
+          depth: op.size.depth,
+          origin: op.origin,
+        };
+        if (op.outline) data.outline = op.outline;
+        return prepareWrite(`/v1/projects/${projectId}/space/rooms`, 'POST', version, data);
+      }
+      if (op.op === 'delete_room') {
+        return prepareWrite(`/v1/projects/${projectId}/space/rooms/${op.roomId}`, 'DELETE', version, {});
+      }
+      if (op.op === 'update_object') {
+        return prepareWrite(
+          `/v1/projects/${projectId}/space/objects/${op.objectId}`,
+          'PATCH',
+          version,
+          { geometry: op.geometry },
+        );
+      }
+      if (op.op === 'create_object') {
+        return prepareWrite(`/v1/projects/${projectId}/space/objects`, 'POST', version, {
+          roomId: op.roomId,
+          kind: op.kind,
+          label: op.label,
+          geometry: op.geometry,
+        });
+      }
+      return prepareWrite(
+        `/v1/projects/${projectId}/space/objects/${op.objectId}`,
+        'DELETE',
+        version,
+        {},
+      );
     },
-    [client, projectId],
+    [projectId],
   );
+
+  const applyOps = useCallback(
+    async (ops: SpaceSyncOp[]) => {
+      // Start from the version the editor state was based on. Each successful
+      // write advances to the version our own write produced, so a concurrent
+      // write between operations surfaces as a 409 rather than being absorbed.
+      let version = baseVersionRef.current;
+      for (const op of ops) {
+        const result = await client.execute<SpaceSnapshot>(buildWrite(op, version));
+        version = result.stateVersion;
+        baseVersionRef.current = version;
+      }
+      const refreshed = await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`);
+      setSnapshot(refreshed);
+      baseVersionRef.current = refreshed.stateVersion;
+      onChangedRef.current?.();
+    },
+    [buildWrite, client, projectId],
+  );
+
+  const drain = useCallback(async () => {
+    if (syncingRef.current) return;
+    const project = pendingProjectRef.current;
+    if (!project) return;
+    pendingProjectRef.current = null;
+    const currentPlan = planRef.current;
+    if (!currentPlan) return;
+    const { ops, unsupported } = upstreamDiff(project, currentPlan, role);
+    setSyncNotes(unsupported);
+    // Deletions are only trusted after a successful import established the base.
+    const applicable = hasImportedRef.current
+      ? ops
+      : ops.filter((op) => op.op !== 'delete_room' && op.op !== 'delete_object');
+    if (applicable.length === 0) return;
+    syncingRef.current = true;
+    setSyncing(true);
+    setError(null);
+    try {
+      await applyOps(applicable);
+      conflictRef.current = false;
+      setSyncConflict(false);
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        // Preserve the draft and let the user decide; never silently rebase.
+        pendingProjectRef.current = project;
+        conflictRef.current = true;
+        setSyncConflict(true);
+        setError('其他协作者已更新空间，本次 3D 编辑未覆盖新版本。请重试以在当前版本上重新应用。');
+      } else {
+        setError(messageOf(caught));
+      }
+    } finally {
+      syncingRef.current = false;
+      setSyncing(false);
+      if (pendingProjectRef.current && !conflictRef.current) void drain();
+    }
+  }, [applyOps, role]);
+
+  const retrySync = useCallback(async () => {
+    const project = pendingProjectRef.current;
+    if (!project) return;
+    conflictRef.current = false;
+    setSyncConflict(false);
+    const current = await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`);
+    planRef.current = current.plan;
+    setSnapshot(current);
+    baseVersionRef.current = current.stateVersion;
+    pendingProjectRef.current = project;
+    void drain();
+  }, [client, projectId, drain]);
 
   // Preview handshake: only a message from the exact local origin is trusted.
   useEffect(() => {
@@ -158,19 +229,24 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
         const target = frame.current?.contentWindow;
         const currentPlan = planRef.current;
         if (!target || !currentPlan) return;
+        baseVersionRef.current = Math.max(baseVersionRef.current, stateVersion);
         target.postMessage(buildPreviewMessage(currentPlan), PREVIEW_URL);
         setPreviewNote('已将当前空间草稿发送到本地 3D 预览（仅本机，不含令牌）。');
+      } else if (parsed.kind === 'applied') {
+        hasImportedRef.current = true;
       } else if (parsed.kind === 'project') {
+        if (!hasImportedRef.current) return;
         const currentPlan = planRef.current;
         if (!currentPlan) return;
-        void applyUpstreamOps(upstreamPatches(parsed.project, currentPlan, role));
+        pendingProjectRef.current = parsed.project;
+        void drain();
       } else if (parsed.kind === 'error') {
         setError(parsed.message);
       }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [previewOpen, applyUpstreamOps, role]);
+  }, [previewOpen, drain, stateVersion]);
 
   // Keep the 3D editor in sync when the 2D panel changes the plan.
   useEffect(() => {
@@ -459,6 +535,21 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
               {syncing ? ' 正在将 3D 编辑同步回后端…' : ''}
               {previewNote ? ` ${previewNote}` : ''}
             </p>
+            {syncConflict && (
+              <p role="alert">
+                3D 编辑与服务器版本冲突，草稿已保留。
+                <button type="button" disabled={syncing} onClick={() => void retrySync()}>
+                  重试同步
+                </button>
+              </p>
+            )}
+            {syncNotes.length > 0 && (
+              <ul role="note">
+                {syncNotes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            )}
             {!isAllowedPreviewOrigin(PREVIEW_URL, PREVIEW_URL) && <p role="alert">预览地址不受信任。</p>}
           </>
         )}

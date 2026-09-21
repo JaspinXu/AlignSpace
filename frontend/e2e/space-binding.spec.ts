@@ -38,6 +38,8 @@ test('a confirmed floor preference is bound, applied and survives a reload', asy
     await expect(shared.getByText('联合审批（说明书 + 空间）')).toBeVisible();
 
     await shared.getByLabel('已确认地板偏好').selectOption({ index: 1 });
+    // The 3D preview cannot render herringbone; acknowledge before binding.
+    await shared.getByLabel(/我理解 3D 预览不会呈现该铺法/).check();
     await shared.getByLabel('房间', { exact: true }).selectOption({ index: 1 });
     const bound = owner.waitForResponse(
       (response) => response.url().endsWith('/space/bindings') && response.request().method() === 'POST',

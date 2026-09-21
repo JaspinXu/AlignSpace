@@ -39,6 +39,9 @@ test('the 3D editor imports the plan, shows the material and syncs edits back', 
     await owner.reload();
     const shared = owner.getByRole('region', { name: '空间草稿' });
     await shared.getByLabel('已确认地板偏好').selectOption({ index: 1 });
+    // An unrenderable laying pattern must be acknowledged before binding.
+    await expect(shared.getByText(/3D 预览暂不支持「人字拼」/)).toBeVisible();
+    await shared.getByLabel(/我理解 3D 预览不会呈现该铺法/).check();
     await shared.getByLabel('房间', { exact: true }).selectOption({ index: 1 });
     const bound = owner.waitForResponse(
       (response) => response.url().endsWith('/space/bindings') && response.request().method() === 'POST',
@@ -95,8 +98,7 @@ test('the 3D editor imports the plan, shows the material and syncs edits back', 
     expect(snapshot.furnitureIds).toContain(objectId);
 
     // A real store mutation in the editor must flow back through our controlled
-    // API. Wait out the import suppression window first.
-    await owner.waitForTimeout(2800);
+    // API. No time window: the bridge only filters the import it just applied.
     await editor!.evaluate((id) => {
       (window as any).__alignspace.moveFurniture(id, { x: 150, y: 350 });
     }, objectId);
@@ -109,6 +111,20 @@ test('the 3D editor imports the plan, shows the material and syncs edits back', 
       .locator(`[data-testid="object-${objectId}"]`);
     await expect(persisted).toBeVisible();
     await expect(persisted).not.toHaveAttribute('x', String(beforeX));
+
+    // Reopening the 3D editor must place the object at the saved position, not
+    // reset it to the room centre.
+    await owner.getByRole('region', { name: '空间草稿' }).getByRole('button', { name: '打开 3D 预览' }).click();
+    const reopenedElement = await owner.locator('iframe[title="OpenPlan3D 本地预览"]').elementHandle();
+    const reopened = await reopenedElement!.contentFrame();
+    await reopened!.waitForFunction(() => Boolean((window as any).__alignspace?.snapshot?.()));
+    const repositioned = await reopened!.evaluate((id) => {
+      const project = (window as any).__alignspace.snapshot();
+      const floor = project?.floors?.find((f: any) => f.id === project.activeFloorId);
+      const item = (floor?.furniture ?? []).find((f: any) => f.id === id);
+      return item ? { x: Math.round(item.position.x), y: Math.round(item.position.y) } : null;
+    }, objectId);
+    expect(repositioned).toEqual({ x: 150, y: 350 });
   } finally {
     await ownerContext.close();
   }

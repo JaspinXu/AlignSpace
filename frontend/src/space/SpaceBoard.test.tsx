@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ApiClient } from '../api';
+import { ApiError, type ApiClient } from '../api';
 import type { SpaceSnapshot } from '../types';
 import { SpaceBoard } from './SpaceBoard';
 
@@ -92,5 +92,68 @@ describe('SpaceBoard', () => {
     const write = execute.mock.calls[0][0];
     expect(write.path).toBe('/v1/projects/p1/space/objects');
     expect(JSON.parse(write.body).data).toMatchObject({ roomId: 'room-a', kind: 'furniture' });
+  });
+});
+
+
+describe('SpaceBoard 3D sync resilience', () => {
+  it('keeps the 3D draft and offers a retry when a concurrent write wins', async () => {
+    const base = snapshot();
+    const withObject: SpaceSnapshot = {
+      ...base,
+      plan: {
+        ...base.plan!,
+        objects: [
+          {
+            id: 'obj-1',
+            roomId: 'room-a',
+            kind: 'furniture',
+            label: '沙发',
+            geometry: { x: 2000, y: 2500, width: 1000, depth: 600, height: 800 },
+          },
+        ],
+      },
+    };
+    const execute = vi.fn(async () => {
+      throw new ApiError(409, 'STATE_VERSION_STALE', 'stale', { recoverable: true });
+    });
+    const client = {
+      get: vi.fn(async (path: string) => (path.endsWith('/materials') ? catalogue : withObject)),
+      execute,
+    } as unknown as ApiClient;
+    render(
+      <SpaceBoard client={client} projectId="p1" role="homeowner" stateVersion={withObject.stateVersion} />,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: '打开 3D 预览' }));
+
+    const walls = [
+      { id: 'n', start: { x: 0, y: 0 }, end: { x: 400, y: 0 } },
+      { id: 'e', start: { x: 400, y: 0 }, end: { x: 400, y: 500 } },
+      { id: 's', start: { x: 400, y: 500 }, end: { x: 0, y: 500 } },
+      { id: 'w', start: { x: 0, y: 500 }, end: { x: 0, y: 0 } },
+    ];
+    const project = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls,
+          rooms: [{ id: 'r', name: '客厅', walls: ['n', 'e', 's', 'w'], alignspaceRoomId: 'room-a' }],
+          furniture: [{ id: 'obj-1', position: { x: 150, y: 350 } }],
+        },
+      ],
+    };
+    const dispatch = (data: unknown) =>
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent('message', { origin: 'http://127.0.0.1:4173', data }),
+        );
+      });
+    dispatch({ type: 'alignspace:applied', protocol: 1 });
+    dispatch({ type: 'alignspace:project', protocol: 1, project });
+
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('button', { name: '重试同步' })).toBeVisible();
+    expect(screen.getByText(/本次 3D 编辑未覆盖新版本/)).toBeVisible();
   });
 });

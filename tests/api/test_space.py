@@ -341,3 +341,51 @@ def _second_project(client: TestClient) -> str:
     )
     assert response.status_code == 201, response.text
     return response.json()["id"]
+
+
+def test_patching_a_room_with_an_outline_replaces_the_wall_loop(client, ready_project):
+    created = create_room(client, ready_project).json()
+    room_id = created["plan"]["rooms"][0]["id"]
+    outline = [
+        {"x": 0, "y": 0},
+        {"x": 4000, "y": 0},
+        {"x": 4000, "y": 2000},
+        {"x": 2000, "y": 2000},
+        {"x": 2000, "y": 5000},
+        {"x": 0, "y": 5000},
+    ]
+    updated = write(
+        client,
+        "PATCH",
+        f"/v1/projects/{ready_project}/space/rooms/{room_id}",
+        ready_project,
+        "outline-edit",
+        {"outline": outline},
+    ).json()
+    room = updated["plan"]["rooms"][0]
+    assert len(room["walls"]) == 6
+    assert room["size"] == {"width": 4000, "depth": 5000}
+    assert room["origin"] == {"x": 0, "y": 0}
+
+
+def test_creating_a_hand_drawn_room_uses_its_outline(client, ready_project):
+    outline = [
+        {"x": 0, "y": 0},
+        {"x": 3000, "y": 0},
+        {"x": 3000, "y": 2000},
+        {"x": 1000, "y": 2000},
+        {"x": 1000, "y": 4000},
+        {"x": 0, "y": 4000},
+    ]
+    created = write(
+        client,
+        "POST",
+        f"/v1/projects/{ready_project}/space/rooms",
+        ready_project,
+        "hand-drawn",
+        {"name": "书房", "outline": outline},
+    ).json()
+    room = created["plan"]["rooms"][0]
+    assert room["name"] == "书房"
+    assert len(room["walls"]) == 6
+    assert created["source"] == "manual_edit"

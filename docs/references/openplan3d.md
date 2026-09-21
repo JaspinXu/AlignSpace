@@ -32,8 +32,9 @@ bash scripts/fetch_openplan3d.sh
 - 上游桥（`vendor/openplan3d/bridge/alignspaceBridge.ts`，由固定脚本安装）：
   - 启动后向父窗口发送 `alignspace:ready`；
   - 收到 `alignspace:space` 后校验并 `importRoomPlan()` 导入，按房间保留我方 `alignspaceRoomId`，按 `alignspaceFloorMaterials` 设置地板纹理（`light-oak`/`porcelain`/`vinyl`/`concrete`）与房间颜色；
-  - 订阅 `currentProject`，防抖后回传 `alignspace:project`。导入后的短暂窗口内抑制回传，避免自回写循环。
-- 编辑回传：前端 `SpaceBoard` 收到 `alignspace:project` 后用 `upstreamPatches()` 与权威计划做差，把房间名称/几何、家具位置、以及新增/删除（删除仅屋主）经**现有受控 API** 落库。非有限坐标会被忽略，避免污染权威几何；后端仍执行结构校验、版本检查、权限与审批失效规则。
+  - 订阅 `currentProject`，用“导入基线指纹”区分程序导入与用户真实编辑（不再使用时间窗），防抖后回传 `alignspace:project`；导入后的基线变更不会被回显。
+- 编辑回传：前端 `SpaceBoard` 收到 `alignspace:project` 后用 `upstreamDiff()` 与权威计划做差，把房间名称/几何（矩形或多边形轮廓）、家具位置、编辑器新增的房间/家具、以及删除（删除仅屋主）经**现有受控 API** 落库。同步以**导入时的基准版本**逐次推进；并发冲突返回 409 时保留草稿并显示“重试同步”，不会用最新版本覆盖他人改动。非有限坐标被忽略；不支持的形状会明确提示而不是静默矩形化。
+- 铺法限制：本地 3D 预览无法渲染的铺法（如人字拼）在绑定表单明确标为“不支持/近似”并要求确认，不在测试或报告中声称已渲染。
 - 只读 MCP 不能替代编辑接口；所有写入都走本仓库后端。
 - **令牌不进 URL**：预览 iframe 只连接本地地址；数据通过 `postMessage` 在 `ready` 握手后传输。`isAllowedPreviewOrigin` 仅接受精确的本地来源。
 
@@ -59,7 +60,8 @@ npm run dev -- --host 127.0.0.1 --port 4173
 
 ## 4. 验收：真实启动与不向上游云发送数据
 
-- `frontend/e2e/space-3d.spec.ts`（当日实测通过）：真实启动固定上游 dev server，验证 2D 计划导入 3D 编辑器、保存的地板材质可见（`floorTexture`）、权威房间 ID 保留、以及在编辑器内移动家具后经受控 API 落库并重载保持。未安装上游时该用例自动跳过。
+- `frontend/e2e/space-3d.spec.ts`（当日实测通过）：真实启动固定上游 dev server，验证 2D 计划导入 3D 编辑器、保存的地板材质可见（`floorTexture`）、权威房间 ID 保留、家具位置导入/导出一致、以及在编辑器内移动家具后经受控 API 落库并重载保持。未安装上游时该用例自动跳过。
+- `frontend/e2e/space-joint-approval.spec.ts`：双账户联合审批与 `brief_stale` 后失效。
 - 网络层面检查：
 
 1. 仅允许到 `127.0.0.1` / `localhost` 的请求；拦截并列出所有其他域名。

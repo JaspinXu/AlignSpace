@@ -257,7 +257,18 @@ class SpaceService:
             if isinstance(size, dict):
                 width = size.get("width")
                 depth = size.get("depth")
-            if width is not None or depth is not None:
+            outline = data.get("outline")
+            if outline is not None:
+                # A hand-drawn / polygonal room edit replaces the wall loop; the
+                # floor material and binding are preserved.
+                rebuilt = self._room_from_outline(
+                    room.id,
+                    str(changes.get("name", room.name)),
+                    str(changes.get("roomType", room.room_type)),
+                    outline,
+                )
+                room = rebuilt.model_copy(update={"floor": room.floor})
+            elif width is not None or depth is not None:
                 new_width = self._number(width, "width") if width is not None else room.size.width
                 new_depth = self._number(depth, "depth") if depth is not None else room.size.depth
                 rebuilt = build_rectangular_room(

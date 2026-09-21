@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, prepareWrite, type ApiClient } from '../api';
+import { previewPatternNote } from './spaceAdapter';
 import type {
   MaterialCatalogue,
   SpaceApprovalView,
@@ -53,6 +54,7 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
   const [confirmApproximation, setConfirmApproximation] = useState(false);
   const [reviewRooms, setReviewRooms] = useState<Record<string, string>>({});
   const [reviewApproximation, setReviewApproximation] = useState<Record<string, boolean>>({});
+  const [patternAcknowledged, setPatternAcknowledged] = useState(false);
 
   const isHomeowner = role === 'homeowner';
   const rooms = plan?.rooms ?? [];
@@ -157,6 +159,10 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
   const floorPreferences = bindingList?.floorPreferences ?? [];
   const bindings = bindingList?.bindings ?? [];
   const approvalRecords = Array.isArray(approvals?.approvals) ? approvals.approvals : [];
+  const selectedPreference = floorPreferences.find((item) => item.attributeId === attributeId);
+  // A confirmed pattern the 3D preview cannot render must be acknowledged, not
+  // silently presented as a full match.
+  const patternNote = selectedPreference ? previewPatternNote(selectedPreference.value) : null;
 
   return (
     <div className="binding-panel">
@@ -212,9 +218,22 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
             />
             我理解近似替代（如以瓷砖近似天然石材），并确认继续
           </label>
+          {patternNote && (
+            <div>
+              <p role="note">{patternNote}</p>
+              <label className="option">
+                <input
+                  type="checkbox"
+                  checked={patternAcknowledged}
+                  onChange={(event) => setPatternAcknowledged(event.target.checked)}
+                />
+                我理解 3D 预览不会呈现该铺法，仍要绑定
+              </label>
+            </div>
+          )}
           <button
             type="button"
-            disabled={busy || !attributeId || !roomId}
+            disabled={busy || !attributeId || !roomId || Boolean(patternNote && !patternAcknowledged)}
             onClick={createBinding}
           >
             绑定到房间
