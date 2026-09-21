@@ -292,7 +292,7 @@ export function parseEditorMessage(event: { origin: string; data: unknown }, all
   return null;
 }
 
-// --- edit-back from the local OpenPlan3D editor ------------------------------
+// --- three-way edit-back from the local OpenPlan3D editor -------------------
 
 export type SpaceSyncOp =
   | {
@@ -323,14 +323,26 @@ export type SpaceSyncOp =
     }
   | { op: 'delete_object'; objectId: string };
 
-export type SpaceSyncDiff = { ops: SpaceSyncOp[]; unsupported: string[] };
+export type SpaceSyncDiff = {
+  ops: SpaceSyncOp[];
+  unsupported: string[];
+  /** Fields the editor changed that a collaborator also changed; never applied. */
+  conflicts: string[];
+};
 
 export type SpaceSyncOptions = {
   /**
-   * The plan the editor imported. Deletions are only ever derived from ids that
-   * existed in this base, so a collaborator's new content is never deleted.
+   * The plan the editor imported. All comparisons are three-way
+   * (base / editor snapshot / server current), so an untouched server-side
+   * change is never reverted and a collaborator's new or edited content is
+   * never overwritten or deleted.
    */
   basePlan?: SpacePlan | null;
+  /**
+   * Entities the editor created during this session, captured at creation time.
+   * They act as the base for later edits before the session base advances.
+   */
+  createdBase?: SpacePlan | null;
   /** Editor temp id -> backend id, learned from earlier create responses. */
   idMap?: Map<string, string>;
 };
@@ -354,6 +366,24 @@ type UpstreamFloor = {
 };
 type UpstreamProject = { activeFloorId?: string; floors?: UpstreamFloor[] };
 
+type ObjectGeometry = {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+};
+
+type RoomGeometryInfo = {
+  kind: 'rect' | 'polygon';
+  origin: SpacePoint;
+  size: { width: number; depth: number };
+  outline: SpacePoint[];
+  signature: string;
+};
+
+type RoomGeometry = RoomGeometryInfo | { kind: 'unsupported' };
+
 function centimetresToMillimetres(value: number): number {
   return Math.round(value * 10);
 }
@@ -373,34 +403,24 @@ function finitePoint(point: unknown): point is SpacePoint {
   );
 }
 
-type RoomGeometry =
-  | { kind: 'rect'; origin: SpacePoint; size: { width: number; depth: number } }
-  | { kind: 'polygon'; origin: SpacePoint; size: { width: number; depth: number }; outline: SpacePoint[] }
-  | { kind: 'unsupported' };
+function signatureOf(points: SpacePoint[]): string {
+  return points
+    .map((point) => `${millimetres(point.x)},${millimetres(point.y)}`)
+    .sort()
+    .join(';');
+}
 
-/** Order a room's wall endpoints into a simple polygon, in millimetres. */
-function orderedOutline(room: UpstreamRoom, walls: Map<string, UpstreamWall>): SpacePoint[] | null {
-  const segments = (room.walls ?? [])
-    .map((id) => walls.get(id))
-    .filter((wall): wall is UpstreamWall => Boolean(wall?.start && wall?.end))
-    .filter((wall) => finitePoint(wall.start) && finitePoint(wall.end));
+/** Order wall segments into a simple polygon, in millimetres. */
+function chainSegments(segments: { start: SpacePoint; end: SpacePoint }[]): SpacePoint[] | null {
   if (segments.length < 3) return null;
   const key = (point: SpacePoint) => `${millimetres(point.x)},${millimetres(point.y)}`;
   const points = new Map<string, SpacePoint>();
   const adjacency = new Map<string, string[]>();
   for (const segment of segments) {
-    const start = {
-      x: centimetresToMillimetres(segment.start!.x),
-      y: centimetresToMillimetres(segment.start!.y),
-    };
-    const end = {
-      x: centimetresToMillimetres(segment.end!.x),
-      y: centimetresToMillimetres(segment.end!.y),
-    };
-    const startKey = key({ x: segment.start!.x, y: segment.start!.y });
-    const endKey = key({ x: segment.end!.x, y: segment.end!.y });
-    points.set(startKey, start);
-    points.set(endKey, end);
+    const startKey = key(segment.start);
+    const endKey = key(segment.end);
+    points.set(startKey, { x: millimetres(segment.start.x), y: millimetres(segment.start.y) });
+    points.set(endKey, { x: millimetres(segment.end.x), y: millimetres(segment.end.y) });
     adjacency.set(startKey, [...(adjacency.get(startKey) ?? []), endKey]);
     adjacency.set(endKey, [...(adjacency.get(endKey) ?? []), startKey]);
   }
@@ -421,9 +441,7 @@ function orderedOutline(room: UpstreamRoom, walls: Map<string, UpstreamWall>): S
   return null;
 }
 
-function roomGeometry(room: UpstreamRoom, walls: Map<string, UpstreamWall>): RoomGeometry {
-  const outline = orderedOutline(room, walls);
-  if (!outline) return { kind: 'unsupported' };
+function geometryFromOutline(outline: SpacePoint[]): RoomGeometryInfo | null {
   const xs = outline.map((point) => point.x);
   const ys = outline.map((point) => point.y);
   const minX = Math.min(...xs);
@@ -432,25 +450,97 @@ function roomGeometry(room: UpstreamRoom, walls: Map<string, UpstreamWall>): Roo
   const maxY = Math.max(...ys);
   const origin = { x: minX, y: minY };
   const size = { width: maxX - minX, depth: maxY - minY };
-  if (size.width < 1000 || size.depth < 1000) return { kind: 'unsupported' };
-  const rectangular = outline.every(
-    (point) =>
-      (point.x === minX || point.x === maxX) && (point.y === minY || point.y === maxY),
-  );
-  if (rectangular && outline.length === 4) return { kind: 'rect', origin, size };
-  return { kind: 'polygon', origin, size, outline };
+  if (size.width < 1000 || size.depth < 1000) return null;
+  const rectangular =
+    outline.length === 4 &&
+    outline.every(
+      (point) => (point.x === minX || point.x === maxX) && (point.y === minY || point.y === maxY),
+    );
+  return {
+    kind: rectangular ? 'rect' : 'polygon',
+    origin,
+    size,
+    outline,
+    signature: signatureOf(outline),
+  };
+}
+
+function upstreamRoomGeometry(room: UpstreamRoom, walls: Map<string, UpstreamWall>): RoomGeometry {
+  const segments = (room.walls ?? [])
+    .map((id) => walls.get(id))
+    .filter((wall): wall is UpstreamWall => Boolean(wall?.start && wall?.end))
+    .filter((wall) => finitePoint(wall.start) && finitePoint(wall.end))
+    .map((wall) => ({
+      start: {
+        x: centimetresToMillimetres(wall.start!.x),
+        y: centimetresToMillimetres(wall.start!.y),
+      },
+      end: {
+        x: centimetresToMillimetres(wall.end!.x),
+        y: centimetresToMillimetres(wall.end!.y),
+      },
+    }));
+  const outline = chainSegments(segments);
+  if (!outline) return { kind: 'unsupported' };
+  return geometryFromOutline(outline) ?? { kind: 'unsupported' };
+}
+
+function planRoomGeometry(room: SpacePlan['rooms'][number]): RoomGeometryInfo {
+  const outline = chainSegments(room.walls.map((wall) => ({ start: wall.start, end: wall.end })));
+  if (outline) {
+    const geometry = geometryFromOutline(outline);
+    if (geometry) return geometry;
+  }
+  // Fallback to the declared rectangle if the loop cannot be chained.
+  const origin = room.origin;
+  const size = room.size;
+  const corners = [
+    { x: origin.x, y: origin.y },
+    { x: origin.x + size.width, y: origin.y },
+    { x: origin.x + size.width, y: origin.y + size.depth },
+    { x: origin.x, y: origin.y + size.depth },
+  ];
+  return {
+    kind: 'rect',
+    origin,
+    size,
+    outline: corners,
+    signature: signatureOf(corners),
+  };
+}
+
+function planObjectGeometry(object: SpacePlan['objects'][number]): ObjectGeometry {
+  const geometry = object.geometry;
+  const number = (key: string, fallback: number) =>
+    typeof geometry[key] === 'number' && Number.isFinite(geometry[key]) ? (geometry[key] as number) : fallback;
+  return {
+    x: number('x', 0),
+    y: number('y', 0),
+    width: number('width', 800),
+    depth: number('depth', 800),
+    height: number('height', 800),
+  };
+}
+
+function upstreamObjectGeometry(item: UpstreamFurniture): ObjectGeometry {
+  return {
+    x: centimetresToMillimetres(item.position!.x),
+    y: centimetresToMillimetres(item.position!.y),
+    width: centimetresToMillimetres(item.width ?? 80),
+    depth: centimetresToMillimetres(item.depth ?? 80),
+    height: centimetresToMillimetres(item.height ?? 80),
+  };
+}
+
+function sameObject(a: ObjectGeometry, b: ObjectGeometry): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.depth === b.depth && a.height === b.height;
 }
 
 function findRoomForPoint(plan: SpacePlan, x: number, y: number): string | null {
   const inside = plan.rooms.find((room) => {
     const minX = room.origin.x;
     const minY = room.origin.y;
-    return (
-      x >= minX &&
-      x <= minX + room.size.width &&
-      y >= minY &&
-      y <= minY + room.size.depth
-    );
+    return x >= minX && x <= minX + room.size.width && y >= minY && y <= minY + room.size.depth;
   });
   if (inside) return inside.id;
   if (plan.rooms.length === 0) return null;
@@ -469,16 +559,10 @@ function findRoomForPoint(plan: SpacePlan, x: number, y: number): string | null 
 }
 
 /**
- * Diff an upstream OpenPlan3D project against our authoritative plan and return
- * the controlled writes needed to persist manual edits.
- *
- * Safety rules:
- * - A snapshot with missing or non-finite coordinates is rejected whole, never
- *   interpreted as a deletion.
- * - Deletions are only derived from ids that existed in the base import, so a
- *   collaborator's new rooms/objects are never deleted by a stale retry.
- * - Editor temp ids are translated through `idMap` once their create response
- *   assigned them a backend id, so continuing to edit them does not duplicate.
+ * Three-way diff between the imported base, the editor snapshot and the current
+ * server plan. Only fields the editor actually changed relative to the base are
+ * written; a field a collaborator also changed differently is reported as a
+ * conflict and left untouched.
  */
 export function upstreamDiff(
   upstream: unknown,
@@ -487,12 +571,11 @@ export function upstreamDiff(
   options: SpaceSyncOptions = {},
 ): SpaceSyncDiff {
   const project = upstream as UpstreamProject | null;
-  if (!project || !Array.isArray(project.floors)) return { ops: [], unsupported: [] };
+  if (!project || !Array.isArray(project.floors)) return { ops: [], unsupported: [], conflicts: [] };
   const floor =
     project.floors.find((item) => item.id === project.activeFloorId) ?? project.floors[0];
-  if (!floor) return { ops: [], unsupported: [] };
+  if (!floor) return { ops: [], unsupported: [], conflicts: [] };
 
-  // Reject an invalid snapshot rather than misreading it as deletions.
   const invalidWalls = (floor.walls ?? []).some(
     (wall) => !finitePoint(wall.start) || !finitePoint(wall.end),
   );
@@ -501,6 +584,7 @@ export function upstreamDiff(
     return {
       ops: [],
       unsupported: ['编辑器快照包含缺失或非法坐标，已忽略本次同步；请在编辑器中检查后重试。'],
+      conflicts: [],
     };
   }
 
@@ -509,18 +593,36 @@ export function upstreamDiff(
   const wallById = new Map((floor.walls ?? []).map((wall) => [wall.id, wall]));
   const ops: SpaceSyncOp[] = [];
   const unsupported: string[] = [];
+  const conflicts: string[] = [];
 
-  const planRooms = new Map(plan.rooms.map((room) => [room.id, room]));
-  const seenRooms = new Set<string>();
+  const createdBase = options.createdBase ?? null;
+  const baseRooms = new Map((base?.rooms ?? []).map((room) => [room.id, room]));
+  for (const room of createdBase?.rooms ?? []) baseRooms.set(room.id, room);
+  const theirRooms = new Map(plan.rooms.map((room) => [room.id, room]));
+  const mineRooms = new Map<
+    string,
+    { upstreamId: string; name: string; geometry: RoomGeometry }
+  >();
   for (const room of floor.rooms ?? []) {
     const ourId = room.alignspaceRoomId ?? idMap.get(room.id);
-    const geometry = roomGeometry(room, wallById);
-    if (!ourId) {
-      // A room drawn in the editor has no backend identity yet: create it.
-      if (geometry.kind === 'unsupported') {
-        unsupported.push(`房间「${room.name || '未命名'}」形状不受支持，未同步。`);
-        continue;
-      }
+    if (!ourId) continue;
+    mineRooms.set(ourId, {
+      upstreamId: room.id,
+      name: room.name ?? '',
+      geometry: upstreamRoomGeometry(room, wallById),
+    });
+  }
+
+  // Rooms drawn in the editor have no backend identity yet: create them.
+  for (const room of floor.rooms ?? []) {
+    const resolved = room.alignspaceRoomId ?? idMap.get(room.id);
+    if (resolved) continue;
+    const geometry = upstreamRoomGeometry(room, wallById);
+    if (geometry.kind === 'unsupported') {
+      unsupported.push(`房间「${room.name || '未命名'}」形状不受支持，未同步。`);
+      continue;
+    }
+    if (!theirRooms.has(room.id)) {
       ops.push({
         op: 'create_room',
         upstreamId: room.id,
@@ -529,93 +631,161 @@ export function upstreamDiff(
         size: geometry.size,
         ...(geometry.kind === 'polygon' ? { outline: geometry.outline } : {}),
       });
-      continue;
-    }
-    seenRooms.add(ourId);
-    const existing = planRooms.get(ourId);
-    if (!existing) continue;
-    const changed: Extract<SpaceSyncOp, { op: 'update_room' }> = {
-      op: 'update_room',
-      roomId: ourId,
-    };
-    let touched = false;
-    if (room.name && room.name !== existing.name) {
-      changed.name = room.name;
-      touched = true;
-    }
-    if (geometry.kind === 'unsupported') {
-      unsupported.push(`房间「${existing.name}」形状不受支持，仅同步名称。`);
-    } else {
-      const geometryChanged =
-        geometry.kind === 'rect'
-          ? geometry.size.width !== existing.size.width ||
-            geometry.size.depth !== existing.size.depth ||
-            geometry.origin.x !== existing.origin.x ||
-            geometry.origin.y !== existing.origin.y
-          : true;
-      if (geometryChanged) {
-        changed.origin = geometry.origin;
-        changed.size = geometry.size;
-        if (geometry.kind === 'polygon') changed.outline = geometry.outline;
-        touched = true;
-      }
-    }
-    if (touched) ops.push(changed);
-  }
-  if (role === 'homeowner' && base) {
-    const baseRoomIds = new Set(base.rooms.map((room) => room.id));
-    for (const room of plan.rooms) {
-      if (baseRoomIds.has(room.id) && !seenRooms.has(room.id)) {
-        ops.push({ op: 'delete_room', roomId: room.id });
-      }
     }
   }
 
-  const planObjects = new Map(plan.objects.map((item) => [item.id, item]));
-  const seenObjects = new Set<string>();
+  const roomIds = new Set<string>([...baseRooms.keys(), ...mineRooms.keys()]);
+  for (const roomId of roomIds) {
+    const baseRoom = baseRooms.get(roomId);
+    const theirRoom = theirRooms.get(roomId);
+    const mine = mineRooms.get(roomId);
+    if (!mine) {
+      if (!baseRoom || !theirRoom) continue;
+      if (planRoomGeometry(baseRoom).signature === planRoomGeometry(theirRoom).signature &&
+          baseRoom.name === theirRoom.name) {
+        if (role === 'homeowner') ops.push({ op: 'delete_room', roomId });
+      } else {
+        conflicts.push(`房间「${baseRoom.name}」已被协作者修改，您的删除未生效。`);
+      }
+      continue;
+    }
+    if (!baseRoom) {
+      if (mine.geometry.kind === 'unsupported') {
+        unsupported.push(`房间「${mine.name || '未命名'}」形状不受支持，未同步。`);
+      } else if (!theirRoom) {
+        ops.push({
+          op: 'create_room',
+          upstreamId: mine.upstreamId,
+          name: mine.name || '房间',
+          origin: mine.geometry.origin,
+          size: mine.geometry.size,
+          ...(mine.geometry.kind === 'polygon' ? { outline: mine.geometry.outline } : {}),
+        });
+      }
+      continue;
+    }
+    if (!theirRoom) {
+      conflicts.push(`房间「${baseRoom.name}」已被协作者删除，您的修改未同步。`);
+      continue;
+    }
+    const baseGeometry = planRoomGeometry(baseRoom);
+    const theirGeometry = planRoomGeometry(theirRoom);
+    const update: Extract<SpaceSyncOp, { op: 'update_room' }> = { op: 'update_room', roomId };
+    let touched = false;
+    if (mine.name && mine.name !== baseRoom.name) {
+      if (theirRoom.name !== baseRoom.name && theirRoom.name !== mine.name) {
+        conflicts.push(`房间「${baseRoom.name}」名称被双方修改，保留协作者版本。`);
+      } else {
+        update.name = mine.name;
+        touched = true;
+      }
+    }
+    if (mine.geometry.kind === 'unsupported') {
+      unsupported.push(`房间「${baseRoom.name}」形状不受支持，仅同步其他字段。`);
+    } else if (mine.geometry.signature !== baseGeometry.signature) {
+      if (
+        theirGeometry.signature !== baseGeometry.signature &&
+        theirGeometry.signature !== mine.geometry.signature
+      ) {
+        conflicts.push(`房间「${baseRoom.name}」几何被双方修改，保留协作者版本。`);
+      } else {
+        update.origin = mine.geometry.origin;
+        update.size = mine.geometry.size;
+        if (mine.geometry.kind === 'polygon') update.outline = mine.geometry.outline;
+        touched = true;
+      }
+    }
+    if (touched) ops.push(update);
+  }
+
+  const baseObjects = new Map((base?.objects ?? []).map((item) => [item.id, item]));
+  for (const item of createdBase?.objects ?? []) baseObjects.set(item.id, item);
+  const theirObjects = new Map(plan.objects.map((item) => [item.id, item]));
+  const mineObjects = new Map<string, { upstreamId: string; geometry: ObjectGeometry; label: string }>();
   for (const item of floor.furniture ?? []) {
     if (!item.id) continue;
     const ourId = idMap.get(item.id) ?? item.id;
-    const x = centimetresToMillimetres(item.position!.x);
-    const y = centimetresToMillimetres(item.position!.y);
-    const existing = planObjects.get(ourId);
-    if (!existing) {
-      // A furniture item added in the editor: create it in the containing room.
-      const roomId = findRoomForPoint(plan, x, y);
-      if (!roomId) {
-        unsupported.push(`家具「${item.catalogId || ourId}」找不到所属房间，未同步。`);
-        continue;
+    mineObjects.set(ourId, {
+      upstreamId: item.id,
+      geometry: upstreamObjectGeometry(item),
+      label: item.alignspaceLabel || item.catalogId || '家具',
+    });
+  }
+
+  const objectIds = new Set<string>([...baseObjects.keys(), ...mineObjects.keys()]);
+  for (const objectId of objectIds) {
+    const baseObject = baseObjects.get(objectId);
+    const theirObject = theirObjects.get(objectId);
+    const mine = mineObjects.get(objectId);
+    if (!mine) {
+      if (!baseObject || !theirObject) continue;
+      if (sameObject(planObjectGeometry(baseObject), planObjectGeometry(theirObject))) {
+        if (role === 'homeowner') ops.push({ op: 'delete_object', objectId });
+      } else {
+        conflicts.push(`家具「${baseObject.label || objectId}」已被协作者修改，您的删除未生效。`);
       }
-      ops.push({
-        op: 'create_object',
-        upstreamId: item.id,
-        roomId,
-        kind: 'furniture',
-        label: item.alignspaceLabel || item.catalogId || '家具',
-        geometry: {
-          x,
-          y,
-          width: centimetresToMillimetres(item.width ?? 80),
-          depth: centimetresToMillimetres(item.depth ?? 80),
-          height: centimetresToMillimetres(item.height ?? 80),
-        },
-      });
       continue;
     }
-    seenObjects.add(ourId);
-    if (existing.geometry.x !== x || existing.geometry.y !== y) {
-      ops.push({ op: 'update_object', objectId: ourId, geometry: { ...existing.geometry, x, y } });
+    if (!baseObject) {
+      if (!theirObject) {
+        const roomId = findRoomForPoint(plan, mine.geometry.x, mine.geometry.y);
+        if (!roomId) {
+          unsupported.push(`家具「${mine.label}」找不到所属房间，未同步。`);
+        } else {
+          ops.push({
+            op: 'create_object',
+            upstreamId: mine.upstreamId,
+            roomId,
+            kind: 'furniture',
+            label: mine.label,
+            geometry: { ...mine.geometry },
+          });
+        }
+      }
+      continue;
     }
-  }
-  if (role === 'homeowner' && base) {
-    const baseObjectIds = new Set(base.objects.map((item) => item.id));
-    for (const item of plan.objects) {
-      if (baseObjectIds.has(item.id) && !seenObjects.has(item.id)) {
-        ops.push({ op: 'delete_object', objectId: item.id });
+    if (!theirObject) {
+      conflicts.push(`家具「${baseObject.label || objectId}」已被协作者删除，您的修改未同步。`);
+      continue;
+    }
+    const baseGeometry = planObjectGeometry(baseObject);
+    const theirGeometry = planObjectGeometry(theirObject);
+    const movedByUser = mine.geometry.x !== baseGeometry.x || mine.geometry.y !== baseGeometry.y;
+    const movedByThem = theirGeometry.x !== baseGeometry.x || theirGeometry.y !== baseGeometry.y;
+    const resizedByUser =
+      mine.geometry.width !== baseGeometry.width ||
+      mine.geometry.depth !== baseGeometry.depth ||
+      mine.geometry.height !== baseGeometry.height;
+    const resizedByThem =
+      theirGeometry.width !== baseGeometry.width ||
+      theirGeometry.depth !== baseGeometry.depth ||
+      theirGeometry.height !== baseGeometry.height;
+    let apply = false;
+    if (movedByUser) {
+      if (movedByThem && (theirGeometry.x !== mine.geometry.x || theirGeometry.y !== mine.geometry.y)) {
+        conflicts.push(`家具「${baseObject.label || objectId}」位置被双方修改，保留协作者版本。`);
+      } else {
+        apply = true;
       }
     }
+    if (resizedByUser) {
+      if (
+        resizedByThem &&
+        (theirGeometry.width !== mine.geometry.width ||
+          theirGeometry.depth !== mine.geometry.depth ||
+          theirGeometry.height !== mine.geometry.height)
+      ) {
+        conflicts.push(`家具「${baseObject.label || objectId}」尺寸被双方修改，保留协作者版本。`);
+      } else {
+        apply = true;
+      }
+    }
+    if (apply) {
+      ops.push({ op: 'update_object', objectId, geometry: { ...mine.geometry } });
+    }
   }
-  return { ops, unsupported };
+
+  return { ops, unsupported, conflicts };
 }
 
 /** Backwards-compatible view of the diff that only returns the writes. */

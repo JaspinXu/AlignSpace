@@ -149,6 +149,7 @@ describe('SpaceBoard 3D sync resilience', () => {
           new MessageEvent('message', { origin: 'http://127.0.0.1:4173', data }),
         );
       });
+    dispatch({ type: 'alignspace:ready', protocol: 1 });
     dispatch({ type: 'alignspace:applied', protocol: 1 });
     dispatch({ type: 'alignspace:project', protocol: 1, project });
 
@@ -217,6 +218,7 @@ describe('SpaceBoard create-then-edit identity', () => {
       act(() => {
         window.dispatchEvent(new MessageEvent('message', { origin: 'http://127.0.0.1:4173', data }));
       });
+    dispatch({ type: 'alignspace:ready', protocol: 1 });
     dispatch({ type: 'alignspace:applied', protocol: 1 });
     dispatch({ type: 'alignspace:project', protocol: 1, project: { activeFloorId: 'f', floors: floors({ x: 100, y: 100 }) } });
     await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
@@ -233,5 +235,97 @@ describe('SpaceBoard create-then-edit identity', () => {
     expect(second.path).toContain('/space/objects/obj-backend');
     expect(JSON.parse(second.body).data.geometry).toMatchObject({ x: 1500, y: 1500 });
     expect(execute.mock.calls.some((call) => call[0].method === 'DELETE')).toBe(false);
+  });
+});
+
+
+describe('SpaceBoard refresh and retry base binding', () => {
+  it('keeps the imported base across a refresh so retry cannot delete collaborator content', async () => {
+    const base = snapshot();
+    const baseWithObjects: SpaceSnapshot = {
+      ...base,
+      plan: {
+        ...base.plan!,
+        objects: [
+          { id: 'obj-a', roomId: 'room-a', kind: 'furniture', label: 'A', geometry: { x: 1000, y: 1000, width: 800, depth: 600, height: 800 } },
+          { id: 'obj-b', roomId: 'room-a', kind: 'furniture', label: 'B', geometry: { x: 1000, y: 1000, width: 800, depth: 600, height: 800 } },
+        ],
+      },
+    };
+    let serverSnapshot = baseWithObjects;
+    let calls = 0;
+    const execute = vi.fn(async (_write: { path: string; method: string; body: string }) => {
+      calls += 1;
+      if (calls === 1) throw new ApiError(409, 'STATE_VERSION_STALE', 'stale', { recoverable: true });
+      return serverSnapshot;
+    });
+    const client = {
+      get: vi.fn(async (path: string) => (path.endsWith('/materials') ? catalogue : serverSnapshot)),
+      execute,
+    } as unknown as ApiClient;
+    const { rerender } = render(
+      <SpaceBoard client={client} projectId="p1" role="homeowner" stateVersion={baseWithObjects.stateVersion} />,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: '打开 3D 预览' }));
+
+    const walls = [
+      { id: 'n', start: { x: 0, y: 0 }, end: { x: 400, y: 0 } },
+      { id: 'e', start: { x: 400, y: 0 }, end: { x: 400, y: 500 } },
+      { id: 's', start: { x: 400, y: 500 }, end: { x: 0, y: 500 } },
+      { id: 'w', start: { x: 0, y: 500 }, end: { x: 0, y: 0 } },
+    ];
+    const project = (positions: Record<string, { x: number; y: number }>) => ({
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls,
+          rooms: [{ id: 'r', name: '客厅', walls: ['n', 'e', 's', 'w'], alignspaceRoomId: 'room-a' }],
+          furniture: Object.entries(positions).map(([id, position]) => ({ id, position, width: 80, depth: 60, height: 80 })),
+        },
+      ],
+    });
+    const dispatch = (data: unknown) =>
+      act(() => {
+        window.dispatchEvent(new MessageEvent('message', { origin: 'http://127.0.0.1:4173', data }));
+      });
+    dispatch({ type: 'alignspace:ready', protocol: 1 });
+    dispatch({ type: 'alignspace:applied', protocol: 1 });
+    // The editor moves A only and sync conflicts.
+    dispatch({
+      type: 'alignspace:project',
+      protocol: 1,
+      project: project({ 'obj-a': { x: 200, y: 100 }, 'obj-b': { x: 100, y: 100 } }),
+    });
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('button', { name: '重试同步' })).toBeVisible();
+
+    // A refresh brings the collaborator's moved B and an added object.
+    serverSnapshot = {
+      ...baseWithObjects,
+      stateVersion: baseWithObjects.stateVersion + 5,
+      plan: {
+        ...baseWithObjects.plan!,
+        objects: [
+          { id: 'obj-a', roomId: 'room-a', kind: 'furniture', label: 'A', geometry: { x: 1000, y: 1000, width: 800, depth: 600, height: 800 } },
+          { id: 'obj-b', roomId: 'room-a', kind: 'furniture', label: 'B', geometry: { x: 3000, y: 1000, width: 800, depth: 600, height: 800 } },
+          { id: 'obj-collab', roomId: 'room-a', kind: 'furniture', label: '协作者', geometry: { x: 2500, y: 2500, width: 800, depth: 800, height: 800 } },
+        ],
+      },
+    };
+    rerender(
+      <SpaceBoard client={client} projectId="p1" role="homeowner" stateVersion={serverSnapshot.stateVersion} />,
+    );
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+
+    execute.mockClear();
+    execute.mockImplementation(async () => serverSnapshot);
+    await userEvent.click(screen.getByRole('button', { name: '重试同步' }));
+    await waitFor(() => expect(execute).toHaveBeenCalled());
+    const writes = execute.mock.calls.map((call) => call[0]);
+    expect(writes.some((write) => write.method === 'DELETE')).toBe(false);
+    expect(writes.some((write) => write.path.includes('obj-collab'))).toBe(false);
+    expect(writes.some((write) => write.path.includes('obj-b'))).toBe(false);
+    expect(writes.some((write) => write.path.includes('obj-a'))).toBe(true);
   });
 });

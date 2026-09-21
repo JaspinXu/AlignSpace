@@ -125,7 +125,7 @@ const upstreamProject = {
           alignspaceRoomId: 'room-a',
         },
       ],
-      furniture: [{ id: 'obj-1', position: { x: 25, y: 30 } }],
+      furniture: [{ id: 'obj-1', position: { x: 25, y: 30 }, width: 200, depth: 90, height: 80 }],
     },
   ],
 };
@@ -138,13 +138,15 @@ describe('spaceAdapter edit-back', () => {
   });
 
   it('diffs a renamed room and a moved object into controlled writes', () => {
-    const ops = upstreamPatches(upstreamProject, plan(), 'homeowner');
-    expect(ops).toContainEqual({ op: 'update_room', roomId: 'room-a', name: '会客厅' });
-    expect(ops).toContainEqual({
+    const base = plan();
+    const diff = upstreamDiff(upstreamProject, base, 'homeowner', { basePlan: base });
+    expect(diff.ops).toContainEqual({ op: 'update_room', roomId: 'room-a', name: '会客厅' });
+    expect(diff.ops).toContainEqual({
       op: 'update_object',
       objectId: 'obj-1',
       geometry: { width: 2000, depth: 900, height: 800, x: 250, y: 300 },
     });
+    expect(diff.conflicts).toEqual([]);
   });
 
   it('does not let a designer delete rooms or objects', () => {
@@ -235,7 +237,7 @@ describe('spaceAdapter edit-back round two', () => {
         },
       ],
     };
-    const diff = upstreamDiff(upstream, plan(), 'designer');
+    const diff = upstreamDiff(upstream, plan(), 'designer', { basePlan: plan() });
     const update = diff.ops.find((op) => op.op === 'update_room') as
       | Extract<ReturnType<typeof upstreamDiff>['ops'][number], { op: 'update_room' }>
       | undefined;
@@ -361,7 +363,13 @@ describe('spaceAdapter round three safety', () => {
       ],
     };
     const idMap = new Map([['temp-1', 'obj-backend']]);
-    const diff = upstreamDiff(upstream, serverPlan, 'designer', { basePlan: plan(), idMap });
+    const backendObject = serverPlan.objects.find((item) => item.id === 'obj-backend')!;
+    const createdBase: SpacePlan = { ...plan(), objects: [backendObject] };
+    const diff = upstreamDiff(upstream, serverPlan, 'designer', {
+      basePlan: plan(),
+      createdBase,
+      idMap,
+    });
     expect(diff.ops).toContainEqual({
       op: 'update_object',
       objectId: 'obj-backend',
@@ -369,5 +377,101 @@ describe('spaceAdapter round three safety', () => {
     });
     expect(diff.ops.some((op) => op.op === 'create_object')).toBe(false);
     expect(diff.ops.some((op) => op.op === 'delete_object')).toBe(false);
+  });
+});
+
+
+function planWithTwoObjects(): SpacePlan {
+  const base = plan();
+  return {
+    ...base,
+    objects: [
+      {
+        id: 'obj-a',
+        roomId: 'room-a',
+        kind: 'furniture',
+        label: 'A',
+        geometry: { x: 1000, y: 1000, width: 800, depth: 600, height: 800 },
+      },
+      {
+        id: 'obj-b',
+        roomId: 'room-a',
+        kind: 'furniture',
+        label: 'B',
+        geometry: { x: 1000, y: 1000, width: 800, depth: 600, height: 800 },
+      },
+    ],
+  };
+}
+
+function upstreamWithFurniture(positions: Record<string, { x: number; y: number }>) {
+  return {
+    activeFloorId: 'f',
+    floors: [
+      {
+        id: 'f',
+        walls: rectWalls,
+        rooms: [roomWithId],
+        furniture: Object.entries(positions).map(([id, position]) => ({
+          id,
+          position,
+          width: 80,
+          depth: 60,
+          height: 80,
+        })),
+      },
+    ],
+  };
+}
+
+describe('spaceAdapter three-way merge', () => {
+  it('does not revert a collaborator object the editor never touched', () => {
+    const base = planWithTwoObjects();
+    const theirs: SpacePlan = {
+      ...base,
+      objects: base.objects.map((item) =>
+        item.id === 'obj-b' ? { ...item, geometry: { ...item.geometry, x: 3000 } } : item,
+      ),
+    };
+    // The editor only moved A; B is still at the base position.
+    const upstream = upstreamWithFurniture({ 'obj-a': { x: 200, y: 100 }, 'obj-b': { x: 100, y: 100 } });
+    const diff = upstreamDiff(upstream, theirs, 'homeowner', { basePlan: base });
+    expect(diff.ops).toContainEqual({
+      op: 'update_object',
+      objectId: 'obj-a',
+      geometry: expect.objectContaining({ x: 2000 }),
+    });
+    expect(diff.ops.some((op) => op.op === 'update_object' && op.objectId === 'obj-b')).toBe(false);
+    expect(diff.conflicts).toEqual([]);
+  });
+
+  it('reports a conflict when both sides change the same object field', () => {
+    const base = planWithTwoObjects();
+    const theirs: SpacePlan = {
+      ...base,
+      objects: base.objects.map((item) =>
+        item.id === 'obj-a' ? { ...item, geometry: { ...item.geometry, x: 3000 } } : item,
+      ),
+    };
+    const upstream = upstreamWithFurniture({ 'obj-a': { x: 200, y: 100 }, 'obj-b': { x: 100, y: 100 } });
+    const diff = upstreamDiff(upstream, theirs, 'homeowner', { basePlan: base });
+    expect(diff.ops.some((op) => op.op === 'update_object' && op.objectId === 'obj-a')).toBe(false);
+    expect(diff.conflicts.join(' ')).toMatch(/双方修改/);
+  });
+
+  it('does not revert a collaborator room rename the editor never touched', () => {
+    const base = plan();
+    const theirs: SpacePlan = {
+      ...base,
+      rooms: base.rooms.map((room) => ({ ...room, name: '会客厅' })),
+    };
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        { id: 'f', walls: rectWalls, rooms: [{ ...roomWithId, name: '客厅' }], furniture: [] },
+      ],
+    };
+    const diff = upstreamDiff(upstream, theirs, 'homeowner', { basePlan: base });
+    expect(diff.ops.some((op) => op.op === 'update_room')).toBe(false);
   });
 });

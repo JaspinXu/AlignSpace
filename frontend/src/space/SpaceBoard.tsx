@@ -59,6 +59,7 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   const [previewNote, setPreviewNote] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncNotes, setSyncNotes] = useState<string[]>([]);
+  const [syncConflicts, setSyncConflicts] = useState<string[]>([]);
   const [syncConflict, setSyncConflict] = useState(false);
   const frame = useRef<HTMLIFrameElement | null>(null);
   const planRef = useRef<SpaceSnapshot['plan']>(null);
@@ -66,14 +67,23 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   const syncingRef = useRef(false);
   const hasImportedRef = useRef(false);
   const conflictRef = useRef(false);
-  const pendingProjectRef = useRef<unknown>(null);
+  // A pending draft is bound to the base it was computed against, so a poll or
+  // re-import cannot silently move the deletion/merge baseline.
+  const pendingSyncRef = useRef<{ project: unknown; basePlan: SpaceSnapshot['plan'] } | null>(null);
   // The version the editor state was based on, so a concurrent write returns 409
   // instead of being silently overwritten.
   const baseVersionRef = useRef(stateVersion);
-  // The plan the editor imported: deletions may only target ids from this base.
-  const basePlanRef = useRef<SpaceSnapshot['plan']>(null);
+  // The plan the editor imported: all merge comparisons use this base.
+  const syncBaseRef = useRef<SpaceSnapshot['plan']>(null);
   // Editor temp id -> backend id, learned from create responses.
   const idMapRef = useRef<Map<string, string>>(new Map());
+  // Entities created by the editor during this session, captured at creation.
+  const createdBaseRef = useRef<NonNullable<SpaceSnapshot['plan']>>({
+    schemaVersion: '1.0.0',
+    units: 'mm',
+    rooms: [],
+    objects: [],
+  });
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
 
@@ -168,16 +178,29 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
         // snapshots update it instead of creating a duplicate and deleting it.
         if (op.op === 'create_room' && op.upstreamId) {
           const created = result.plan?.rooms.find((room) => !beforeRoomIds.has(room.id));
-          if (created) idMapRef.current.set(op.upstreamId, created.id);
+          if (created) {
+            idMapRef.current.set(op.upstreamId, created.id);
+            createdBaseRef.current = {
+              ...createdBaseRef.current,
+              rooms: [...createdBaseRef.current.rooms, created],
+            };
+          }
         } else if (op.op === 'create_object' && op.upstreamId) {
           const created = result.plan?.objects.find((item) => !beforeObjectIds.has(item.id));
-          if (created) idMapRef.current.set(op.upstreamId, created.id);
+          if (created) {
+            idMapRef.current.set(op.upstreamId, created.id);
+            createdBaseRef.current = {
+              ...createdBaseRef.current,
+              objects: [...createdBaseRef.current.objects, created],
+            };
+          }
         }
         version = result.stateVersion;
         baseVersionRef.current = version;
       }
       const refreshed = await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`);
       planRef.current = refreshed.plan;
+      syncBaseRef.current = refreshed.plan;
       setSnapshot(refreshed);
       baseVersionRef.current = refreshed.stateVersion;
       onChangedRef.current?.();
@@ -187,16 +210,18 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
 
   const drain = useCallback(async () => {
     if (syncingRef.current) return;
-    const project = pendingProjectRef.current;
-    if (!project) return;
-    pendingProjectRef.current = null;
+    const pending = pendingSyncRef.current;
+    if (!pending) return;
+    pendingSyncRef.current = null;
     const currentPlan = planRef.current;
     if (!currentPlan) return;
-    const { ops, unsupported } = upstreamDiff(project, currentPlan, role, {
-      basePlan: basePlanRef.current,
+    const { ops, unsupported, conflicts } = upstreamDiff(pending.project, currentPlan, role, {
+      basePlan: pending.basePlan,
+      createdBase: createdBaseRef.current,
       idMap: idMapRef.current,
     });
     setSyncNotes(unsupported);
+    setSyncConflicts(conflicts);
     // Deletions are only trusted after a successful import established the base.
     const applicable = hasImportedRef.current
       ? ops
@@ -211,8 +236,8 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
       setSyncConflict(false);
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
-        // Preserve the draft and let the user decide; never silently rebase.
-        pendingProjectRef.current = project;
+        // Preserve the draft with its original base; never silently rebase.
+        pendingSyncRef.current = pending;
         conflictRef.current = true;
         setSyncConflict(true);
         setError('其他协作者已更新空间，本次 3D 编辑未覆盖新版本。请重试以在当前版本上重新应用。');
@@ -222,20 +247,22 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
     } finally {
       syncingRef.current = false;
       setSyncing(false);
-      if (pendingProjectRef.current && !conflictRef.current) void drain();
+      if (pendingSyncRef.current && !conflictRef.current) void drain();
     }
   }, [applyOps, role]);
 
   const retrySync = useCallback(async () => {
-    const project = pendingProjectRef.current;
-    if (!project) return;
+    const pending = pendingSyncRef.current;
+    if (!pending) return;
     conflictRef.current = false;
     setSyncConflict(false);
+    // Refresh the server target and version, but keep the draft's original base
+    // for the three-way merge so a collaborator's new content is never deleted.
     const current = await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`);
     planRef.current = current.plan;
     setSnapshot(current);
     baseVersionRef.current = current.stateVersion;
-    pendingProjectRef.current = project;
+    pendingSyncRef.current = pending;
     void drain();
   }, [client, projectId, drain]);
 
@@ -247,11 +274,15 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
       if (!parsed) return;
       if (parsed.kind === 'ready') {
         readyRef.current = true;
-        const target = frame.current?.contentWindow;
         const currentPlan = planRef.current;
-        if (!target || !currentPlan) return;
+        if (!currentPlan) return;
         baseVersionRef.current = Math.max(baseVersionRef.current, stateVersion);
-        basePlanRef.current = currentPlan;
+        if (!pendingSyncRef.current) {
+          syncBaseRef.current = currentPlan;
+          createdBaseRef.current = { schemaVersion: '1.0.0', units: 'mm', rooms: [], objects: [] };
+        }
+        const target = frame.current?.contentWindow;
+        if (!target) return;
         target.postMessage(buildPreviewMessage(currentPlan), PREVIEW_URL);
         setPreviewNote('已将当前空间草稿发送到本地 3D 预览（仅本机，不含令牌）。');
       } else if (parsed.kind === 'applied') {
@@ -260,7 +291,10 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
         if (!hasImportedRef.current) return;
         const currentPlan = planRef.current;
         if (!currentPlan) return;
-        pendingProjectRef.current = parsed.project;
+        // Keep the base of an existing draft; only a fresh edit session uses the
+        // current base.
+        const basePlan = pendingSyncRef.current?.basePlan ?? syncBaseRef.current;
+        pendingSyncRef.current = { project: parsed.project, basePlan };
         void drain();
       } else if (parsed.kind === 'error') {
         setError(parsed.message);
@@ -274,8 +308,9 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   useEffect(() => {
     if (!previewOpen || !readyRef.current) return;
     const target = frame.current?.contentWindow;
-    if (target && plan) {
-      basePlanRef.current = plan;
+    // Do not re-import over a draft that still needs syncing or conflict review.
+    if (target && plan && !pendingSyncRef.current && !conflictRef.current) {
+      syncBaseRef.current = plan;
       target.postMessage(buildPreviewMessage(plan), PREVIEW_URL);
     }
   }, [previewOpen, plan]);
@@ -567,6 +602,13 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
                   重试同步
                 </button>
               </p>
+            )}
+            {syncConflicts.length > 0 && (
+              <ul role="alert">
+                {syncConflicts.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
             )}
             {syncNotes.length > 0 && (
               <ul role="note">
