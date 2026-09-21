@@ -55,6 +55,7 @@ from alignspace.domain.policies import (
     record_conflict_attempt,
     validate_professional_claim,
 )
+from alignspace.domain.space import invalidate_bindings
 from alignspace.persistence.repository import canonical_request_hash
 from alignspace.persistence.tables import ImageAssetRow
 from alignspace.persistence.uow import SqlAlchemyUnitOfWork
@@ -243,6 +244,12 @@ class WorkflowService:
                 update={
                     "completeness": calculate_completeness(updated),
                     "conflicts": reconcile_constraints(updated),
+                    # A changed preference invalidates any binding derived from it and
+                    # any joint approval that relied on the previous values.
+                    "space_bindings": invalidate_bindings(
+                        updated.space_bindings, attribute_id=attribute_id
+                    ),
+                    "space_approvals": [],
                 }
             )
             updated = flag_brief_change(updated)

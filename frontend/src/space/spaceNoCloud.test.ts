@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
  * never talk to an upstream cloud service, and must never put a credential in
  * a URL. The upstream tree itself is hardened by scripts/fetch_openplan3d.sh.
  */
-const sources = ['./spaceAdapter.ts', './SpaceBoard.tsx'];
+const sources = ['./spaceAdapter.ts', './SpaceBoard.tsx', './BindingPanel.tsx'];
 
 function read(name: string): string {
   return readFileSync(new URL(name, import.meta.url), 'utf8');

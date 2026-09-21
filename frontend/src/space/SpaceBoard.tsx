@@ -7,6 +7,7 @@ import type {
   SpaceRoom,
   SpaceSnapshot,
 } from '../types';
+import { BindingPanel } from './BindingPanel';
 import {
   buildPreviewMessage,
   isAllowedPreviewOrigin,
@@ -35,9 +36,10 @@ type Props = {
   projectId: string;
   role: 'homeowner' | 'designer';
   stateVersion: number;
+  onChanged?: () => void;
 };
 
-export function SpaceBoard({ client, projectId, role, stateVersion }: Props) {
+export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }: Props) {
   const [snapshot, setSnapshot] = useState<SpaceSnapshot | null>(null);
   const [materials, setMaterials] = useState<MaterialCatalogue | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +102,7 @@ export function SpaceBoard({ client, projectId, role, stateVersion }: Props) {
     try {
       const next = await client.execute<SpaceSnapshot>(write);
       setSnapshot(next);
+      onChanged?.();
     } catch (caught) {
       setError(messageOf(caught));
     } finally {
@@ -370,6 +373,17 @@ export function SpaceBoard({ client, projectId, role, stateVersion }: Props) {
           </ul>
         </details>
       )}
+
+      <BindingPanel
+        client={client}
+        projectId={projectId}
+        role={role}
+        stateVersion={expectedVersion}
+        plan={plan}
+        materials={materials}
+        onApplied={setSnapshot}
+        onChanged={onChanged}
+      />
     </section>
   );
 }

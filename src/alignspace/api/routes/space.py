@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from alignspace.api.dependencies import get_actor, get_container
 from alignspace.application.commands import ActorContext, WriteEnvelope
 from alignspace.application.space_service import (
+    BindingList,
     MaterialCatalogue,
+    SpaceApprovalView,
     SpaceSnapshot,
     SpaceVersionList,
 )
@@ -101,3 +103,55 @@ def delete_object(
 ) -> SpaceSnapshot:
     response.status_code = status.HTTP_200_OK
     return container.space.delete_object(project_id, object_id, actor, envelope)
+
+
+@router.get("/{project_id}/space/bindings", response_model=BindingList)
+def list_bindings(project_id: str, actor: Actor, container: Container) -> BindingList:
+    return container.space.list_bindings(project_id, actor)
+
+
+@router.post("/{project_id}/space/bindings", response_model=BindingList)
+def create_binding(
+    project_id: str,
+    envelope: WriteEnvelope[dict[str, object]],
+    actor: Actor,
+    container: Container,
+) -> BindingList:
+    return container.space.create_binding(project_id, actor, envelope)
+
+
+@router.post("/{project_id}/space/bindings/{binding_id}/apply", response_model=SpaceSnapshot)
+def apply_binding(
+    project_id: str,
+    binding_id: str,
+    envelope: WriteEnvelope[dict[str, object]],
+    actor: Actor,
+    container: Container,
+) -> SpaceSnapshot:
+    return container.space.apply_binding(project_id, binding_id, actor, envelope)
+
+
+@router.post("/{project_id}/space/bindings/{binding_id}/review", response_model=BindingList)
+def review_binding(
+    project_id: str,
+    binding_id: str,
+    envelope: WriteEnvelope[dict[str, object]],
+    actor: Actor,
+    container: Container,
+) -> BindingList:
+    return container.space.review_binding(project_id, binding_id, actor, envelope)
+
+
+@router.get("/{project_id}/space/approvals", response_model=SpaceApprovalView)
+def space_approvals(project_id: str, actor: Actor, container: Container) -> SpaceApprovalView:
+    return container.space.approvals(project_id, actor)
+
+
+@router.post("/{project_id}/space/approvals", response_model=SpaceApprovalView)
+def joint_approve(
+    project_id: str,
+    envelope: WriteEnvelope[dict[str, object]],
+    actor: Actor,
+    container: Container,
+) -> SpaceApprovalView:
+    return container.space.joint_approve(project_id, actor, envelope)

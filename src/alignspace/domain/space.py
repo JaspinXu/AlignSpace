@@ -9,11 +9,13 @@ only ever a temporary draft.
 import hashlib
 import json
 from datetime import UTC, datetime
+from enum import Enum
 
 from pydantic import Field, model_validator
 
 from alignspace.domain.base import DomainModel, NonBlankString
 from alignspace.domain.enums import Role
+from alignspace.domain.space_catalog import MATERIAL_OPTIONS, Approximation, MaterialTarget
 
 SCHEMA_VERSION = "1.0.0"
 UNITS = "mm"
@@ -92,6 +94,13 @@ class SpacePlan(DomainModel):
                 seen.add(identifier)
             if room.room_type not in ROOM_TYPES:
                 raise ValueError(f"unsupported room type {room.room_type}")
+            material_id = room.floor.material_option_id
+            if material_id is not None:
+                option = MATERIAL_OPTIONS.get(material_id)
+                if option is None or MaterialTarget.FLOOR not in option.targets:
+                    raise ValueError(
+                        f"floor material {material_id!r} is not a supported floor option"
+                    )
         for item in self.objects:
             if item.id in seen:
                 raise ValueError(f"duplicate space object id {item.id}")
@@ -173,3 +182,76 @@ class SpaceVersion(DomainModel):
         if self.content_hash != calculate_space_content_hash(self.payload):
             raise ValueError("content_hash must match canonical space payload SHA-256")
         return self
+
+
+class BindingTarget(str, Enum):
+    FLOOR = "floor"
+
+
+class BindingStatus(str, Enum):
+    ACTIVE = "active"
+    NEEDS_REVIEW = "needs_review"
+    INVALIDATED = "invalidated"
+
+
+class SpaceBinding(DomainModel):
+    """A confirmed preference mapped onto a supported space material.
+
+    ``needs_review`` is set when the referenced room changes identity or the
+    underlying preference changes. Nothing is transferred silently.
+    """
+
+    id: str
+    room_id: str
+    floor_object_id: str | None = None
+    target: BindingTarget = BindingTarget.FLOOR
+    attribute_id: str | None = None
+    candidate_id: str | None = None
+    material_option_id: str
+    approximation: Approximation
+    note: str = ""
+    status: BindingStatus = BindingStatus.ACTIVE
+    bound_by: str
+    bound_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    space_version: int = Field(ge=1)
+    applied_space_version: int | None = None
+
+
+class SpaceApproval(DomainModel):
+    """A joint brief+space approval, separate from the brief-only approval."""
+
+    id: str
+    role: Role
+    actor_id: NonBlankString
+    brief_version: int = Field(ge=1)
+    brief_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    space_version: int = Field(ge=1)
+    space_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    approved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+def invalidate_bindings(
+    bindings: list[SpaceBinding],
+    *,
+    room_id: str | None = None,
+    attribute_id: str | None = None,
+) -> list[SpaceBinding]:
+    """Move active bindings touching a changed room/preference to needs_review.
+
+    Room split/merge/delete and preference edits change the identity a binding
+    was based on, so the binding must be re-confirmed rather than silently
+    transferred.
+    """
+
+    result: list[SpaceBinding] = []
+    for binding in bindings:
+        touched = (room_id is not None and binding.room_id == room_id) or (
+            attribute_id is not None and binding.attribute_id == attribute_id
+        )
+        if touched and binding.status is BindingStatus.ACTIVE:
+            result.append(
+                binding.model_copy(update={"status": BindingStatus.NEEDS_REVIEW})
+            )
+        else:
+            result.append(binding)
+    return result

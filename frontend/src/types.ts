@@ -329,6 +329,13 @@ export type SpaceBindingList = {
   projectId: string;
   stateVersion: number;
   bindings: SpaceBinding[];
+  floorPreferences: FloorPreference[];
+};
+
+export type FloorPreference = {
+  attributeId: string;
+  value: string;
+  dimension: string;
 };
 
 export type JointApproval = {

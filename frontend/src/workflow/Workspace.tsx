@@ -742,6 +742,7 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard }: {
             projectId={projectId}
             role={project.role}
             stateVersion={project.stateVersion}
+            onChanged={() => void load()}
           />
 
           <section aria-label="参考图片">

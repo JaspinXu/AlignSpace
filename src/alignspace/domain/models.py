@@ -24,7 +24,7 @@ from alignspace.domain.preferences import (
     CandidatePreference,
     DesignEntry,
 )
-from alignspace.domain.space import SpaceVersion
+from alignspace.domain.space import SpaceApproval, SpaceBinding, SpaceVersion
 
 __all__ = [
     "Approval",
@@ -38,6 +38,8 @@ __all__ = [
     "ProjectState",
     "Question",
     "QuestionOption",
+    "SpaceApproval",
+    "SpaceBinding",
     "SpaceVersion",
     "calculate_brief_content_hash",
     "to_camel",
@@ -171,6 +173,8 @@ class ProjectState(DomainModel):
     design_entries: list[DesignEntry] = Field(default_factory=list)
     candidates: list[CandidatePreference] = Field(default_factory=list)
     space_versions: list[SpaceVersion] = Field(default_factory=list)
+    space_bindings: list[SpaceBinding] = Field(default_factory=list)
+    space_approvals: list[SpaceApproval] = Field(default_factory=list)
     completeness: float = Field(default=0, ge=0, le=1)
     current_node: str | None = None
     wait_reason: str | None = None

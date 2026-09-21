@@ -157,6 +157,28 @@ class SpaceVersionRow(Base):
     payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
 
 
+class SpaceBindingRow(Base):
+    __tablename__ = "space_bindings"
+
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+
+
+class SpaceApprovalRow(Base):
+    __tablename__ = "space_approvals"
+
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+
+
 class AuditEventRow(Base):
     __tablename__ = "audit_events"
 

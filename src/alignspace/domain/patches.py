@@ -14,7 +14,7 @@ from alignspace.domain.models import (
 )
 from alignspace.domain.policies import DomainRuleError, StaleStateError
 from alignspace.domain.preferences import AnalysisRun, CandidatePreference, DesignEntry
-from alignspace.domain.space import SpaceVersion
+from alignspace.domain.space import SpaceApproval, SpaceBinding, SpaceVersion
 
 
 class UpsertAttribute(BaseModel):
@@ -67,6 +67,16 @@ class UpsertSpaceVersion(BaseModel):
     space_version: SpaceVersion
 
 
+class UpsertSpaceBinding(BaseModel):
+    op: Literal["upsert_space_binding"] = "upsert_space_binding"
+    binding: SpaceBinding
+
+
+class UpsertSpaceApproval(BaseModel):
+    op: Literal["upsert_space_approval"] = "upsert_space_approval"
+    approval: SpaceApproval
+
+
 PatchOperation = Annotated[
     UpsertAttribute
     | UpsertConstraint
@@ -77,7 +87,9 @@ PatchOperation = Annotated[
     | UpsertAnalysisRun
     | UpsertDesignEntry
     | UpsertCandidate
-    | UpsertSpaceVersion,
+    | UpsertSpaceVersion
+    | UpsertSpaceBinding
+    | UpsertSpaceApproval,
     Field(discriminator="op"),
 ]
 
@@ -102,6 +114,8 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
     design_entries = list(state.design_entries)
     candidates = list(state.candidates)
     space_versions = list(state.space_versions)
+    space_bindings = list(state.space_bindings)
+    space_approvals = list(state.space_approvals)
     for operation in patch.operations:
         if isinstance(operation, UpsertAttribute):
             attribute = operation.attribute
@@ -171,6 +185,14 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
                 item for item in space_versions if item.version != space_version.version
             ]
             space_versions.append(space_version)
+        elif isinstance(operation, UpsertSpaceBinding):
+            binding = operation.binding
+            space_bindings = [item for item in space_bindings if item.id != binding.id]
+            space_bindings.append(binding)
+        elif isinstance(operation, UpsertSpaceApproval):
+            approval = operation.approval
+            space_approvals = [item for item in space_approvals if item.id != approval.id]
+            space_approvals.append(approval)
         else:
             raise TypeError(f"unsupported patch operation: {operation!r}")
     return state.model_copy(
@@ -185,6 +207,8 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
             "design_entries": design_entries,
             "candidates": candidates,
             "space_versions": space_versions,
+            "space_bindings": space_bindings,
+            "space_approvals": space_approvals,
             "state_version": state.state_version + 1,
         }
     )

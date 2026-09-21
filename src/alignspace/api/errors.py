@@ -17,8 +17,14 @@ from alignspace.application.service import (
     BriefReviewError,
     BriefSchemaError,
 )
+from alignspace.application.space_service import (
+    ApproximationConfirmationRequired,
+    SpaceApprovalMismatch,
+    SpaceStateError,
+)
 from alignspace.auth.service import AuthError
 from alignspace.domain.policies import PolicyViolationError, StaleStateError
+from alignspace.domain.space_catalog import UnsupportedMaterialError
 from alignspace.persistence.repository import IdempotencyConflictError
 from alignspace.storage.images import ImageValidationError
 
@@ -132,6 +138,52 @@ def install_error_handlers(app: FastAPI) -> None:
             request,
             status_code=409,
             code="CANDIDATE_STATE_INVALID",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(SpaceStateError)
+    async def space_state_handler(request: Request, exc: SpaceStateError) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="SPACE_STATE_INVALID",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(UnsupportedMaterialError)
+    async def unsupported_material_handler(
+        request: Request, exc: UnsupportedMaterialError
+    ) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="UNSUPPORTED_MATERIAL",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(ApproximationConfirmationRequired)
+    async def approximation_handler(
+        request: Request, exc: ApproximationConfirmationRequired
+    ) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="APPROXIMATION_REQUIRES_CONFIRMATION",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(SpaceApprovalMismatch)
+    async def approval_mismatch_handler(
+        request: Request, exc: SpaceApprovalMismatch
+    ) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="SPACE_APPROVAL_MISMATCH",
             message=str(exc),
             recoverable=True,
         )
