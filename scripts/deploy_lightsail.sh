@@ -63,7 +63,9 @@ if ! curl -fs http://127.0.0.1:8010/health; then
 fi
 echo; echo "deployed $REV"
 ls -1dt "$ROOT"/releases/* | tail -n +4 | xargs -r rm -rf   # keep the three newest releases
-$FIRST_ENV && echo "FIRST RUN: edit $ROOT/shared/.env (gateway URL, model, key), then: sudo systemctl restart alignspace"
+if [[ "$FIRST_ENV" == "true" ]]; then
+  echo "FIRST RUN: edit $ROOT/shared/.env (gateway URL, model, key), then: sudo systemctl restart alignspace"
+fi
 REMOTE
 
 if [[ "$MODE" == "--https" ]]; then URL="https://${HOST}.sslip.io"; else URL="http://${HOST}"; fi
