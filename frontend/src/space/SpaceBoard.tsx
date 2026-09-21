@@ -16,7 +16,8 @@ import {
   spaceExtent,
 } from './spaceAdapter';
 
-const PREVIEW_URL = 'http://127.0.0.1:4173';
+const PREVIEW_URL =
+  (import.meta.env.VITE_OPENPLAN3D_URL as string | undefined) ?? 'http://127.0.0.1:4173';
 const ROOM_TYPES = [
   { value: 'living_room', label: '客厅' },
   { value: 'bedroom', label: '卧室' },

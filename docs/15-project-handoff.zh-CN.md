@@ -2,7 +2,20 @@
 
 ## 最新接手入口（2026-09-21，优先于下方历史快照）
 
-## 下一轮接续入口（2026-09-21，先读这一节）
+## 下一轮接续入口（2026-09-21）
+
+### ✅ 里程碑②③与交付文档已完成（2026-09-21 收尾）
+
+**最新提交**：`f8987a0`（里程碑③）、`87ddc6e`（里程碑②），均在 `codex/preference-space-integration`；接续点原为 `5eda6ce`。**未合并、未推送、未部署、未调用外部付费模型。**
+
+- 实测（本机隔离临时目录）：后端 **330**、前端 **142**（10 文件）、浏览器 **13**、Ruff/构建/`tsc` 通过。命令见下方原任务书。
+- 里程碑②：空间服务与 API（共享可写、删除仅屋主、白名单 PATCH、不可变 `SpaceVersion`）、前端 `spaceAdapter`/`SpaceBoard`（2D 编辑 + 来源校验的本地 3D 预览入口）、OpenPlan3D 固定 SHA `d68cadf703578f2cd3a7c77f820e18d342580c32` 与离线加固。报告 `docs/reports/space-persistence-validation.zh-CN.md`。
+- 里程碑③：`SpaceBinding` + `SpaceApproval`（迁移 v8）、绑定/应用/复核与联合审批、受支持材质映射（近似需确认、不支持报错）、房间/偏好变更转 `needs_review`、前端 `BindingPanel`。报告 `docs/reports/space-binding-validation.zh-CN.md`。
+- 交付文档：`docs/references/preference-space-delivery.zh-CN.md`（迁移与兼容、模型 IO 协议、环境变量、DeepSeek 联调步骤）、`.env.example`、`docs/references/openplan3d.md`、`docs/14-data-and-asset-register.md`。
+- **工作区仍保留 6 个他人未提交文件，未纳入任何提交**（清单见下）。
+- **唯一未完成项**：**真实 DeepSeek 联调待用户配置密钥后验收。** 模拟通过 ≠ 真实识图已验证。
+
+> 以下为当时的任务书，保留作历史参考；实际实现以上述完成为准。
 
 **任务**：继续完成「图片偏好分析框架 ＋ OpenPlan3D 集成」的**里程碑②、③与交付文档**。
 
