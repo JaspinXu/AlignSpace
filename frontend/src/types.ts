@@ -158,3 +158,69 @@ export type WriteEnvelope<T> = {
   idempotencyKey: string;
   data: T;
 };
+
+export type CandidateDimension =
+  | 'colour'
+  | 'material'
+  | 'style'
+  | 'laying'
+  | 'lighting'
+  | 'other';
+
+export type CandidateCertainty = 'inferred' | 'uncertain';
+
+export type CandidateStatus = 'proposed' | 'confirmed' | 'rejected' | 'dismissed';
+
+export type EntryStatus =
+  | 'open'
+  | 'partially_confirmed'
+  | 'confirmed'
+  | 'dismissed'
+  | 'source_deleted';
+
+/** A model proposal. It is not a preference until the homeowner confirms it. */
+export type Candidate = {
+  id: string;
+  entryId: string;
+  dimension: CandidateDimension;
+  certainty: CandidateCertainty;
+  proposedValue: string | null;
+  confirmedValue: string | null;
+  status: CandidateStatus;
+  attributeId: string | null;
+  humanEdited: boolean;
+  evidence: Evidence[];
+};
+
+export type DesignEntry = {
+  id: string;
+  analysisRunId: string;
+  sourceAssetId: string | null;
+  sourceAvailable: boolean;
+  targetElement: string;
+  attentionDimensions: CandidateDimension[];
+  note: string;
+  status: EntryStatus;
+  candidates: Candidate[];
+};
+
+export type AnalysisRun = {
+  id: string;
+  status: string;
+  description: string;
+  providerMode: string;
+  model: string;
+  promptVersion: string;
+  schemaVersion: string;
+  thirdPartyConsent: boolean;
+  inputAssets: { assetId: string; sha256: string }[];
+  inputFingerprint: string;
+  stale: boolean;
+  error: string | null;
+  entries: DesignEntry[];
+};
+
+export type CandidateBoard = {
+  stateVersion: number;
+  runs: AnalysisRun[];
+};

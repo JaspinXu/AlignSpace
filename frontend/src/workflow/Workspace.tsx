@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, newIdempotencyKey, prepareWrite } from '../api';
+import { PreferenceBoard } from '../preferences/PreferenceBoard';
 import type { Asset, Attribute, Conflict, Constraint, ProjectSnapshot } from '../types';
 
 const BROAD_OPTIONS: { label: string; keyword: string }[] = [];
@@ -726,6 +727,14 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard }: {
               </button>
             </section>
           )}
+
+          <PreferenceBoard
+            client={client}
+            projectId={projectId}
+            role={project.role}
+            assets={project.assets}
+            stateVersion={project.stateVersion}
+          />
 
           <section aria-label="参考图片">
             <h3>参考图片</h3>

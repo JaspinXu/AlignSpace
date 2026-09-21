@@ -208,7 +208,9 @@ test('deleting a question source image lets another tab reach the next step', as
   // The other tab refreshes into the next valid question, not the deleted image.
   await tabB.reload();
   await expect(tabB.getByRole('button', { name: '喜欢', exact: true }).first()).toBeVisible();
-  expect(await tabB.locator('fieldset').innerText()).not.toContain(imageName);
+  expect(
+    await tabB.getByRole('group', { name: '部位属性取值' }).innerText(),
+  ).not.toContain(imageName);
 });
 
 test('a refresh response arriving after logout cannot restore the session', async ({ browser }) => {
