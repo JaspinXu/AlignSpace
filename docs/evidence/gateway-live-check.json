@@ -1,0 +1,44 @@
+{
+  "purpose": "Confirm the deployed build really calls the organiser Claude Sonnet 4.5 JSON API, not the offline keyword rules.",
+  "checkedAt": "2026-09-21T09:05:48Z",
+  "deployment": "https://54.255.93.19.sslip.io",
+  "release": "a1c8bd0",
+  "runtimeEndpoint": {
+    "analysisMode": "gateway",
+    "imageAnalysisEnabled": false,
+    "projectRunLimit": 20
+  },
+  "method": [
+    "Created a throwaway project through the public site (HDB 4-room, no saved inspiration).",
+    "Added one homeowner note written so that no decision option appears as a literal keyword, which the offline rules can only ignore.",
+    "Ran POST /api/projects/{id}/analysis-runs with no mode override, i.e. one real gateway request.",
+    "Read back GET /api/projects/{id}/analysis-runs for the recorded usage row."
+  ],
+  "note": "Whenever we visit friends' places I find myself drawn to rooms where the late afternoon light lands on something with a bit of grain to it, and where you can put a mug down without thinking twice. The last condo showflat we saw felt like a hotel lobby - everything reflective, nothing you'd want to sit on for three hours with a laptop. We host my parents most Sundays, so seven or eight people end up in the living room, and the TV is honestly secondary to that.",
+  "usage": {
+    "mode": "gateway_notes",
+    "model": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "promptVersion": "reference-observations-v3-grounded",
+    "knowledgeCorpusVersion": "29cb7dfb3f168bd184b68e23781b611086665fbdc039329a678c6b8f7179e539",
+    "retrievedChunkIds": ["a52c48745b541183", "9b931a0f1c595f5c", "342dab15ae933f9e"],
+    "latencyMs": 7476,
+    "attempts": 1,
+    "ignoredTrailingOutput": false,
+    "inputTokens": 1873,
+    "outputTokens": 426,
+    "status": "completed"
+  },
+  "proposals": [
+    {"dimension": "lighting", "value": "natural_bright", "status": "proposed", "evidence": "Explicitly drawn to \"late afternoon light\" as a positive quality in visited spaces"},
+    {"dimension": "material", "value": "light_oak", "status": "proposed", "evidence": "Attracted to surfaces \"with a bit of grain to it\" where light lands; disliked reflective finishes in contrasting example"},
+    {"dimension": "mood", "value": "social", "status": "proposed", "evidence": "Hosts parents most Sundays with seven to eight people in living room; TV is secondary to gathering"},
+    {"dimension": "function", "value": "hosting", "status": "proposed", "evidence": "Regular Sunday hosting of seven to eight people; living room serves as primary gathering space"},
+    {"dimension": "mood", "value": "cosy", "status": "proposed", "evidence": "Values ability to \"sit on for three hours with a laptop\" and put a mug down comfortably; rejects formal hotel-lobby feel"}
+  ],
+  "conclusions": [
+    "The note contains none of the proposed option labels, so these five observations could not come from the offline keyword rules.",
+    "Every observation arrived as status 'proposed' with a quoted source span; nothing was auto-confirmed.",
+    "One request was consumed; the run is recorded in the analysis-runs ledger with model, prompt version and token counts.",
+    "Image analysis stayed disabled, matching the documented limitation."
+  ]
+}

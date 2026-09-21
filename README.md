@@ -156,7 +156,7 @@ Keys belong in the server-side `.env` only (ignored by Git and the Docker contex
 | `ALIGNSPACE_ANALYSIS_MODE` | `gateway` or `offline` |
 | `ALIGNSPACE_ALLOW_IMAGES` | Enable image analysis (off until a vision endpoint passes a known-image check) |
 | `VISION_API_FORMAT`, `VISION_GATEWAY_URL`, `VISION_GATEWAY_API_KEY`, `VISION_MODEL` | Optional vision provider: `openai`, `anthropic` or `ollama` format |
-| `ALIGNSPACE_PROJECT_RUN_LIMIT`, `ALIGNSPACE_DAILY_RUN_LIMIT` | Analysis caps (defaults 20 per project, 100 per rolling day; 10 s cooldown) |
+| `ALIGNSPACE_PROJECT_RUN_LIMIT`, `ALIGNSPACE_DAILY_RUN_LIMIT` | Analysis caps (defaults 20 per project, 100 per rolling day; 10 s cooldown). The public deployment runs 20 and 40. |
 | `ALIGNSPACE_DB_PATH`, `ALIGNSPACE_UPLOAD_DIR` | SQLite file and private upload folder |
 | `ALIGNSPACE_SECURE_COOKIES` | `true` when served over HTTPS |
 
