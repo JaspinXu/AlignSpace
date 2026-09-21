@@ -13,11 +13,13 @@ from alignspace.api.routes.briefs import router as briefs_router
 from alignspace.api.routes.constraints import router as constraints_router
 from alignspace.api.routes.preferences import router as preferences_router
 from alignspace.api.routes.projects import router as projects_router
+from alignspace.api.routes.space import router as space_router
 from alignspace.api.routes.workflow import router as workflow_router
 from alignspace.application.membership import MembershipService
 from alignspace.application.preferences import PreferenceService
 from alignspace.application.resources import ProjectResourceService
 from alignspace.application.service import WorkflowService
+from alignspace.application.space_service import SpaceService
 from alignspace.auth.config import AuthConfig
 from alignspace.auth.routes import router as auth_router
 from alignspace.auth.service import AuthService
@@ -37,6 +39,7 @@ class Container:
     workflow: WorkflowService
     membership: MembershipService
     preferences: PreferenceService
+    space: SpaceService
     auth: AuthService
 
 
@@ -76,6 +79,10 @@ def create_app(
         storage=storage,
         membership_check=resources.is_member,
     )
+    space = SpaceService(
+        session_factory=session_factory,
+        membership_check=resources.is_member,
+    )
     container = Container(
         engine=engine,
         session_factory=session_factory,
@@ -84,6 +91,7 @@ def create_app(
         workflow=workflow,
         membership=membership,
         preferences=preferences,
+        space=space,
         auth=AuthService(session_factory, auth_config or AuthConfig.from_env()),
     )
 
@@ -111,6 +119,7 @@ def create_app(
     app.include_router(projects_router)
     app.include_router(constraints_router)
     app.include_router(preferences_router)
+    app.include_router(space_router)
     app.include_router(workflow_router)
     app.include_router(briefs_router)
     return app

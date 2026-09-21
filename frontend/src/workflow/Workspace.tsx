@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, newIdempotencyKey, prepareWrite } from '../api';
 import { PreferenceBoard } from '../preferences/PreferenceBoard';
+import { SpaceBoard } from '../space/SpaceBoard';
 import type { Asset, Attribute, Conflict, Constraint, ProjectSnapshot } from '../types';
 
 const BROAD_OPTIONS: { label: string; keyword: string }[] = [];
@@ -733,6 +734,13 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard }: {
             projectId={projectId}
             role={project.role}
             assets={project.assets}
+            stateVersion={project.stateVersion}
+          />
+
+          <SpaceBoard
+            client={client}
+            projectId={projectId}
+            role={project.role}
             stateVersion={project.stateVersion}
           />
 

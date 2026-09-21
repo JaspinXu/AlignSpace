@@ -224,3 +224,130 @@ export type CandidateBoard = {
   stateVersion: number;
   runs: AnalysisRun[];
 };
+
+export type SpacePoint = { x: number; y: number };
+
+export type SpaceWall = {
+  id: string;
+  start: SpacePoint;
+  end: SpacePoint;
+  thickness: number;
+};
+
+export type SpaceFloor = {
+  id: string;
+  materialOptionId: string | null;
+  bindingId: string | null;
+};
+
+export type SpaceRoom = {
+  id: string;
+  name: string;
+  roomType: string;
+  origin: SpacePoint;
+  size: { width: number; depth: number };
+  walls: SpaceWall[];
+  floor: SpaceFloor;
+};
+
+export type SpaceObject = {
+  id: string;
+  roomId: string;
+  kind: string;
+  label: string;
+  geometry: Record<string, unknown>;
+};
+
+export type SpacePlan = {
+  schemaVersion: string;
+  units: string;
+  rooms: SpaceRoom[];
+  objects: SpaceObject[];
+};
+
+export type SpaceSnapshot = {
+  projectId: string;
+  stateVersion: number;
+  version: number | null;
+  contentHash: string | null;
+  source: string | null;
+  previousVersion: number | null;
+  createdBy: string | null;
+  createdRole: Role | null;
+  createdAt: string | null;
+  plan: SpacePlan | null;
+};
+
+export type SpaceVersionSummary = {
+  version: number;
+  contentHash: string;
+  source: string;
+  previousVersion: number | null;
+  createdBy: string;
+  createdRole: Role;
+  createdAt: string;
+};
+
+export type SpaceVersionList = {
+  projectId: string;
+  stateVersion: number;
+  versions: SpaceVersionSummary[];
+};
+
+export type MaterialOption = {
+  id: string;
+  label: string;
+  targets: string[];
+  colours: string[];
+  patterns: string[];
+};
+
+export type MaterialCatalogue = { options: MaterialOption[] };
+
+export type Approximation = 'exact' | 'approximate';
+
+export type BindingStatus = 'active' | 'needs_review' | 'invalidated';
+
+export type SpaceBinding = {
+  id: string;
+  roomId: string;
+  floorObjectId: string | null;
+  target: 'floor';
+  attributeId: string | null;
+  candidateId: string | null;
+  materialOptionId: string;
+  approximation: Approximation;
+  note: string;
+  status: BindingStatus;
+  boundBy: string;
+  boundAt: string;
+  spaceVersion: number;
+  appliedSpaceVersion: number | null;
+};
+
+export type SpaceBindingList = {
+  projectId: string;
+  stateVersion: number;
+  bindings: SpaceBinding[];
+};
+
+export type JointApproval = {
+  role: Role;
+  actorId: string;
+  briefVersion: number;
+  briefHash: string;
+  spaceVersion: number;
+  spaceHash: string;
+  approvedAt: string;
+};
+
+export type SpaceApprovalView = {
+  projectId: string;
+  stateVersion: number;
+  briefVersion: number | null;
+  briefHash: string | null;
+  spaceVersion: number | null;
+  spaceHash: string | null;
+  approvals: JointApproval[];
+  approved: boolean;
+};

@@ -17,4 +17,5 @@ __pycache__/
 .DS_Store
 .worktrees/
 .superpowers/
+vendor/openplan3d/upstream/
 var/

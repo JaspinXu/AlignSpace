@@ -8,6 +8,7 @@ Use one row per dataset, image set, icon pack, font, generated asset group, thir
 | DATA-001 | 30-case evaluation set | Team + lawful sources | Pending | Case register | Internal evaluation | Per rights | AI lead | Planned |
 | FONT-001 | UI fonts | Open-license choice | Pending | License URL/file | Product/demo | While distributed | Frontend | Planned |
 | ICON-001 | UI icons | Open-license choice | Pending | License URL/file | Product/demo | While distributed | Frontend | Planned |
+| ASSET-OPENPLAN3D-001 | OpenPlan3D 2D/3D editor source (local 3D preview) | theLodgeStudio, https://github.com/laanlabs/openPlan3D @ `d68cadf703578f2cd3a7c77f820e18d342580c32` | MIT (`vendor/openplan3d/LICENSE`) | Pinned SHA + vendored license + `MODEL_SOURCES.md`; see `docs/references/openplan3d.md` | Local preview only; source not committed; analytics/share hardened out | Not vendored in git; fetched on demand | Frontend | Integrated (local) |
 
 ## Required before use
 
