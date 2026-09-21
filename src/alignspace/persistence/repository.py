@@ -17,6 +17,7 @@ from alignspace.domain.models import (
 )
 from alignspace.domain.policies import StaleStateError
 from alignspace.domain.preferences import AnalysisRun, CandidatePreference, DesignEntry
+from alignspace.domain.space import SpaceVersion
 from alignspace.persistence.tables import (
     AnalysisRunRow,
     ApprovalRow,
@@ -30,6 +31,7 @@ from alignspace.persistence.tables import (
     IdempotencyRecordRow,
     ProjectRow,
     QuestionRow,
+    SpaceVersionRow,
 )
 
 
@@ -168,6 +170,7 @@ class ProjectRepository:
             candidates=self._load_models(
                 CandidatePreferenceRow, CandidatePreference, project_id
             ),
+            space_versions=self._load_models(SpaceVersionRow, SpaceVersion, project_id),
             completeness=project.completeness,
             current_node=project.current_node,
             wait_reason=project.wait_reason,
@@ -216,6 +219,7 @@ class ProjectRepository:
             (AnalysisRunRow, state.analysis_runs, lambda item: {"id": item.id}),
             (DesignEntryRow, state.design_entries, lambda item: {"id": item.id}),
             (CandidatePreferenceRow, state.candidates, lambda item: {"id": item.id}),
+            (SpaceVersionRow, state.space_versions, lambda item: {"version": item.version}),
         )
         for row_type, items, identity in specifications:
             self._session.execute(delete(row_type).where(row_type.project_id == state.project_id))

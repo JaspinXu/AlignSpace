@@ -146,6 +146,17 @@ class CandidatePreferenceRow(Base):
     payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
 
 
+class SpaceVersionRow(Base):
+    __tablename__ = "space_versions"
+
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+
+
 class AuditEventRow(Base):
     __tablename__ = "audit_events"
 

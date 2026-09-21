@@ -355,3 +355,61 @@ def test_candidate_entities_round_trip_through_the_repository(tmp_path):
         assert reloaded.candidates[0].proposed_value == "warm grey"
     finally:
         engine.dispose()
+
+
+def test_space_versions_round_trip_through_the_repository(tmp_path):
+    from alignspace.domain.enums import Role
+    from alignspace.domain.space import (
+        SpacePlan,
+        SpaceVersion,
+        build_rectangular_room,
+        calculate_space_content_hash,
+    )
+    from alignspace.persistence.database import create_engine_and_session
+    from alignspace.persistence.repository import ProjectRepository
+
+    engine, session_factory = create_engine_and_session(f"sqlite:///{tmp_path / 'space.db'}")
+    try:
+        with session_factory() as session:
+            repository = ProjectRepository(session)
+            state = ProjectState(project_id="project-space")
+            repository.create(state)
+            session.commit()
+
+        with session_factory() as session:
+            repository = ProjectRepository(session)
+            state = repository.load("project-space")
+            plan = SpacePlan(
+                rooms=[
+                    build_rectangular_room(
+                        room_id="room-1", name="客厅", width=4000, depth=5000
+                    )
+                ]
+            )
+            payload = plan.model_dump(mode="json", by_alias=True)
+            version = SpaceVersion(
+                version=1,
+                content_hash=calculate_space_content_hash(payload),
+                payload=payload,
+                created_by="homeowner-1",
+                created_role=Role.HOMEOWNER,
+                source="rectangular_dimensions",
+            )
+            updated = state.model_copy(
+                update={
+                    "state_version": state.state_version + 1,
+                    "space_versions": [version],
+                }
+            )
+            repository.save(updated, expected_version=state.state_version)
+            session.commit()
+
+        with session_factory() as session:
+            reloaded = ProjectRepository(session).load("project-space")
+        assert [item.version for item in reloaded.space_versions] == [1]
+        restored = reloaded.space_versions[0]
+        assert restored.created_role is Role.HOMEOWNER
+        assert restored.payload["rooms"][0]["id"] == "room-1"
+        assert restored.payload["rooms"][0]["floor"]["id"] == "floor-room-1"
+    finally:
+        engine.dispose()

@@ -14,6 +14,7 @@ from alignspace.domain.models import (
 )
 from alignspace.domain.policies import DomainRuleError, StaleStateError
 from alignspace.domain.preferences import AnalysisRun, CandidatePreference, DesignEntry
+from alignspace.domain.space import SpaceVersion
 
 
 class UpsertAttribute(BaseModel):
@@ -61,6 +62,11 @@ class UpsertCandidate(BaseModel):
     candidate: CandidatePreference
 
 
+class UpsertSpaceVersion(BaseModel):
+    op: Literal["upsert_space_version"] = "upsert_space_version"
+    space_version: SpaceVersion
+
+
 PatchOperation = Annotated[
     UpsertAttribute
     | UpsertConstraint
@@ -70,7 +76,8 @@ PatchOperation = Annotated[
     | UpsertApproval
     | UpsertAnalysisRun
     | UpsertDesignEntry
-    | UpsertCandidate,
+    | UpsertCandidate
+    | UpsertSpaceVersion,
     Field(discriminator="op"),
 ]
 
@@ -94,6 +101,7 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
     analysis_runs = list(state.analysis_runs)
     design_entries = list(state.design_entries)
     candidates = list(state.candidates)
+    space_versions = list(state.space_versions)
     for operation in patch.operations:
         if isinstance(operation, UpsertAttribute):
             attribute = operation.attribute
@@ -157,6 +165,12 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
             candidate = operation.candidate
             candidates = [item for item in candidates if item.id != candidate.id]
             candidates.append(candidate)
+        elif isinstance(operation, UpsertSpaceVersion):
+            space_version = operation.space_version
+            space_versions = [
+                item for item in space_versions if item.version != space_version.version
+            ]
+            space_versions.append(space_version)
         else:
             raise TypeError(f"unsupported patch operation: {operation!r}")
     return state.model_copy(
@@ -170,6 +184,7 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
             "analysis_runs": analysis_runs,
             "design_entries": design_entries,
             "candidates": candidates,
+            "space_versions": space_versions,
             "state_version": state.state_version + 1,
         }
     )

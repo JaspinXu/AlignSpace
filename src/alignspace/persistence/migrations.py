@@ -80,4 +80,10 @@ def migrate(engine):
             text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
             {"version": 6},
         )
+        # Version 7 adds space_versions. Historical projects have no rows, so they
+        # keep the original brief-only flow and no space approval is fabricated.
+        connection.execute(
+            text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
+            {"version": 7},
+        )
     assert MigrationRow.__tablename__ in Base.metadata.tables
