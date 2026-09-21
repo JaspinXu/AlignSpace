@@ -11,15 +11,18 @@ from alignspace.agents.contracts import AgentBundle
 from alignspace.api.errors import install_error_handlers
 from alignspace.api.routes.briefs import router as briefs_router
 from alignspace.api.routes.constraints import router as constraints_router
+from alignspace.api.routes.preferences import router as preferences_router
 from alignspace.api.routes.projects import router as projects_router
 from alignspace.api.routes.workflow import router as workflow_router
 from alignspace.application.membership import MembershipService
+from alignspace.application.preferences import PreferenceService
 from alignspace.application.resources import ProjectResourceService
 from alignspace.application.service import WorkflowService
 from alignspace.auth.config import AuthConfig
 from alignspace.auth.routes import router as auth_router
 from alignspace.auth.service import AuthService
 from alignspace.persistence.database import create_engine_and_session
+from alignspace.providers.factory import build_preference_provider
 from alignspace.providers.mock import build_mock_agents
 from alignspace.storage.local import LocalStorage
 from alignspace.workflow.runtime import sqlite_graph
@@ -33,6 +36,7 @@ class Container:
     resources: ProjectResourceService
     workflow: WorkflowService
     membership: MembershipService
+    preferences: PreferenceService
     auth: AuthService
 
 
@@ -66,6 +70,12 @@ def create_app(
         session_factory=session_factory,
         resources=resources,
     )
+    preferences = PreferenceService(
+        session_factory=session_factory,
+        provider=build_preference_provider(),
+        storage=storage,
+        membership_check=resources.is_member,
+    )
     container = Container(
         engine=engine,
         session_factory=session_factory,
@@ -73,6 +83,7 @@ def create_app(
         resources=resources,
         workflow=workflow,
         membership=membership,
+        preferences=preferences,
         auth=AuthService(session_factory, auth_config or AuthConfig.from_env()),
     )
 
@@ -99,6 +110,7 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(projects_router)
     app.include_router(constraints_router)
+    app.include_router(preferences_router)
     app.include_router(workflow_router)
     app.include_router(briefs_router)
     return app

@@ -12,6 +12,7 @@ from alignspace.domain.constraints import flag_brief_change, reconcile_constrain
 from alignspace.domain.enums import AttributeStatus, EvidenceSource, Role
 from alignspace.domain.models import DomainModel, NonBlankString, ProjectState, Question
 from alignspace.domain.policies import StaleStateError, calculate_completeness
+from alignspace.domain.preferences import EntryStatus
 from alignspace.persistence.database import read_transaction
 from alignspace.persistence.repository import ProjectRepository, canonical_request_hash
 from alignspace.persistence.tables import ImageAssetRow, ProjectMemberRow, ProjectRow
@@ -315,11 +316,20 @@ class ProjectResourceService:
                 remaining_questions = [
                     _without_asset_options(question, asset_id) for question in state.questions
                 ]
+                # Candidate entries keep their history but are marked as no longer
+                # sourced; unconfirmed candidates from them can no longer be applied.
+                remaining_entries = [
+                    item.model_copy(update={"status": EntryStatus.SOURCE_DELETED})
+                    if item.source_asset_id == asset_id
+                    else item
+                    for item in state.design_entries
+                ]
                 updated = state.model_copy(
                     update={
                         "state_version": state.state_version + 1,
                         "attributes": remaining,
                         "questions": remaining_questions,
+                        "design_entries": remaining_entries,
                     }
                 )
                 updated = updated.model_copy(

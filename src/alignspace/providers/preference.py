@@ -141,6 +141,7 @@ class MockPreferenceAnalysisProvider:
     """Deterministic, explicable stand-in for real image understanding."""
 
     MODEL = "mock-deterministic"
+    provider_mode = ProviderMode.MOCK
 
     def analyze(self, request: PreferenceAnalysisRequest) -> PreferenceAnalysisResult:
         entries: list[ProposedEntry] = []

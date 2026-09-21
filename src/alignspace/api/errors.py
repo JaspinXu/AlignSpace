@@ -5,6 +5,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from alignspace.application.membership import JoinCodeError
+from alignspace.application.preferences import (
+    CandidateStateError,
+    ThirdPartyConsentRequired,
+)
 from alignspace.application.resources import AssetCountError, AssetLimitError, ConsentRequiredError
 from alignspace.application.service import (
     ApprovalNotAllowedError,
@@ -104,6 +108,30 @@ def install_error_handlers(app: FastAPI) -> None:
             request,
             status_code=409,
             code="ASSET_COUNT_INVALID",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(ThirdPartyConsentRequired)
+    async def third_party_consent_handler(
+        request: Request, exc: ThirdPartyConsentRequired
+    ) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="THIRD_PARTY_CONSENT_REQUIRED",
+            message=str(exc),
+            recoverable=True,
+        )
+
+    @app.exception_handler(CandidateStateError)
+    async def candidate_state_handler(
+        request: Request, exc: CandidateStateError
+    ) -> JSONResponse:
+        return _response(
+            request,
+            status_code=409,
+            code="CANDIDATE_STATE_INVALID",
             message=str(exc),
             recoverable=True,
         )

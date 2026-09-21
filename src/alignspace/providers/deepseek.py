@@ -98,6 +98,7 @@ class UrllibTransport:
 class DeepSeekPreferenceAnalysisProvider:
     DEFAULT_MODEL = "deepseek-flash"
     DEFAULT_BASE_URL = "https://api.deepseek.com"
+    provider_mode = ProviderMode.DEEPSEEK
     # Official error codes: 400 invalid format, 401 auth, 402 insufficient balance,
     # 422 invalid parameters are terminal; 429/5xx are retryable.
     _TERMINAL_STATUSES = frozenset({400, 401, 402, 403, 422})

@@ -80,6 +80,7 @@ class CandidatePreference(DomainModel):
     confirmed_value: str | None = None
     attribute_id: str | None = None
     decided_by: str | None = None
+    human_edited: bool = False
 
     @model_validator(mode="after")
     def validate_candidate(self) -> "CandidatePreference":
