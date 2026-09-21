@@ -2,6 +2,8 @@
 
 ## 最新接手入口（2026-09-21，优先于下方历史快照）
 
+> **2026-09-21 追加：图片偏好分析框架（里程碑①完成）。** 开发分支 `codex/preference-space-integration`，基线 `codex/brief-reader` @ `5843774`。新增可替换的分析 provider（确定性 mock + 已实现但**本轮未调用**的 DeepSeek 适配器，缺密钥显式失败不降级），以及候选偏好闭环：屋主选图＋自然语言描述 → 模型提出候选（三类事实分离：关注维度／模型推断／屋主确认；不确定材质不编造取值）→ 屋主逐项确认 → 写入**唯一**正式 `Attribute`（`pref-{candidateId}`，重复确认不重复创建）。重新分析不覆盖已确认/人工编辑内容；删除条目保留已确认偏好；删除来源图后未确认候选失效。迁移 **v6**。接口：`POST/GET /v1/projects/{id}/preference-analyses`、`PATCH/DELETE /v1/projects/{id}/design-entries/{eid}`、`PATCH/POST /v1/projects/{id}/candidates/{cid}`（含 confirm/reject）。实测：后端 293、前端 119、浏览器 11 连续 3 次通过，Ruff/构建通过。DeepSeek 协议已抓官方文档核对（`docs/references/deepseek.md`）。证据见 [里程碑①验证报告](reports/preference-candidates-validation.zh-CN.md)。**里程碑②空间持久化、③地板联动、OpenPlan3D 集成尚未开始。** 工作区仍保留他人 6 个未提交文件（预算金额输入＋密码下限），未合并、未推送、未部署。
+
 > **2026-09-21 验证收尾：** 只读说明书页已通过独立审查及修复复核，补齐浏览器历史导航的未保存输入保护。最新实测为后端 245 项、前端 111 项、浏览器 10 项通过，Ruff 与构建通过。证据见 [说明书页验证记录](reports/brief-reader-validation.zh-CN.md)。当前仍在 `codex/brief-reader`，未合并、未推送、未部署；下方旧阶段数字仅作历史记录。
 
 > **2026-09-20 追加：独立只读说明书详情页。** 开发分支 `codex/brief-reader`，从本地 `shawn` @ `0b10ae5`（规格提交；此前试运行保障合并为 `e31d23b`）创建。工作区“查看设计说明书”进入详情，可刷新深链接、选择历史版本、前进后退；正文只读取所选版本快照。编辑、重新生成与审批仍在工作区；有未保存输入时进入阅读页需确认。复用项目 state GET，无新后端接口或迁移。历史审批可能被现有流程清空，因此缺失显示“历史审批记录不可用”，不能据此推断当时未批准。项目模板残留元数据不当作历史事实展示。原图证据显示来源 ID；不新增导出、版本比较、真实模型或部署。规格与实施计划见 `docs/superpowers/specs/2026-09-20-brief-reader-design.md`、`docs/superpowers/plans/2026-09-20-brief-reader-plan.md`。最终提交和集成状态以 Git 为准。

@@ -10,10 +10,10 @@
 - [x] 核对真实 Git 状态与工作区，记录未提交改动清单（6 文件，保留不动）。
 - [x] 创建独立功能分支 `codex/preference-space-integration`。
 - [x] 编写设计规格与大方向计划（本文件）。
-- [ ] **等待用户确认第 7 节两个权限问题**（里程碑②的写入路径依赖此答案）。
-- [ ] 运行基线：`uv run pytest -q`、`uv run ruff check src tests scripts`、`cd frontend && npm test && npm run build`，记录真实数字（不沿用历史报告）。
+- [x] 权限问题已确认：空间草稿共享可写；删除仅限屋主。
+- [x] 基线已记录：后端 249、前端 113、浏览器 10（阶段 0 时点）。
 
-## 里程碑①：候选偏好闭环
+## 里程碑①：候选偏好闭环 —— ✅ 已完成（见 `docs/reports/preference-candidates-validation.zh-CN.md`）
 
 ### ①.1 领域模型（后端，TDD）
 1. 测试：`tests/unit/domain/test_preference_candidates.py`
@@ -58,9 +58,7 @@
 ### ①.5 验收报告
 - `docs/reports/preference-candidates-validation.zh-CN.md`：真实运行的后端/前端/构建/浏览器结果；明确「模拟通过 ≠ 真实识图」。
 
-## 里程碑②：空间持久化闭环
-
-> 依赖用户对第 7 节权限问题的答复。
+## 里程碑②：空间持久化闭环 —— ⬜ 未开始（权限已确认：草稿共享可写，删除仅限屋主）
 
 1. 领域：`src/alignspace/domain/space.py`（空间 payload + 校验）、`space_catalog.py`（材质目录）。
 2. 持久化：`space_versions` 表（迁移 v7），`content_hash` 同 `BriefVersion` 模式。
@@ -69,7 +67,7 @@
 5. 前端：`frontend/src/space/spaceAdapter.ts` + 2D 编辑与 3D 预览入口；本地存储仅草稿；iframe `message` 来源校验。
 6. OpenPlan3D：固定上游 SHA、许可证与素材归属、本地启动说明、**不向云服务发送数据**的验收检查。
 
-## 里程碑③：地板联动闭环
+## 里程碑③：地板联动闭环 —— ⬜ 未开始
 
 1. `SpaceBinding`（迁移 v8）+ 绑定/复核/应用接口。
 2. 联动路径：已确认地板偏好 → 绑定房间 → 受支持材质 → 预览与适配说明 → 用户确认 → 新空间版本 → 重载保持。
