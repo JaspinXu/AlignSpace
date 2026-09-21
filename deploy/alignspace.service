@@ -10,11 +10,17 @@ WorkingDirectory=/home/ubuntu/alignspace/current
 EnvironmentFile=/home/ubuntu/alignspace/shared/.env
 Environment=ALIGNSPACE_DB_PATH=/home/ubuntu/alignspace/shared/data/alignspace.db
 Environment=ALIGNSPACE_UPLOAD_DIR=/home/ubuntu/alignspace/shared/data/uploads
-ExecStart=/home/ubuntu/alignspace/current/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010 --proxy-headers
+ExecStart=/home/ubuntu/alignspace/current/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=3
+
+# Only the shared data directory is writable; the app never needs anything else.
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/alignspace/shared/data
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
