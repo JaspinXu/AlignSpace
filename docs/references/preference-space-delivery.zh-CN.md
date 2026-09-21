@@ -86,7 +86,7 @@ PreferenceAnalysisResult:
 
 ## 6. OpenPlan3D 本地启动与上游归属
 
-见 `docs/references/openplan3d.md`：固定 SHA `d68cadf703578f2cd3a7c77f820e18d342580c32`，MIT 许可证与素材归属副本在 `vendor/openplan3d/`，`scripts/fetch_openplan3d.sh` 负责拉取并做离线加固（移除 Firebase Analytics、禁用云端分享导入）。3D 预览仅连接本地来源，令牌不入 URL；`frontend/src/space/spaceNoCloud.test.ts` 做静态回归。
+见 `docs/references/openplan3d.md`：固定 SHA `d68cadf703578f2cd3a7c77f820e18d342580c32`，MIT 许可证与素材归属副本在 `vendor/openplan3d/`。`scripts/fetch_openplan3d.sh` 负责拉取、离线加固（移除 Firebase Analytics、禁用云端分享导入）并安装双向编辑桥（`vendor/openplan3d/bridge/alignspaceBridge.ts`，注入 `editor/+page.svelte`）。桥在固定 SHA 上把后端计划导入编辑器（保留权威房间/对象 ID、按 `alignspaceFloorMaterials` 呈现地板材质），并把编辑器内变更回传，经 `spaceAdapter.upstreamPatches()` 走同一套受控 API 落库。3D 预览仅连接本地来源，令牌不入 URL；`frontend/e2e/space-3d.spec.ts` 真实启动上游验收（未安装上游时自动跳过），`frontend/src/space/spaceNoCloud.test.ts` 做静态回归。
 
 ## 7. 验收结果索引
 

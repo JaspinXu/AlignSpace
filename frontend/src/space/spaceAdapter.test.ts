@@ -5,9 +5,11 @@ import {
   buildPreviewMessage,
   isAllowedPreviewOrigin,
   parseEditorMessage,
+  planFingerprint,
   roomCorners,
   spaceExtent,
   toOpenPlan3DHandoff,
+  upstreamPatches,
 } from './spaceAdapter';
 
 const ORIGIN = 'http://127.0.0.1:4173';
@@ -99,5 +101,56 @@ describe('spaceAdapter', () => {
     expect(message.type).toBe('alignspace:space');
     expect(message.protocol).toBe(1);
     expect(message.handoff.walls).toHaveLength(2);
+  });
+});
+
+const upstreamProject = {
+  activeFloorId: 'floor-x',
+  floors: [
+    {
+      id: 'floor-x',
+      walls: [
+        { id: 'wall-room-a-north', start: { x: 100, y: 200 }, end: { x: 500, y: 200 } },
+        { id: 'wall-room-a-east', start: { x: 500, y: 200 }, end: { x: 500, y: 700 } },
+        { id: 'wall-room-a-south', start: { x: 500, y: 700 }, end: { x: 100, y: 700 } },
+        { id: 'wall-room-a-west', start: { x: 100, y: 700 }, end: { x: 100, y: 200 } },
+      ],
+      rooms: [
+        {
+          id: 'detected-1',
+          name: '会客厅',
+          walls: ['wall-room-a-north', 'wall-room-a-east', 'wall-room-a-south', 'wall-room-a-west'],
+          alignspaceRoomId: 'room-a',
+        },
+      ],
+      furniture: [{ id: 'obj-1', position: { x: 25, y: 30 } }],
+    },
+  ],
+};
+
+describe('spaceAdapter edit-back', () => {
+  it('carries authoritative room and object ids into the handoff', () => {
+    const handoff = toOpenPlan3DHandoff(plan());
+    expect(handoff.alignspaceRoomIds).toEqual(['room-a']);
+    expect(handoff.alignspaceObjectIds).toEqual(['obj-1']);
+  });
+
+  it('diffs a renamed room and a moved object into controlled writes', () => {
+    const ops = upstreamPatches(upstreamProject, plan(), 'homeowner');
+    expect(ops).toContainEqual({ op: 'update_room', roomId: 'room-a', name: '会客厅' });
+    expect(ops).toContainEqual({
+      op: 'update_object',
+      objectId: 'obj-1',
+      geometry: { width: 2000, depth: 900, height: 800, x: 250, y: 300 },
+    });
+  });
+
+  it('does not let a designer delete rooms or objects', () => {
+    const ops = upstreamPatches(upstreamProject, plan(), 'designer');
+    expect(ops.some((op) => op.op === 'delete_room' || op.op === 'delete_object')).toBe(false);
+  });
+
+  it('produces a stable fingerprint for the same plan', () => {
+    expect(planFingerprint(plan())).toBe(planFingerprint(plan()));
   });
 });

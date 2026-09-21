@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,6 +9,12 @@ const dataDir = process.env.ALIGNSPACE_E2E_DATA_DIR || mkdtempSync(join(tmpdir()
 process.env.ALIGNSPACE_E2E_DATA_DIR = dataDir;
 const frontendUrl = 'http://127.0.0.1:5174';
 const backendUrl = 'http://127.0.0.1:8013';
+const upstreamUrl = 'http://127.0.0.1:4173';
+// The pinned OpenPlan3D checkout is optional; when present we also boot its dev
+// server so the 3D integration spec can run a real browser acceptance.
+const upstreamDir = join(process.cwd(), '..', 'vendor', 'openplan3d', 'upstream');
+const hasUpstream = existsSync(join(upstreamDir, 'node_modules'));
+process.env.ALIGNSPACE_3D_AVAILABLE = hasUpstream ? '1' : '';
 
 export default defineConfig({
   testDir: './e2e',
@@ -45,5 +51,15 @@ export default defineConfig({
       reuseExistingServer: false,
       env: { API_PROXY_TARGET: backendUrl },
     },
+    ...(hasUpstream
+      ? [
+          {
+            command: 'npm run dev -- --host 127.0.0.1 --port 4173',
+            cwd: upstreamDir,
+            url: `${upstreamUrl}/editor`,
+            reuseExistingServer: false,
+          },
+        ]
+      : []),
   ],
 });

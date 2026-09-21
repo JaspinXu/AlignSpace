@@ -11,6 +11,8 @@ set -euo pipefail
 UPSTREAM_URL="https://github.com/laanlabs/openPlan3D"
 PINNED_SHA="d68cadf703578f2cd3a7c77f820e18d342580c32"
 TARGET="${1:-vendor/openplan3d/upstream}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BRIDGE_SRC="$SCRIPT_DIR/../vendor/openplan3d/bridge/alignspaceBridge.ts"
 
 if [ -d "$TARGET/.git" ]; then
   echo "Updating existing checkout at $TARGET"
@@ -56,6 +58,33 @@ PY
 if grep -RInE "google-analytics\.com|googletagmanager\.com|firebaseapp\.com|firebaseio\.com|firebasestorage\.googleapis\.com" \
   "$TARGET/src" >/dev/null 2>&1; then
   echo "Cloud endpoint reference still present under $TARGET/src; refusing to continue." >&2
+  exit 1
+fi
+
+# Install the AlignSpace bridge (import + edit-back) into the pinned editor.
+cp "$BRIDGE_SRC" "$TARGET/src/lib/alignspaceBridge.ts"
+python3 - "$TARGET" <<'PY'
+import pathlib
+import sys
+
+target = pathlib.Path(sys.argv[1])
+page = target / "src/routes/editor/+page.svelte"
+text = page.read_text()
+if "startAlignSpaceBridge" not in text:
+    text = text.replace(
+        "import { onMount } from 'svelte';",
+        "import { onMount } from 'svelte';\n  import { startAlignSpaceBridge } from '$lib/alignspaceBridge';",
+        1,
+    )
+    text = text.replace(
+        "onMount(() => {\n    void initializeEditor();",
+        "onMount(() => {\n    startAlignSpaceBridge();\n    void initializeEditor();",
+        1,
+    )
+    page.write_text(text)
+PY
+if ! grep -q "startAlignSpaceBridge" "$TARGET/src/routes/editor/+page.svelte"; then
+  echo "AlignSpace bridge injection failed; refusing to continue." >&2
   exit 1
 fi
 

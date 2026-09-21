@@ -68,3 +68,19 @@ POST   /v1/projects/{id}/space/approvals                # 联合审批
 ## 7. 结论
 
 里程碑③闭环全部通过：已确认地板偏好可受控映射到受支持材质、生成新空间版本并在重载后保持；不支持/近似/未确认输入均被正确拒绝；房间身份变化与偏好修改会显式触发复核，联合审批严格绑定说明书与空间两者的版本与哈希。
+
+## 8. 评审修复与 OpenPlan3D 真实集成（2026-09-21 追加）
+
+针对代码评审提出的 5 项 P1：
+
+| 评审项 | 处理 |
+|---|---|
+| OpenPlan3D 无可运行集成 | 在固定 SHA `d68cadf…` 上安装双向桥并注入 `editor/+page.svelte`：ready→导入（保留房间/对象 ID、按材质设置地板纹理）→ `currentProject` 变更回传→受控 API 落库；新增真实启动的浏览器验收 `frontend/e2e/space-3d.spec.ts` |
+| 地板材质未进入 3D | handoff 新增 `alignspaceFloorMaterials` 与 `section.color`，桥按材质设置 `floorTexture`/颜色 |
+| brief_stale 时联合审批仍显示已批准 | `_approval_view()` 在 `brief_stale` 时判为失效，历史批准保留 |
+| 手选材质绕过近似确认 | 手选目标与偏好映射一致时沿用 `approximate`；不同项视为替代仍需确认 |
+| 重新绑定绕过屋主且默认 rooms[0] | 复核仅屋主（403），必须显式选择目标房间，重算近似并要求必要确认 |
+
+追加实测（本机隔离临时目录）：后端 **334**、前端 **149**、浏览器 **14**（含真实 OpenPlan3D）、Ruff/构建/`tsc` 通过。提交 `71d09df` 及后续 3D 集成提交。
+
+> **真实 DeepSeek 联调待用户配置密钥后验收。**

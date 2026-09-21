@@ -14,6 +14,8 @@ import {
   parseEditorMessage,
   roomCorners,
   spaceExtent,
+  upstreamPatches,
+  type SpaceSyncOp,
 } from './spaceAdapter';
 
 const PREVIEW_URL =
@@ -54,7 +56,15 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   const [objectLabel, setObjectLabel] = useState('沙发');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewNote, setPreviewNote] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const frame = useRef<HTMLIFrameElement | null>(null);
+  const planRef = useRef<SpaceSnapshot['plan']>(null);
+  const readyRef = useRef(false);
+  const syncingRef = useRef(false);
+  const versionRef = useRef(stateVersion);
+  versionRef.current = stateVersion;
+  const onChangedRef = useRef(onChanged);
+  onChangedRef.current = onChanged;
 
   const isHomeowner = role === 'homeowner';
 
@@ -76,26 +86,98 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
     void load();
   }, [load, stateVersion]);
 
+  const expectedVersion = snapshot ? Math.max(snapshot.stateVersion, stateVersion) : stateVersion;
+  const plan = snapshot?.plan ?? null;
+  planRef.current = plan;
+  // Older workspaces and unrelated test doubles may not expose a catalogue yet.
+  const materialOptions = Array.isArray(materials?.options) ? materials.options : [];
+
+  const applyUpstreamOps = useCallback(
+    async (ops: SpaceSyncOp[]) => {
+      if (ops.length === 0 || syncingRef.current) return;
+      syncingRef.current = true;
+      setSyncing(true);
+      setError(null);
+      try {
+        for (const op of ops) {
+          const current = await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`);
+          const version = Math.max(current.stateVersion, versionRef.current);
+          if (op.op === 'update_room') {
+            const data: Record<string, unknown> = {};
+            if (op.name !== undefined) data.name = op.name;
+            if (op.origin) data.origin = op.origin;
+            if (op.size) data.size = op.size;
+            await client.execute(
+              prepareWrite(`/v1/projects/${projectId}/space/rooms/${op.roomId}`, 'PATCH', version, data),
+            );
+          } else if (op.op === 'create_room') {
+            await client.execute(
+              prepareWrite(`/v1/projects/${projectId}/space/rooms`, 'POST', version, {
+                name: op.name,
+                width: op.size.width,
+                depth: op.size.depth,
+                origin: op.origin,
+              }),
+            );
+          } else if (op.op === 'delete_room') {
+            await client.execute(
+              prepareWrite(`/v1/projects/${projectId}/space/rooms/${op.roomId}`, 'DELETE', version, {}),
+            );
+          } else if (op.op === 'update_object') {
+            await client.execute(
+              prepareWrite(`/v1/projects/${projectId}/space/objects/${op.objectId}`, 'PATCH', version, {
+                geometry: op.geometry,
+              }),
+            );
+          } else if (op.op === 'delete_object') {
+            await client.execute(
+              prepareWrite(`/v1/projects/${projectId}/space/objects/${op.objectId}`, 'DELETE', version, {}),
+            );
+          }
+        }
+        setSnapshot(await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`));
+        onChangedRef.current?.();
+      } catch (caught) {
+        setError(messageOf(caught));
+      } finally {
+        syncingRef.current = false;
+        setSyncing(false);
+      }
+    },
+    [client, projectId],
+  );
+
   // Preview handshake: only a message from the exact local origin is trusted.
   useEffect(() => {
     if (!previewOpen) return;
     const onMessage = (event: MessageEvent) => {
       const parsed = parseEditorMessage(event, PREVIEW_URL);
-      if (!parsed || parsed.kind !== 'ready') return;
-      if (!snapshot?.plan) return;
-      const target = frame.current?.contentWindow;
-      if (!target) return;
-      target.postMessage(buildPreviewMessage(snapshot.plan), PREVIEW_URL);
-      setPreviewNote('已将当前空间草稿发送到本地 3D 预览（仅本机，不含令牌）。');
+      if (!parsed) return;
+      if (parsed.kind === 'ready') {
+        readyRef.current = true;
+        const target = frame.current?.contentWindow;
+        const currentPlan = planRef.current;
+        if (!target || !currentPlan) return;
+        target.postMessage(buildPreviewMessage(currentPlan), PREVIEW_URL);
+        setPreviewNote('已将当前空间草稿发送到本地 3D 预览（仅本机，不含令牌）。');
+      } else if (parsed.kind === 'project') {
+        const currentPlan = planRef.current;
+        if (!currentPlan) return;
+        void applyUpstreamOps(upstreamPatches(parsed.project, currentPlan, role));
+      } else if (parsed.kind === 'error') {
+        setError(parsed.message);
+      }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [previewOpen, snapshot?.plan]);
+  }, [previewOpen, applyUpstreamOps, role]);
 
-  const expectedVersion = snapshot ? Math.max(snapshot.stateVersion, stateVersion) : stateVersion;
-  const plan = snapshot?.plan ?? null;
-  // Older workspaces and unrelated test doubles may not expose a catalogue yet.
-  const materialOptions = Array.isArray(materials?.options) ? materials.options : [];
+  // Keep the 3D editor in sync when the 2D panel changes the plan.
+  useEffect(() => {
+    if (!previewOpen || !readyRef.current) return;
+    const target = frame.current?.contentWindow;
+    if (target && plan) target.postMessage(buildPreviewMessage(plan), PREVIEW_URL);
+  }, [previewOpen, plan]);
 
   const run = async (write: ReturnType<typeof prepareWrite>) => {
     setBusy(true);
@@ -163,11 +245,22 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
       setError('请先选择一个房间，再添加家具。');
       return;
     }
+    const room = plan?.rooms.find((item) => item.id === selectedRoomId);
+    const geometry = room
+      ? {
+          x: room.origin.x + room.size.width / 2,
+          y: room.origin.y + room.size.depth / 2,
+          width: 1000,
+          depth: 600,
+          height: 800,
+        }
+      : {};
     void run(
       prepareWrite(`/v1/projects/${projectId}/space/objects`, 'POST', expectedVersion, {
         roomId: selectedRoomId,
         kind: 'furniture',
         label: objectLabel.trim() || '家具',
+        geometry,
       }),
     );
   };
@@ -256,11 +349,19 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
               if (!room) return null;
               const width = typeof object.geometry.width === 'number' ? object.geometry.width : 800;
               const depth = typeof object.geometry.depth === 'number' ? object.geometry.depth : 800;
+              const centerX =
+                typeof object.geometry.x === 'number'
+                  ? object.geometry.x
+                  : room.origin.x + room.size.width / 2;
+              const centerY =
+                typeof object.geometry.y === 'number'
+                  ? object.geometry.y
+                  : room.origin.y + room.size.depth / 2;
               return (
                 <rect
                   key={object.id}
-                  x={room.origin.x + room.size.width / 2 - width / 2}
-                  y={room.origin.y + room.size.depth / 2 - depth / 2}
+                  x={centerX - width / 2}
+                  y={centerY - depth / 2}
                   width={width}
                   height={depth}
                   fill="#f59e0b"
@@ -349,12 +450,13 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
             <iframe
               ref={frame}
               title="OpenPlan3D 本地预览"
-              src={PREVIEW_URL}
+              src={`${PREVIEW_URL}/editor`}
               sandbox="allow-scripts allow-same-origin"
               style={{ width: '100%', height: 360, border: '1px solid #ccc' }}
             />
             <p className="question-hint">
               预览仅连接本机 OpenPlan3D（{PREVIEW_URL}），不调用上游云分享、统计或账户；访问令牌不会放入 URL。
+              {syncing ? ' 正在将 3D 编辑同步回后端…' : ''}
               {previewNote ? ` ${previewNote}` : ''}
             </p>
             {!isAllowedPreviewOrigin(PREVIEW_URL, PREVIEW_URL) && <p role="alert">预览地址不受信任。</p>}

@@ -19,18 +19,23 @@ bash scripts/fetch_openplan3d.sh
 # 输出：OpenPlan3D pinned at d68cadf... and hardened for offline local use.
 ```
 
-脚本在 checkout 后做两处**离线加固**（因为“不调用上游云分享/统计/账户”是硬约束）：
+脚本在 checkout 后执行以下步骤：
 
-1. 用惰性模块覆盖 `src/lib/firebase.ts`，移除 Firebase Analytics 初始化。
+1. **离线加固**：用惰性模块覆盖 `src/lib/firebase.ts`，移除 Firebase Analytics 初始化。
 2. 把 iOS 云端分享导入（Google Storage inbox 拉取）的 URL 改为不受支持的 `local://disabled-upstream-share`，使其无法访问外网。
-3. 最后静态扫描 `$TARGET/src`，若仍出现 `google-analytics.com`、`googletagmanager.com`、`firebaseapp.com`、`firebaseio.com`、`firebasestorage.googleapis.com` 则拒绝继续。
+3. **安装编辑桥**：把 `vendor/openplan3d/bridge/alignspaceBridge.ts` 复制为 `src/lib/alignspaceBridge.ts`，并在 `src/routes/editor/+page.svelte` 的 `onMount` 中调用 `startAlignSpaceBridge()`。
+4. 最后静态扫描 `$TARGET/src`，若仍出现 `google-analytics.com`、`googletagmanager.com`、`firebaseapp.com`、`firebaseio.com`、`firebasestorage.googleapis.com` 则拒绝继续。
 
-## 2. 受控适配层
+## 2. 受控适配层与双向桥
 
-- 前端适配层：`frontend/src/space/spaceAdapter.ts`。它把后端持久化的毫米级 `SpacePlan` 转成 OpenPlan3D 的 handoff JSON（`openplanHandoffVersion: 1`，米制），并把消息封装为 `{ type: 'alignspace:space', protocol: 1, handoff }`。
-- 只信任精确配置的本地来源：`isAllowedPreviewOrigin` 仅接受 `http(s)://127.0.0.1` 或 `localhost` 且与配置完全相等，从不接受通配符。
-- **令牌不进 URL**：预览 iframe 的 `src` 只含本地地址；项目数据通过 `postMessage` 在 `ready` 握手后发送。
-- OpenPlan3D 的只读 MCP 不能替代编辑接口；所有编辑仍走本仓库后端权限、结构校验、版本检查与审批失效规则。
+- 前端适配层：`frontend/src/space/spaceAdapter.ts`。把后端持久化的毫米级 `SpacePlan` 转成 OpenPlan3D 的 handoff JSON（`openplanHandoffVersion: 1`，米制），并附带扩展字段：`alignspaceFloorMaterials`（房间→材质）、`alignspaceRoomIds`/`alignspaceObjectIds`（保持权威身份）、`alignspaceFingerprint`（去重）。
+- 上游桥（`vendor/openplan3d/bridge/alignspaceBridge.ts`，由固定脚本安装）：
+  - 启动后向父窗口发送 `alignspace:ready`；
+  - 收到 `alignspace:space` 后校验并 `importRoomPlan()` 导入，按房间保留我方 `alignspaceRoomId`，按 `alignspaceFloorMaterials` 设置地板纹理（`light-oak`/`porcelain`/`vinyl`/`concrete`）与房间颜色；
+  - 订阅 `currentProject`，防抖后回传 `alignspace:project`。导入后的短暂窗口内抑制回传，避免自回写循环。
+- 编辑回传：前端 `SpaceBoard` 收到 `alignspace:project` 后用 `upstreamPatches()` 与权威计划做差，把房间名称/几何、家具位置、以及新增/删除（删除仅屋主）经**现有受控 API** 落库。非有限坐标会被忽略，避免污染权威几何；后端仍执行结构校验、版本检查、权限与审批失效规则。
+- 只读 MCP 不能替代编辑接口；所有写入都走本仓库后端。
+- **令牌不进 URL**：预览 iframe 只连接本地地址；数据通过 `postMessage` 在 `ready` 握手后传输。`isAllowedPreviewOrigin` 仅接受精确的本地来源。
 
 ## 3. 本地启动
 
@@ -50,11 +55,12 @@ npm install
 npm run dev -- --host 127.0.0.1 --port 4173
 ```
 
-前端打开“空间草稿 → 打开 3D 预览”即加载本地编辑器；只有收到来自 `http://127.0.0.1:4173` 的 `alignspace:ready` 才会发送当前空间草稿。
+前端打开“空间草稿 → 打开 3D 预览”（iframe 指向 `http://127.0.0.1:4173/editor`）。只有收到来自该精确来源的 `alignspace:ready` 才发送当前空间草稿。
 
-## 4. 验收：不向上游云发送项目数据
+## 4. 验收：真实启动与不向上游云发送数据
 
-网络层面断言（人工或端到端脚本）：
+- `frontend/e2e/space-3d.spec.ts`（当日实测通过）：真实启动固定上游 dev server，验证 2D 计划导入 3D 编辑器、保存的地板材质可见（`floorTexture`）、权威房间 ID 保留、以及在编辑器内移动家具后经受控 API 落库并重载保持。未安装上游时该用例自动跳过。
+- 网络层面检查：
 
 1. 仅允许到 `127.0.0.1` / `localhost` 的请求；拦截并列出所有其他域名。
 2. 打开空间草稿与 3D 预览、编辑房间、应用材质，触发一次完整消息往返。
