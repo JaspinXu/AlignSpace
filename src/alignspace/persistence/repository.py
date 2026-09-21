@@ -16,13 +16,17 @@ from alignspace.domain.models import (
     Question,
 )
 from alignspace.domain.policies import StaleStateError
+from alignspace.domain.preferences import AnalysisRun, CandidatePreference, DesignEntry
 from alignspace.persistence.tables import (
+    AnalysisRunRow,
     ApprovalRow,
     AttributeRow,
     AuditEventRow,
     BriefVersionRow,
+    CandidatePreferenceRow,
     ConflictRow,
     ConstraintRow,
+    DesignEntryRow,
     IdempotencyRecordRow,
     ProjectRow,
     QuestionRow,
@@ -159,6 +163,11 @@ class ProjectRepository:
             conflicts=self._load_models(ConflictRow, Conflict, project_id),
             brief_versions=self._load_models(BriefVersionRow, BriefVersion, project_id),
             approvals=self._load_models(ApprovalRow, Approval, project_id),
+            analysis_runs=self._load_models(AnalysisRunRow, AnalysisRun, project_id),
+            design_entries=self._load_models(DesignEntryRow, DesignEntry, project_id),
+            candidates=self._load_models(
+                CandidatePreferenceRow, CandidatePreference, project_id
+            ),
             completeness=project.completeness,
             current_node=project.current_node,
             wait_reason=project.wait_reason,
@@ -204,6 +213,9 @@ class ProjectRepository:
                     "content_hash": item.content_hash,
                 },
             ),
+            (AnalysisRunRow, state.analysis_runs, lambda item: {"id": item.id}),
+            (DesignEntryRow, state.design_entries, lambda item: {"id": item.id}),
+            (CandidatePreferenceRow, state.candidates, lambda item: {"id": item.id}),
         )
         for row_type, items, identity in specifications:
             self._session.execute(delete(row_type).where(row_type.project_id == state.project_id))

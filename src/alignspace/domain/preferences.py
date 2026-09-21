@@ -20,7 +20,7 @@ from enum import Enum
 
 from pydantic import Field, model_validator
 
-from alignspace.domain.models import DomainModel, Evidence, NonBlankString
+from alignspace.domain.base import DomainModel, Evidence, NonBlankString
 
 
 class CandidateDimension(str, Enum):

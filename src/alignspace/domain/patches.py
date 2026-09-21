@@ -13,6 +13,7 @@ from alignspace.domain.models import (
     Question,
 )
 from alignspace.domain.policies import DomainRuleError, StaleStateError
+from alignspace.domain.preferences import AnalysisRun, CandidatePreference, DesignEntry
 
 
 class UpsertAttribute(BaseModel):
@@ -45,13 +46,31 @@ class UpsertApproval(BaseModel):
     approval: Approval
 
 
+class UpsertAnalysisRun(BaseModel):
+    op: Literal["upsert_analysis_run"] = "upsert_analysis_run"
+    analysis_run: AnalysisRun
+
+
+class UpsertDesignEntry(BaseModel):
+    op: Literal["upsert_design_entry"] = "upsert_design_entry"
+    entry: DesignEntry
+
+
+class UpsertCandidate(BaseModel):
+    op: Literal["upsert_candidate"] = "upsert_candidate"
+    candidate: CandidatePreference
+
+
 PatchOperation = Annotated[
     UpsertAttribute
     | UpsertConstraint
     | UpsertQuestion
     | UpsertConflict
     | UpsertBriefVersion
-    | UpsertApproval,
+    | UpsertApproval
+    | UpsertAnalysisRun
+    | UpsertDesignEntry
+    | UpsertCandidate,
     Field(discriminator="op"),
 ]
 
@@ -72,6 +91,9 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
     conflicts = list(state.conflicts)
     brief_versions = list(state.brief_versions)
     approvals = list(state.approvals)
+    analysis_runs = list(state.analysis_runs)
+    design_entries = list(state.design_entries)
+    candidates = list(state.candidates)
     for operation in patch.operations:
         if isinstance(operation, UpsertAttribute):
             attribute = operation.attribute
@@ -123,6 +145,18 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
                 != (approval.role, approval.brief_version, approval.content_hash)
             ]
             approvals.append(approval)
+        elif isinstance(operation, UpsertAnalysisRun):
+            analysis_run = operation.analysis_run
+            analysis_runs = [item for item in analysis_runs if item.id != analysis_run.id]
+            analysis_runs.append(analysis_run)
+        elif isinstance(operation, UpsertDesignEntry):
+            entry = operation.entry
+            design_entries = [item for item in design_entries if item.id != entry.id]
+            design_entries.append(entry)
+        elif isinstance(operation, UpsertCandidate):
+            candidate = operation.candidate
+            candidates = [item for item in candidates if item.id != candidate.id]
+            candidates.append(candidate)
         else:
             raise TypeError(f"unsupported patch operation: {operation!r}")
     return state.model_copy(
@@ -133,6 +167,9 @@ def apply_patch(state: ProjectState, patch: StatePatch) -> ProjectState:
             "conflicts": conflicts,
             "brief_versions": brief_versions,
             "approvals": approvals,
+            "analysis_runs": analysis_runs,
+            "design_entries": design_entries,
+            "candidates": candidates,
             "state_version": state.state_version + 1,
         }
     )

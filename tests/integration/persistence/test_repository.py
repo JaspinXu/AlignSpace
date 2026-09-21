@@ -283,3 +283,75 @@ def test_uncommitted_unit_of_work_rolls_back_project_audit_and_idempotency(tmp_p
         assert session.scalar(select(AuditEventRow.id)) is None
         assert session.scalar(select(IdempotencyRecordRow.key)) is None
     engine.dispose()
+
+
+def test_candidate_entities_round_trip_through_the_repository(tmp_path):
+    from alignspace.domain.preferences import (
+        AnalysisRun,
+        AnalysisStatus,
+        CandidateDimension,
+        CandidatePreference,
+        Certainty,
+        DesignEntry,
+        InputAsset,
+        ProviderMode,
+    )
+    from alignspace.persistence.database import create_engine_and_session
+    from alignspace.persistence.repository import ProjectRepository
+
+    engine, session_factory = create_engine_and_session(f"sqlite:///{tmp_path / 'cand.db'}")
+    try:
+        with session_factory() as session:
+            repository = ProjectRepository(session)
+            state = ProjectState(project_id="project-cand")
+            repository.create(state)
+            session.commit()
+
+        with session_factory() as session:
+            repository = ProjectRepository(session)
+            state = repository.load("project-cand")
+            run = AnalysisRun(
+                id="run-1",
+                status=AnalysisStatus.COMPLETED,
+                requested_by="homeowner-1",
+                description="喜欢床的颜色",
+                input_assets=[InputAsset(asset_id="asset-1", sha256="aaa")],
+                input_fingerprint="fp",
+                provider_mode=ProviderMode.MOCK,
+                model="mock-deterministic",
+                prompt_version="prompt-v1",
+                schema_version="1.0.0",
+            )
+            entry = DesignEntry(
+                id="entry-1",
+                analysis_run_id="run-1",
+                source_asset_id="asset-1",
+                target_element="bed",
+                attention_dimensions=[CandidateDimension.COLOUR],
+            )
+            candidate = CandidatePreference(
+                id="cand-1",
+                entry_id="entry-1",
+                dimension=CandidateDimension.COLOUR,
+                certainty=Certainty.INFERRED,
+                proposed_value="warm grey",
+            )
+            updated = state.model_copy(
+                update={
+                    "state_version": state.state_version + 1,
+                    "analysis_runs": [run],
+                    "design_entries": [entry],
+                    "candidates": [candidate],
+                }
+            )
+            repository.save(updated, expected_version=state.state_version)
+            session.commit()
+
+        with session_factory() as session:
+            reloaded = ProjectRepository(session).load("project-cand")
+        assert [item.id for item in reloaded.analysis_runs] == ["run-1"]
+        assert [item.id for item in reloaded.design_entries] == ["entry-1"]
+        assert [item.id for item in reloaded.candidates] == ["cand-1"]
+        assert reloaded.candidates[0].proposed_value == "warm grey"
+    finally:
+        engine.dispose()

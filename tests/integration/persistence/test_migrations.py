@@ -84,7 +84,16 @@ def test_migration_adds_soft_delete_column_and_is_repeatable(tmp_path):
                 "SELECT version FROM schema_migrations"
             )
         }
-        assert versions == {1, 2, 3, 4, 5}
+        assert versions == {1, 2, 3, 4, 5, 6}
+    finally:
+        engine.dispose()
+
+
+def test_migration_creates_candidate_preference_tables(tmp_path):
+    engine, _ = create_engine_and_session(f"sqlite:///{tmp_path / 'candidates.db'}")
+    try:
+        tables = set(inspect(engine).get_table_names())
+        assert {"analysis_runs", "design_entries", "candidate_preferences"} <= tables
     finally:
         engine.dispose()
 

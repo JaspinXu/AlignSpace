@@ -71,4 +71,13 @@ def migrate(engine):
             text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
             {"version": 5},
         )
+        # Version 6 adds the candidate preference analysis tables
+        # (analysis_runs, design_entries, candidate_preferences). They are created
+        # by create_all above; this marker records the schema level. Older projects
+        # simply have no rows, so the existing brief-only flow keeps working and no
+        # historical analysis is fabricated.
+        connection.execute(
+            text("INSERT OR IGNORE INTO schema_migrations (version) VALUES (:version)"),
+            {"version": 6},
+        )
     assert MigrationRow.__tablename__ in Base.metadata.tables

@@ -192,7 +192,7 @@ def test_offline_backup_restore_and_resume(tmp_path, monkeypatch):
     assert (backup_dir / "assets").is_dir()
     manifest = json.loads((backup_dir / "manifest.json").read_text())
     assert manifest["formatVersion"] == 1
-    assert manifest["migrationVersion"] == 5
+    assert manifest["migrationVersion"] == 6
     assert str(tmp_path) not in json.dumps(manifest)
     assert {entry["path"] for entry in manifest["files"]} >= {
         "database.sqlite3", "checkpoints.sqlite3"

@@ -1,10 +1,10 @@
 import hashlib
 import json
 from datetime import UTC, datetime
-from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import Field, model_validator
 
+from alignspace.domain.base import DomainModel, Evidence, NonBlankString, to_camel
 from alignspace.domain.enums import (
     ActorKind,
     AttributeStatus,
@@ -19,18 +19,27 @@ from alignspace.domain.enums import (
     QuestionKind,
     Role,
 )
+from alignspace.domain.preferences import (
+    AnalysisRun,
+    CandidatePreference,
+    DesignEntry,
+)
 
-
-def to_camel(value: str) -> str:
-    head, *tail = value.split("_")
-    return head + "".join(part.capitalize() for part in tail)
-
-
-class DomainModel(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
-
-
-NonBlankString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+__all__ = [
+    "Approval",
+    "Attribute",
+    "BriefVersion",
+    "Conflict",
+    "Constraint",
+    "DomainModel",
+    "Evidence",
+    "NonBlankString",
+    "ProjectState",
+    "Question",
+    "QuestionOption",
+    "calculate_brief_content_hash",
+    "to_camel",
+]
 
 
 def calculate_brief_content_hash(payload: dict[str, object]) -> str:
@@ -42,12 +51,6 @@ def calculate_brief_content_hash(payload: dict[str, object]) -> str:
         sort_keys=True,
     )
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
-
-
-class Evidence(DomainModel):
-    source_type: EvidenceSource
-    source_id: NonBlankString
-    description: NonBlankString
 
 
 class Attribute(DomainModel):
@@ -162,6 +165,9 @@ class ProjectState(DomainModel):
     conflicts: list[Conflict] = Field(default_factory=list)
     brief_versions: list[BriefVersion] = Field(default_factory=list)
     approvals: list[Approval] = Field(default_factory=list)
+    analysis_runs: list[AnalysisRun] = Field(default_factory=list)
+    design_entries: list[DesignEntry] = Field(default_factory=list)
+    candidates: list[CandidatePreference] = Field(default_factory=list)
     completeness: float = Field(default=0, ge=0, le=1)
     current_node: str | None = None
     wait_reason: str | None = None
