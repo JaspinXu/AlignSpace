@@ -6,13 +6,14 @@ Deadline: **28 September 2026, 09:00 SGT**, posted in `#submission` (not `#round
 
 | # | Action | Where | Status |
 |---|---|---|---|
-| 1 | Make `JaspinXu/AlignSpace` public (or add judges as collaborators if organisers say so) | GitHub → Settings → General → Danger Zone → Change visibility | Pending — history scanned clean on 18 Sep |
+| 1 | Make `JaspinXu/AlignSpace` public | GitHub → Settings → General → Danger Zone | **Done, 21 Sep** — verified by an anonymous clone; history has no secrets |
 | 2 | Deploy the tagged release and note the public URL | `scripts/deploy_lightsail.sh ubuntu@<ip> <key.pem>` (see `docs/15`) | Pending — needs instance IP |
 | 3 | Record the narrated video and upload it (YouTube unlisted or a direct MP4 link) | Script in section 4 | Pending |
 | 4 | Fill the URL placeholders in `docs/writeup/writeup.html`, re-render (`python docs/writeup/render_pdf.py`) and link the PDF | `docs/writeup/AlignSpace-writeup.pdf` | Draft ready |
 | 5 | Run the owner trial and fill `docs/17-user-trial.md` | Local app | Pending |
 | 6 | Ask the organisers the open questions in section 3 | `#admin-related` | Pending |
-| 7 | Check every link in a private/signed-out window, then post | Slack `#submission` | Pending |
+| 7 | Publish the GitHub release `v1.0` with the PDF and demo MP4 attached | `gh release create` (section 6) | Pending |
+| 8 | Check every link in a private/signed-out window, then post | Slack `#submission` | Pending |
 
 ## 2. Slack post (text only; do not attach the video)
 
@@ -40,6 +41,7 @@ Before posting: replace every `<...>`, open each link in a private window, and k
 3. What counts as "deployment evidence" — is a public URL enough, or do you also want screenshots of the Lightsail console?
 4. Is there a page limit or template for the PDF write-up?
 5. Please confirm our topic selection (Design Inspiration, Public category) is recorded for team 8QFDUS2I.
+6. Between the shortlisting deadline and the finale window (29 September – 5 October), does our Lightsail instance stay available, and should the deployment URL remain reachable for judging during that time?
 
 ## 4. Video plan and narration script
 
@@ -73,6 +75,18 @@ Recording checklist: 1920×1080, browser zoom 100%, notifications off, synthetic
 - [ ] `docs/16` updated with the live URL, date and checks; `docs/17` filled.
 - [ ] Post in `#submission`; screenshot the post.
 
-## 6. Finale (only if shortlisted)
+## 6. Release assets
+
+A GitHub release gives permanent direct links for the write-up and the demo video, which also satisfies the "URL to download the video in MP4 format" requirement without YouTube:
+
+```bash
+gh release create v1.0 --title "AlignSpace v1.0 (shortlisting submission)" \
+  --notes "Shortlisting submission for NUS-ISS Show Me Your Agents. Deployment: <URL>." \
+  docs/writeup/AlignSpace-writeup.pdf "output/alignspace-golden-path-demo.mp4#Golden-path demo (2m12s, captioned)"
+```
+
+The asset links are then `https://github.com/JaspinXu/AlignSpace/releases/download/v1.0/<filename>`. Check both in a private window before posting.
+
+## 7. Finale (only if shortlisted)
 
 Finalists: 10 October 2026, 08:30 SGT, face-to-face. Updated artifacts go to `#final-submission`. Prepare: five-minute pitch (`docs/11`), live demo on the deployed URL with the captioned MP4 as fallback, three clean rehearsals, and answers to the judge Q&A in `docs/11`.

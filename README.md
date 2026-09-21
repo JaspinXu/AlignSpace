@@ -13,7 +13,7 @@ References, notes and practical constraints become one versioned living-room bri
 <img src="https://img.shields.io/badge/Storage-SQLite-003B57?logo=sqlite&logoColor=white" alt="SQLite">
 <img src="https://img.shields.io/badge/LLM-Claude%20Sonnet%204.5-D97757?logo=anthropic&logoColor=white" alt="Claude Sonnet 4.5">
 <img src="https://img.shields.io/badge/Deploy-AWS%20Lightsail-FF9900?logo=amazonaws&logoColor=white" alt="AWS Lightsail">
-<img src="https://img.shields.io/badge/tests-77%20passed-3f7a12" alt="77 tests passed">
+<a href="https://github.com/JaspinXu/AlignSpace/actions/workflows/ci.yml"><img src="https://github.com/JaspinXu/AlignSpace/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 <img src="https://img.shields.io/badge/UI-English%20%2F%20%E4%B8%AD%E6%96%87-6543ee" alt="English / Chinese">
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT License"></a>
 </p>
@@ -187,6 +187,8 @@ ALIGNSPACE_ANALYSIS_MODE=offline ALIGNSPACE_DB_PATH=/tmp/e2e.db python -m uvicor
 python scripts/e2e_golden_path.py http://127.0.0.1:8011
 ```
 
+Every push runs the same checks in GitHub Actions: ruff, the test suite, the belief simulation and a schema check on the recorded brief.
+
 Evidence: [verification report](docs/16-verification-report.md) · [run results](docs/evidence/e2e-run.json) · [example approved brief](docs/evidence/approved-brief.example.json) · [evaluation plan](docs/08-evaluation-plan.md).
 
 ## Deploy
@@ -237,6 +239,8 @@ docs/                  Product, agent, safety, evaluation, deployment and submis
 
 <details>
 <summary><b>Documentation map</b></summary>
+
+Documents under `docs/` include design proposals that are **not** what runs today — for example [docs/05](docs/05-technical-architecture.md) describes a serverless AWS target, while the assessed build is a single Lightsail instance. This README and the [verification report](docs/16-verification-report.md) are the current implementation record.
 
 | Topic | Documents |
 | --- | --- |

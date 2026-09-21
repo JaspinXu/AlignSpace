@@ -354,7 +354,8 @@ def create_app(database_path: str | Path | None = None, upload_dir: str | Path |
                 mutation = engine.analyse_references
             else:
                 proposals, usage = gateway.analyse(snapshot, application.state.upload_dir)
-                mutation = lambda current: engine.apply_model_proposals(current, proposals)
+                def mutation(current):
+                    return engine.apply_model_proposals(current, proposals)
             result = store(request).mutate(project_id, 'reference_analysis_completed', 'analysis_service', mutation, snapshot['stateVersion'])
             store(request).finish_analysis(run_id,'completed',usage)
             return {**_present(result), 'analysisSummary':usage}

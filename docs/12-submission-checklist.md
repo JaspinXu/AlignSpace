@@ -1,12 +1,12 @@
 # Submission and Readiness Checklist
 
-Updated 18 September 2026. Initial submission is due **28 September, 09:00 SGT** in `#submission`. Required fields are now known; scoring weights and the exact interpretation of the 30-minute video remain open.
+Updated 21 September 2026. Initial submission is due **28 September, 09:00 SGT** in `#submission`. Required fields are now known; scoring weights and the exact interpretation of the 30-minute video remain open.
 
 ## Submission package
 
 - [x] Team: Four Wolf Kings — 8QFDUS2I.
 - [x] Project: AlignSpace — Design Inspiration Agents.
-- [ ] Judge-accessible GitHub repository URL and release identifier. Code is merged to `main` and tagged `v1.0-rc1`; **repository is still private — make it public (or grant judges access) before posting.**
+- [x] Judge-accessible GitHub repository URL: the repository is public (verified 21 September by anonymous clone) and `main` carries the submitted code. Tag `v1.0` on the final commit before posting.
 - [ ] Video viewing/download URL (do not upload the video to Slack). Captioned golden-path recording and narration script are ready (`docs/23-submission-kit.md`); team narration and upload pending.
 - [ ] PDF write-up with problem, value, implementation and measured evidence. Draft generated: `docs/writeup/AlignSpace-writeup.pdf` (source `writeup.html`, re-render with `python docs/writeup/render_pdf.py`); fill the URL placeholders and trial results before submitting.
 - [ ] Public Lightsail deployment URL verified in a signed-out browser. Use `scripts/deploy_lightsail.sh` (see `docs/15`).

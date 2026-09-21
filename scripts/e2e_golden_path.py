@@ -9,7 +9,10 @@ Synthetic data only; run the app in offline analysis mode so no model calls are 
 Requires `pip install playwright` and a Chromium build. Writes to docs/evidence/.
 bypass_csp is set only in this harness so Playwright can poll page state; the app's CSP is unchanged.
 """
-import asyncio, json, time, sys
+import asyncio
+import json
+import sys
+import time
 from pathlib import Path
 from playwright.async_api import async_playwright
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8011'

@@ -12,7 +12,7 @@
 <img src="https://img.shields.io/badge/Storage-SQLite-003B57?logo=sqlite&logoColor=white" alt="SQLite">
 <img src="https://img.shields.io/badge/LLM-Claude%20Sonnet%204.5-D97757?logo=anthropic&logoColor=white" alt="Claude Sonnet 4.5">
 <img src="https://img.shields.io/badge/Deploy-AWS%20Lightsail-FF9900?logo=amazonaws&logoColor=white" alt="AWS Lightsail">
-<img src="https://img.shields.io/badge/tests-77%20passed-3f7a12" alt="77 tests passed">
+<a href="https://github.com/JaspinXu/AlignSpace/actions/workflows/ci.yml"><img src="https://github.com/JaspinXu/AlignSpace/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT License"></a>
 </p>
 
@@ -129,6 +129,10 @@ python scripts/simulate_belief.py                     # 合成数据上的信念
 ALIGNSPACE_ANALYSIS_MODE=offline ALIGNSPACE_DB_PATH=/tmp/e2e.db python -m uvicorn app.main:app --port 8011
 python scripts/e2e_golden_path.py http://127.0.0.1:8011   # 双会话浏览器检查，写入 docs/evidence/
 ```
+
+每次推送都会在 GitHub Actions 里跑同一套检查：ruff、测试套件、信念模拟和示例简报的 schema 校验。
+
+`docs/` 下的文档包含**尚未实现**的设计方案——例如 [docs/05](docs/05-technical-architecture.md) 写的是无服务器的 AWS 目标架构，而评审版本跑在单台 Lightsail 上。以本文件和[验证报告](docs/16-verification-report.md)为准。
 
 证据：[验证报告](docs/16-verification-report.md) · [运行结果](docs/evidence/e2e-run.json) · [批准简报示例](docs/evidence/approved-brief.example.json)。
 

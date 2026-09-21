@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, jaspin]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check app scripts tests
+
+      - name: Tests (pytest)
+        run: python -m pytest -q
+
+      - name: Belief simulation (method check, synthetic data)
+        run: python scripts/simulate_belief.py --homeowners 200 --seed 7
+
+      - name: Brief schema check on the recorded example
+        run: |
+          python - <<'PY'
+          import json
+          from jsonschema import Draft202012Validator
+          schema = json.load(open('schemas/design-brief.schema.json', encoding='utf-8'))
+          brief = json.load(open('docs/evidence/approved-brief.example.json', encoding='utf-8'))
+          Draft202012Validator(schema).validate(brief)
+          print('approved-brief.example.json validates against the schema')
+          PY

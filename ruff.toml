@@ -1,0 +1,7 @@
+# House style: compact one-line statements are intentional in this codebase, so the
+# semicolon/colon rules are off. Everything else in ruff's default set is enforced in CI.
+line-length = 140
+target-version = "py311"
+
+[lint]
+ignore = ["E701", "E702"]

@@ -14,7 +14,7 @@ def designer_client(client, project_id):
     return designer
 
 
-from app.main import create_app
+from app.main import create_app  # noqa: E402  (imported after the path/fixture setup above)
 
 
 def make_client(tmp_path):
