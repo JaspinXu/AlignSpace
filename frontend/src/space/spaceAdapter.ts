@@ -305,6 +305,7 @@ export type SpaceSyncOp =
     }
   | {
       op: 'create_room';
+      upstreamId: string;
       name: string;
       origin: SpacePoint;
       size: { width: number; depth: number };
@@ -314,6 +315,7 @@ export type SpaceSyncOp =
   | { op: 'update_object'; objectId: string; geometry: Record<string, unknown> }
   | {
       op: 'create_object';
+      upstreamId: string;
       roomId: string;
       kind: string;
       label: string;
@@ -322,6 +324,16 @@ export type SpaceSyncOp =
   | { op: 'delete_object'; objectId: string };
 
 export type SpaceSyncDiff = { ops: SpaceSyncOp[]; unsupported: string[] };
+
+export type SpaceSyncOptions = {
+  /**
+   * The plan the editor imported. Deletions are only ever derived from ids that
+   * existed in this base, so a collaborator's new content is never deleted.
+   */
+  basePlan?: SpacePlan | null;
+  /** Editor temp id -> backend id, learned from earlier create responses. */
+  idMap?: Map<string, string>;
+};
 
 type UpstreamWall = { id: string; start?: SpacePoint; end?: SpacePoint };
 type UpstreamRoom = { id: string; name?: string; walls?: string[]; alignspaceRoomId?: string };
@@ -350,6 +362,17 @@ function millimetres(value: number): number {
   return Math.round(value);
 }
 
+function finitePoint(point: unknown): point is SpacePoint {
+  const candidate = point as SpacePoint | undefined;
+  return (
+    Boolean(candidate) &&
+    typeof candidate!.x === 'number' &&
+    Number.isFinite(candidate!.x) &&
+    typeof candidate!.y === 'number' &&
+    Number.isFinite(candidate!.y)
+  );
+}
+
 type RoomGeometry =
   | { kind: 'rect'; origin: SpacePoint; size: { width: number; depth: number } }
   | { kind: 'polygon'; origin: SpacePoint; size: { width: number; depth: number }; outline: SpacePoint[] }
@@ -360,8 +383,7 @@ function orderedOutline(room: UpstreamRoom, walls: Map<string, UpstreamWall>): S
   const segments = (room.walls ?? [])
     .map((id) => walls.get(id))
     .filter((wall): wall is UpstreamWall => Boolean(wall?.start && wall?.end))
-    .filter((wall) => Number.isFinite(wall.start!.x) && Number.isFinite(wall.start!.y))
-    .filter((wall) => Number.isFinite(wall.end!.x) && Number.isFinite(wall.end!.y));
+    .filter((wall) => finitePoint(wall.start) && finitePoint(wall.end));
   if (segments.length < 3) return null;
   const key = (point: SpacePoint) => `${millimetres(point.x)},${millimetres(point.y)}`;
   const points = new Map<string, SpacePoint>();
@@ -448,22 +470,42 @@ function findRoomForPoint(plan: SpacePlan, x: number, y: number): string | null 
 
 /**
  * Diff an upstream OpenPlan3D project against our authoritative plan and return
- * the controlled writes needed to persist manual edits. New rooms/objects are
- * created, changed geometry is written (rectangular or polygonal) and removed
- * items are deleted; everything goes through the same permissioned, versioned
- * API as the 2D panel. Unsupported shapes are reported instead of silently
- * rewritten.
+ * the controlled writes needed to persist manual edits.
+ *
+ * Safety rules:
+ * - A snapshot with missing or non-finite coordinates is rejected whole, never
+ *   interpreted as a deletion.
+ * - Deletions are only derived from ids that existed in the base import, so a
+ *   collaborator's new rooms/objects are never deleted by a stale retry.
+ * - Editor temp ids are translated through `idMap` once their create response
+ *   assigned them a backend id, so continuing to edit them does not duplicate.
  */
 export function upstreamDiff(
   upstream: unknown,
   plan: SpacePlan,
   role: 'homeowner' | 'designer',
+  options: SpaceSyncOptions = {},
 ): SpaceSyncDiff {
   const project = upstream as UpstreamProject | null;
   if (!project || !Array.isArray(project.floors)) return { ops: [], unsupported: [] };
   const floor =
     project.floors.find((item) => item.id === project.activeFloorId) ?? project.floors[0];
   if (!floor) return { ops: [], unsupported: [] };
+
+  // Reject an invalid snapshot rather than misreading it as deletions.
+  const invalidWalls = (floor.walls ?? []).some(
+    (wall) => !finitePoint(wall.start) || !finitePoint(wall.end),
+  );
+  const invalidFurniture = (floor.furniture ?? []).some((item) => !finitePoint(item.position));
+  if (invalidWalls || invalidFurniture) {
+    return {
+      ops: [],
+      unsupported: ['编辑器快照包含缺失或非法坐标，已忽略本次同步；请在编辑器中检查后重试。'],
+    };
+  }
+
+  const idMap = options.idMap ?? new Map<string, string>();
+  const base = options.basePlan ?? null;
   const wallById = new Map((floor.walls ?? []).map((wall) => [wall.id, wall]));
   const ops: SpaceSyncOp[] = [];
   const unsupported: string[] = [];
@@ -471,7 +513,7 @@ export function upstreamDiff(
   const planRooms = new Map(plan.rooms.map((room) => [room.id, room]));
   const seenRooms = new Set<string>();
   for (const room of floor.rooms ?? []) {
-    const ourId = room.alignspaceRoomId;
+    const ourId = room.alignspaceRoomId ?? idMap.get(room.id);
     const geometry = roomGeometry(room, wallById);
     if (!ourId) {
       // A room drawn in the editor has no backend identity yet: create it.
@@ -481,6 +523,7 @@ export function upstreamDiff(
       }
       ops.push({
         op: 'create_room',
+        upstreamId: room.id,
         name: room.name || '房间',
         origin: geometry.origin,
         size: geometry.size,
@@ -519,24 +562,22 @@ export function upstreamDiff(
     }
     if (touched) ops.push(changed);
   }
-  if (role === 'homeowner') {
+  if (role === 'homeowner' && base) {
+    const baseRoomIds = new Set(base.rooms.map((room) => room.id));
     for (const room of plan.rooms) {
-      if (!seenRooms.has(room.id)) ops.push({ op: 'delete_room', roomId: room.id });
+      if (baseRoomIds.has(room.id) && !seenRooms.has(room.id)) {
+        ops.push({ op: 'delete_room', roomId: room.id });
+      }
     }
   }
 
   const planObjects = new Map(plan.objects.map((item) => [item.id, item]));
   const seenObjects = new Set<string>();
   for (const item of floor.furniture ?? []) {
-    const ourId = item.id;
-    if (!ourId) continue;
-    const px = item.position?.x;
-    const py = item.position?.y;
-    if (typeof px !== 'number' || !Number.isFinite(px) || typeof py !== 'number' || !Number.isFinite(py)) {
-      continue;
-    }
-    const x = centimetresToMillimetres(px);
-    const y = centimetresToMillimetres(py);
+    if (!item.id) continue;
+    const ourId = idMap.get(item.id) ?? item.id;
+    const x = centimetresToMillimetres(item.position!.x);
+    const y = centimetresToMillimetres(item.position!.y);
     const existing = planObjects.get(ourId);
     if (!existing) {
       // A furniture item added in the editor: create it in the containing room.
@@ -547,6 +588,7 @@ export function upstreamDiff(
       }
       ops.push({
         op: 'create_object',
+        upstreamId: item.id,
         roomId,
         kind: 'furniture',
         label: item.alignspaceLabel || item.catalogId || '家具',
@@ -565,9 +607,12 @@ export function upstreamDiff(
       ops.push({ op: 'update_object', objectId: ourId, geometry: { ...existing.geometry, x, y } });
     }
   }
-  if (role === 'homeowner') {
+  if (role === 'homeowner' && base) {
+    const baseObjectIds = new Set(base.objects.map((item) => item.id));
     for (const item of plan.objects) {
-      if (!seenObjects.has(item.id)) ops.push({ op: 'delete_object', objectId: item.id });
+      if (baseObjectIds.has(item.id) && !seenObjects.has(item.id)) {
+        ops.push({ op: 'delete_object', objectId: item.id });
+      }
     }
   }
   return { ops, unsupported };
@@ -578,6 +623,7 @@ export function upstreamPatches(
   upstream: unknown,
   plan: SpacePlan,
   role: 'homeowner' | 'designer',
+  options: SpaceSyncOptions = {},
 ): SpaceSyncOp[] {
-  return upstreamDiff(upstream, plan, role).ops;
+  return upstreamDiff(upstream, plan, role, options).ops;
 }

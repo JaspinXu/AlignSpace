@@ -194,6 +194,7 @@ describe('spaceAdapter edit-back round two', () => {
     const diff = upstreamDiff(upstream, plan(), 'homeowner');
     expect(diff.ops).toContainEqual({
       op: 'create_room',
+      upstreamId: 'r',
       name: '书房',
       origin: { x: 0, y: 0 },
       size: { width: 4000, depth: 5000 },
@@ -202,7 +203,7 @@ describe('spaceAdapter edit-back round two', () => {
 
   it('deletes the last room and object instead of silently keeping them', () => {
     const empty = { activeFloorId: 'f', floors: [{ id: 'f', walls: [], rooms: [], furniture: [] }] };
-    const diff = upstreamDiff(empty, plan(), 'homeowner');
+    const diff = upstreamDiff(empty, plan(), 'homeowner', { basePlan: plan() });
     expect(diff.ops).toContainEqual({ op: 'delete_room', roomId: 'room-a' });
     expect(diff.ops).toContainEqual({ op: 'delete_object', objectId: 'obj-1' });
   });
@@ -259,6 +260,7 @@ describe('spaceAdapter edit-back round two', () => {
     const diff = upstreamDiff(upstream, plan(), 'designer');
     expect(diff.ops).toContainEqual({
       op: 'create_object',
+      upstreamId: 'new-f',
       roomId: 'room-a',
       kind: 'furniture',
       label: 'sofa',
@@ -269,5 +271,103 @@ describe('spaceAdapter edit-back round two', () => {
   it('flags a confirmed pattern that the preview cannot render', () => {
     expect(previewPatternNote('herringbone')).toMatch(/不支持/);
     expect(previewPatternNote('pale oak')).toBeNull();
+  });
+});
+
+
+const roomWithId = {
+  id: 'r',
+  name: '客厅',
+  walls: rectWalls.map((wall) => wall.id),
+  alignspaceRoomId: 'room-a',
+};
+
+describe('spaceAdapter round three safety', () => {
+  it('rejects an invalid-coordinate snapshot instead of deleting the object', () => {
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls: rectWalls,
+          rooms: [roomWithId],
+          furniture: [{ id: 'obj-1', position: { x: Number.NaN, y: 0 } }],
+        },
+      ],
+    };
+    const diff = upstreamDiff(upstream, plan(), 'homeowner', { basePlan: plan() });
+    expect(diff.ops).toEqual([]);
+    expect(diff.unsupported[0]).toMatch(/非法坐标/);
+  });
+
+  it('never deletes a collaborator object added after the base import', () => {
+    const base = plan();
+    const serverPlan: SpacePlan = {
+      ...plan(),
+      objects: [
+        ...plan().objects,
+        {
+          id: 'obj-collab',
+          roomId: 'room-a',
+          kind: 'furniture',
+          label: '协作者家具',
+          geometry: { x: 2500, y: 2500, width: 800, depth: 800, height: 800 },
+        },
+      ],
+    };
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls: rectWalls,
+          rooms: [roomWithId],
+          furniture: [{ id: 'obj-1', position: { x: 250, y: 300 } }],
+        },
+      ],
+    };
+    const diff = upstreamDiff(upstream, serverPlan, 'homeowner', { basePlan: base });
+    expect(
+      diff.ops.some((op) => op.op === 'delete_object' && op.objectId === 'obj-collab'),
+    ).toBe(false);
+  });
+
+  it('updates an editor-created object once its backend id is known', () => {
+    const serverPlan: SpacePlan = {
+      ...plan(),
+      objects: [
+        ...plan().objects,
+        {
+          id: 'obj-backend',
+          roomId: 'room-a',
+          kind: 'furniture',
+          label: '沙发',
+          geometry: { x: 1000, y: 1000, width: 800, depth: 600, height: 800 },
+        },
+      ],
+    };
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls: rectWalls,
+          rooms: [roomWithId],
+          furniture: [
+            { id: 'obj-1', position: { x: 250, y: 300 } },
+            { id: 'temp-1', position: { x: 120, y: 130 } },
+          ],
+        },
+      ],
+    };
+    const idMap = new Map([['temp-1', 'obj-backend']]);
+    const diff = upstreamDiff(upstream, serverPlan, 'designer', { basePlan: plan(), idMap });
+    expect(diff.ops).toContainEqual({
+      op: 'update_object',
+      objectId: 'obj-backend',
+      geometry: expect.objectContaining({ x: 1200, y: 1300 }),
+    });
+    expect(diff.ops.some((op) => op.op === 'create_object')).toBe(false);
+    expect(diff.ops.some((op) => op.op === 'delete_object')).toBe(false);
   });
 });

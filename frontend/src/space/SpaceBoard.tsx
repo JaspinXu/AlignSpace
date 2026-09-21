@@ -70,6 +70,10 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   // The version the editor state was based on, so a concurrent write returns 409
   // instead of being silently overwritten.
   const baseVersionRef = useRef(stateVersion);
+  // The plan the editor imported: deletions may only target ids from this base.
+  const basePlanRef = useRef<SpaceSnapshot['plan']>(null);
+  // Editor temp id -> backend id, learned from create responses.
+  const idMapRef = useRef<Map<string, string>>(new Map());
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
 
@@ -154,12 +158,26 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
       // write advances to the version our own write produced, so a concurrent
       // write between operations surfaces as a 409 rather than being absorbed.
       let version = baseVersionRef.current;
+      let currentPlan = planRef.current;
       for (const op of ops) {
+        const beforeRoomIds = new Set((currentPlan?.rooms ?? []).map((room) => room.id));
+        const beforeObjectIds = new Set((currentPlan?.objects ?? []).map((item) => item.id));
         const result = await client.execute<SpaceSnapshot>(buildWrite(op, version));
+        currentPlan = result.plan;
+        // Learn the backend id assigned to an editor-created entity so later
+        // snapshots update it instead of creating a duplicate and deleting it.
+        if (op.op === 'create_room' && op.upstreamId) {
+          const created = result.plan?.rooms.find((room) => !beforeRoomIds.has(room.id));
+          if (created) idMapRef.current.set(op.upstreamId, created.id);
+        } else if (op.op === 'create_object' && op.upstreamId) {
+          const created = result.plan?.objects.find((item) => !beforeObjectIds.has(item.id));
+          if (created) idMapRef.current.set(op.upstreamId, created.id);
+        }
         version = result.stateVersion;
         baseVersionRef.current = version;
       }
       const refreshed = await client.get<SpaceSnapshot>(`/v1/projects/${projectId}/space`);
+      planRef.current = refreshed.plan;
       setSnapshot(refreshed);
       baseVersionRef.current = refreshed.stateVersion;
       onChangedRef.current?.();
@@ -174,7 +192,10 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
     pendingProjectRef.current = null;
     const currentPlan = planRef.current;
     if (!currentPlan) return;
-    const { ops, unsupported } = upstreamDiff(project, currentPlan, role);
+    const { ops, unsupported } = upstreamDiff(project, currentPlan, role, {
+      basePlan: basePlanRef.current,
+      idMap: idMapRef.current,
+    });
     setSyncNotes(unsupported);
     // Deletions are only trusted after a successful import established the base.
     const applicable = hasImportedRef.current
@@ -230,6 +251,7 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
         const currentPlan = planRef.current;
         if (!target || !currentPlan) return;
         baseVersionRef.current = Math.max(baseVersionRef.current, stateVersion);
+        basePlanRef.current = currentPlan;
         target.postMessage(buildPreviewMessage(currentPlan), PREVIEW_URL);
         setPreviewNote('已将当前空间草稿发送到本地 3D 预览（仅本机，不含令牌）。');
       } else if (parsed.kind === 'applied') {
@@ -252,7 +274,10 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   useEffect(() => {
     if (!previewOpen || !readyRef.current) return;
     const target = frame.current?.contentWindow;
-    if (target && plan) target.postMessage(buildPreviewMessage(plan), PREVIEW_URL);
+    if (target && plan) {
+      basePlanRef.current = plan;
+      target.postMessage(buildPreviewMessage(plan), PREVIEW_URL);
+    }
   }, [previewOpen, plan]);
 
   const run = async (write: ReturnType<typeof prepareWrite>) => {

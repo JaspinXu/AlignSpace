@@ -157,3 +157,81 @@ describe('SpaceBoard 3D sync resilience', () => {
     expect(screen.getByText(/本次 3D 编辑未覆盖新版本/)).toBeVisible();
   });
 });
+
+
+describe('SpaceBoard create-then-edit identity', () => {
+  it('does not duplicate an editor-created object edited before the create returns', async () => {
+    const base = snapshot();
+    const withBackendObject: SpaceSnapshot = {
+      ...base,
+      stateVersion: base.stateVersion + 1,
+      plan: {
+        ...base.plan!,
+        objects: [
+          {
+            id: 'obj-backend',
+            roomId: 'room-a',
+            kind: 'furniture',
+            label: 'sofa',
+            geometry: { x: 1000, y: 1000, width: 800, depth: 600, height: 800 },
+          },
+        ],
+      },
+    };
+    let resolveCreate!: (value: SpaceSnapshot) => void;
+    const createPromise = new Promise<SpaceSnapshot>((resolve) => {
+      resolveCreate = resolve;
+    });
+    let calls = 0;
+    const execute = vi.fn(async (_write: { path: string; method: string; body: string }) => {
+      calls += 1;
+      return calls === 1 ? createPromise : withBackendObject;
+    });
+    let serverSnapshot = base;
+    const client = {
+      get: vi.fn(async (path: string) => (path.endsWith('/materials') ? catalogue : serverSnapshot)),
+      execute,
+    } as unknown as ApiClient;
+    render(
+      <SpaceBoard client={client} projectId="p1" role="homeowner" stateVersion={base.stateVersion} />,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: '打开 3D 预览' }));
+
+    const walls = [
+      { id: 'n', start: { x: 0, y: 0 }, end: { x: 400, y: 0 } },
+      { id: 'e', start: { x: 400, y: 0 }, end: { x: 400, y: 500 } },
+      { id: 's', start: { x: 400, y: 500 }, end: { x: 0, y: 500 } },
+      { id: 'w', start: { x: 0, y: 500 }, end: { x: 0, y: 0 } },
+    ];
+    const floors = (position: { x: number; y: number }) => [
+      {
+        id: 'f',
+        walls,
+        rooms: [{ id: 'r', name: '客厅', walls: ['n', 'e', 's', 'w'], alignspaceRoomId: 'room-a' }],
+        furniture: [
+          { id: 'temp-1', position, width: 80, depth: 60, height: 80, catalogId: 'sofa' },
+        ],
+      },
+    ];
+    const dispatch = (data: unknown) =>
+      act(() => {
+        window.dispatchEvent(new MessageEvent('message', { origin: 'http://127.0.0.1:4173', data }));
+      });
+    dispatch({ type: 'alignspace:applied', protocol: 1 });
+    dispatch({ type: 'alignspace:project', protocol: 1, project: { activeFloorId: 'f', floors: floors({ x: 100, y: 100 }) } });
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(execute.mock.calls[0][0].body).data.geometry).toMatchObject({ x: 1000, y: 1000 });
+
+    // The user moves it again while the create request is still in flight.
+    dispatch({ type: 'alignspace:project', protocol: 1, project: { activeFloorId: 'f', floors: floors({ x: 150, y: 150 }) } });
+    serverSnapshot = withBackendObject;
+    resolveCreate(withBackendObject);
+
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(2));
+    const second = execute.mock.calls[1][0];
+    expect(second.method).toBe('PATCH');
+    expect(second.path).toContain('/space/objects/obj-backend');
+    expect(JSON.parse(second.body).data.geometry).toMatchObject({ x: 1500, y: 1500 });
+    expect(execute.mock.calls.some((call) => call[0].method === 'DELETE')).toBe(false);
+  });
+});

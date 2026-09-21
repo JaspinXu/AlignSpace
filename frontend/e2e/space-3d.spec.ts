@@ -73,7 +73,11 @@ test('the 3D editor imports the plan, shows the material and syncs edits back', 
     expect(element).not.toBeNull();
     const editor = await element!.contentFrame();
     expect(editor).not.toBeNull();
-    await editor!.waitForFunction(() => Boolean((window as any).__alignspace?.snapshot?.()));
+    await editor!.waitForFunction(() => {
+      const project = (window as any).__alignspace?.snapshot?.();
+      const floor = project?.floors?.find((f: any) => f.id === project.activeFloorId);
+      return (floor?.rooms?.length ?? 0) > 0;
+    });
 
     // The plan imported with the saved floor material and our room identity.
     const snapshot = await editor!.evaluate(() => {
@@ -117,7 +121,15 @@ test('the 3D editor imports the plan, shows the material and syncs edits back', 
     await owner.getByRole('region', { name: '空间草稿' }).getByRole('button', { name: '打开 3D 预览' }).click();
     const reopenedElement = await owner.locator('iframe[title="OpenPlan3D 本地预览"]').elementHandle();
     const reopened = await reopenedElement!.contentFrame();
-    await reopened!.waitForFunction(() => Boolean((window as any).__alignspace?.snapshot?.()));
+    // Wait for the import to actually contain the object, not just the bridge.
+    await reopened!.waitForFunction(
+      (id) => {
+        const project = (window as any).__alignspace?.snapshot?.();
+        const floor = project?.floors?.find((f: any) => f.id === project.activeFloorId);
+        return (floor?.furniture ?? []).some((item: any) => item.id === id);
+      },
+      objectId,
+    );
     const repositioned = await reopened!.evaluate((id) => {
       const project = (window as any).__alignspace.snapshot();
       const floor = project?.floors?.find((f: any) => f.id === project.activeFloorId);
