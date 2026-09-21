@@ -12,7 +12,7 @@ Deadline: **28 September 2026, 09:00 SGT**, posted in `#submission` (not `#round
 | 4 | Fill the URL placeholders in `docs/writeup/writeup.html`, re-render (`python docs/writeup/render_pdf.py`) and link the PDF | `docs/writeup/AlignSpace-writeup.pdf` | Draft ready |
 | 5 | Run the owner trial and fill `docs/17-user-trial.md` | Local app | Pending |
 | 6 | Ask the organisers the open questions in section 3 | `#admin-related` | Pending |
-| 7 | Publish the GitHub release `v1.0` with the PDF and demo MP4 attached | `gh release create` (section 6) | Pending |
+| 7 | Publish the GitHub release `v1.0` with the PDF and demo MP4 attached | `gh release create` (section 6) | Done 21 Sep — <https://github.com/JaspinXu/AlignSpace/releases/tag/v1.0> (tag on `4fb6ae4`) |
 | 8 | Check every link in a private/signed-out window, then post | Slack `#submission` | Pending |
 
 ## 2. Slack post (text only; do not attach the video)
@@ -25,7 +25,7 @@ Problem: Design Inspiration (Public category)
 
 GitHub Repo: https://github.com/JaspinXu/AlignSpace  (release tag: v1.0)
 Video (MP4 / YouTube): <VIDEO_URL>
-Write-up (PDF): <PDF_URL>
+Write-up (PDF): https://github.com/JaspinXu/AlignSpace/releases/download/v1.0/AlignSpace-writeup.pdf
 Deployment: https://54.255.93.19.sslip.io  — running on the organiser-provided Lightsail medium instance
 Deployment evidence: docs/16-verification-report.md (live checks, 21 Sep), docs/evidence/e2e-live-run.json
 
@@ -67,7 +67,7 @@ Recording checklist: 1920×1080, browser zoom 100%, notifications off, synthetic
 
 ## 5. Link and packaging check (27 September)
 
-- [ ] `main` contains the final code; tag `v1.0` created on the submitted commit (`git tag -a v1.0 -m "Shortlisting submission" && git push origin v1.0`).
+- [x] `main` contains the final code; tag `v1.0` created and pushed on the submitted commit `4fb6ae4` (21 Sep), CI green on that commit. If code changes after this, re-tag (`git tag -f v1.0 <sha> && git push -f origin v1.0`) and edit the release, or cut `v1.1`.
 - [ ] Repository opens in a private window; README renders; LICENSE present.
 - [ ] Deployment URL opens in a private window; `/health` returns ok; guided sample works; designer invitation works in a second private window.
 - [ ] Video link plays in a private window (unlisted, not private).

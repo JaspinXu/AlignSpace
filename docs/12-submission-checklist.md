@@ -6,9 +6,9 @@ Updated 21 September 2026. Initial submission is due **28 September, 09:00 SGT**
 
 - [x] Team: Four Wolf Kings — 8QFDUS2I.
 - [x] Project: AlignSpace — Design Inspiration Agents.
-- [x] Judge-accessible GitHub repository URL: the repository is public (verified 21 September by anonymous clone) and `main` carries the submitted code. Tag `v1.0` on the final commit before posting.
+- [x] Judge-accessible GitHub repository URL: the repository is public (verified 21 September by anonymous clone), `main` carries the submitted code, and tag `v1.0` plus the published release sit on commit `4fb6ae4` (21 September): <https://github.com/JaspinXu/AlignSpace/releases/tag/v1.0>.
 - [ ] Video viewing/download URL (do not upload the video to Slack). Captioned golden-path recording and narration script are ready (`docs/23-submission-kit.md`); team narration and upload pending.
-- [ ] PDF write-up with problem, value, implementation and measured evidence. Draft generated: `docs/writeup/AlignSpace-writeup.pdf` (source `writeup.html`, re-render with `python docs/writeup/render_pdf.py`); fill the URL placeholders and trial results before submitting.
+- [ ] PDF write-up with problem, value, implementation and measured evidence. Draft generated: `docs/writeup/AlignSpace-writeup.pdf` (source `writeup.html`, re-render with `python docs/writeup/render_pdf.py`), 10 pages, published as a release asset: <https://github.com/JaspinXu/AlignSpace/releases/download/v1.0/AlignSpace-writeup.pdf>. Only the video URL row (line 51) and the trial results are still open — re-render and re-upload the asset (`gh release upload v1.0 docs/writeup/AlignSpace-writeup.pdf --clobber`) once they land.
 - [x] Public Lightsail deployment URL: <https://54.255.93.19.sslip.io> (deployed 21 September, 19/19 live two-session checks). Re-check in a signed-out browser on submission day.
 - [ ] Formal topic-selection record checked by the team.
 - [ ] Owner trial results collected; external user/SME validation clearly distinguished.
@@ -41,7 +41,7 @@ Updated 21 September 2026. Initial submission is due **28 September, 09:00 SGT**
 - [x] `.env.example` placeholders only.
 - [x] No secrets, tokens, private images, participant/customer data in history (scanned 18 September: no `.env`, database or key material ever committed).
 - [x] Dependency and asset licenses/provenance documented (MIT `LICENSE` with third-party exclusions; Atelier and Getty attributions in `app/knowledge_data`).
-- [ ] Clean deployment; reproducible tagged release.
+- [x] Clean deployment; reproducible tagged release (`v1.0` on `4fb6ae4`, CI green, release published with the PDF and demo MP4).
 
 ## Product and agent evidence
 
