@@ -1,0 +1,121 @@
+{
+  "base": "https://54.255.93.19.sslip.io",
+  "seconds": 18.7,
+  "checks": {
+    "injected_instruction_not_executed": true,
+    "marble_never_proposed": true,
+    "suggestions_start_unconfirmed": true,
+    "homeowner_next_step_is_invite": true,
+    "designer_role_from_invitation": true,
+    "conflict_opened": true,
+    "conflict_blocks_approval": true,
+    "designer_next_step_is_resolve": true,
+    "ready_after_resolution": true,
+    "homeowner_cannot_approve_as_designer": true,
+    "approved": true,
+    "same_content_hash": true,
+    "duplicate_suggestion_hidden_after_confirmation": true,
+    "edit_invalidates_approvals": true,
+    "invitation_replay_rejected": true,
+    "other_session_cannot_read_project": true,
+    "stale_edit_rejected": true,
+    "role_spoof_rejected": true,
+    "decision_log_recorded": true
+  },
+  "allPassed": true,
+  "consoleErrors": [],
+  "steps": [
+    {
+      "t": 3.59,
+      "step": "VIDEO_START"
+    },
+    {
+      "t": 3.6,
+      "step": "Homeowner opens AlignSpace"
+    },
+    {
+      "t": 5.67,
+      "step": "Project created"
+    },
+    {
+      "t": 7.14,
+      "step": "Goals and must-avoid saved"
+    },
+    {
+      "t": 7.79,
+      "step": "Suggestions proposed (not confirmed): ['material:light_oak', 'lighting:warm_ambient']"
+    },
+    {
+      "t": 8.13,
+      "step": "Homeowner confirms light oak"
+    },
+    {
+      "t": 9.2,
+      "step": "Homeowner answers \"Which overall direction feels most like the home you want?\" -> warm_modern"
+    },
+    {
+      "t": 9.27,
+      "step": "Homeowner answers \"What is the living room's most important everyday job?\" -> family_relaxing"
+    },
+    {
+      "t": 9.35,
+      "step": "Homeowner answers \"What should the living room feel like most of the time?\" -> cosy"
+    },
+    {
+      "t": 9.44,
+      "step": "Homeowner answers \"Which colour family should dominate the room?\" -> warm_neutral"
+    },
+    {
+      "t": 9.55,
+      "step": "Homeowner answers \"Which lighting character matters most to you?\" -> warm_ambient"
+    },
+    {
+      "t": 9.74,
+      "step": "Private single-use designer invitation created"
+    },
+    {
+      "t": 10.15,
+      "step": "Designer answers \"Which layout strategy is most feasible for this project?\" -> zoned"
+    },
+    {
+      "t": 10.23,
+      "step": "Designer answers \"Which maintenance profile should guide material selection?\" -> easy_care"
+    },
+    {
+      "t": 11.83,
+      "step": "Constraint added; conflict opened; approval blocked"
+    },
+    {
+      "t": 12.55,
+      "step": "Designer accepts constraint; light oak preference withdrawn"
+    },
+    {
+      "t": 15.42,
+      "step": "Homeowner revises material to walnut"
+    },
+    {
+      "t": 15.7,
+      "step": "Homeowner approved"
+    },
+    {
+      "t": 16.64,
+      "step": "Dual approval recorded"
+    },
+    {
+      "t": 17.31,
+      "step": "Exported project-haven-synthetic--brief-v15.json"
+    },
+    {
+      "t": 17.31,
+      "step": "Designer done"
+    },
+    {
+      "t": 18.25,
+      "step": "Post-approval edit cleared approvals"
+    },
+    {
+      "t": 18.64,
+      "step": "Guardrail checks done; decision log entries: 13"
+    }
+  ]
+}

@@ -9,7 +9,7 @@ Updated 21 September 2026. Initial submission is due **28 September, 09:00 SGT**
 - [x] Judge-accessible GitHub repository URL: the repository is public (verified 21 September by anonymous clone) and `main` carries the submitted code. Tag `v1.0` on the final commit before posting.
 - [ ] Video viewing/download URL (do not upload the video to Slack). Captioned golden-path recording and narration script are ready (`docs/23-submission-kit.md`); team narration and upload pending.
 - [ ] PDF write-up with problem, value, implementation and measured evidence. Draft generated: `docs/writeup/AlignSpace-writeup.pdf` (source `writeup.html`, re-render with `python docs/writeup/render_pdf.py`); fill the URL placeholders and trial results before submitting.
-- [ ] Public Lightsail deployment URL verified in a signed-out browser. Use `scripts/deploy_lightsail.sh` (see `docs/15`).
+- [x] Public Lightsail deployment URL: <https://54.255.93.19.sslip.io> (deployed 21 September, 19/19 live two-session checks). Re-check in a signed-out browser on submission day.
 - [ ] Formal topic-selection record checked by the team.
 - [ ] Owner trial results collected; external user/SME validation clearly distinguished.
 

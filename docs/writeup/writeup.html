@@ -47,9 +47,9 @@
   <table class="kv">
     <tr><td>Team</td><td>Four Wolf Kings — team code 8QFDUS2I</td></tr>
     <tr><td>Repository</td><td>https://github.com/JaspinXu/AlignSpace (branch <code>main</code>, tag <code>v1.0</code>)</td></tr>
-    <tr><td>Deployment</td><td><span class="todo">&lt;PUBLIC URL on organiser Lightsail — add after deploy&gt;</span></td></tr>
+    <tr><td>Deployment</td><td><a href="https://54.255.93.19.sslip.io">https://54.255.93.19.sslip.io</a> (organiser Lightsail medium instance, released 21 September 2026)</td></tr>
     <tr><td>Video</td><td><span class="todo">&lt;VIDEO URL — add after upload&gt;</span></td></tr>
-    <tr><td>Document date</td><td>18 September 2026 (draft for the 28 September shortlisting submission)</td></tr>
+    <tr><td>Document date</td><td>21 September 2026 (draft for the 28 September shortlisting submission)</td></tr>
     <tr><td>Evidence labels</td><td><b>Result</b> = measured in this repository; <b>Target</b>/<b>Hypothesis</b> = not yet measured. No time-saving, satisfaction or ROI result is claimed.</td></tr>
   </table>
   <div class="callout"><b>In one line.</b> Homeowners can say what they like but not in design vocabulary; designers decode screenshots and discover the misunderstanding at the first concept. AlignSpace keeps an explicit shared state, asks the question that removes the most uncertainty, keeps every AI observation as a proposal until a person confirms it, surfaces conflicts instead of resolving them, and releases the brief only when both people approve the same content hash.</div>
@@ -152,7 +152,7 @@
   <tr><td>Two-session browser run (<code>scripts/e2e_golden_path.py</code>)</td><td>Golden path plus adversarial checks across separate homeowner and designer browser contexts</td><td class="pass">19/19 checks, 0 console errors</td></tr>
   <tr><td>Belief simulation (<code>scripts/simulate_belief.py</code>)</td><td>Recovering hidden preferences from noisy, bursty synthetic evidence vs naive vote counting</td><td>Top-1 0.71–0.73 vs 0.68–0.70 (3 seeds); "leaning" precision ≈0.78 → still requires human check</td></tr>
   <tr><td>Live gateway smoke test</td><td>Real note analysis through the organiser API</td><td>1 call: 3.2 s, 393 in / 144 out tokens (not a benchmark)</td></tr>
-  <tr><td>Earlier Lightsail deployment</td><td>Secure cookie, isolation, replay, spoofing, dual approval, invalidation, restart persistence</td><td class="pass">7/7 live checks</td></tr>
+  <tr><td>Live deployment (21 Sep)</td><td>The same two-session run against the public URL on the organiser instance</td><td class="pass">19/19 checks, 0 console errors</td></tr>
 </table>
 <div class="grid2" style="grid-template-columns:1.5fr 1fr"><div><p><b>Tracing.</b> Every state change writes an audit event (actor, action, version); model runs record model, prompt version, retrieval IDs, attempts, latency and token usage; the decision log records which next step was suggested, what the person did, whether it matched, and uncertainty before and after — the intervention data needed to evaluate and later train the policy.</p>
 </div><figure><img src="../evidence/screenshots/02-belief.png"><figcaption>Figure 5. Suggested next step and per-decision clarity. Advisory only; never part of the signed brief.</figcaption></figure></div>

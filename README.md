@@ -19,6 +19,7 @@ References, notes and practical constraints become one versioned living-room bri
 </p>
 
 <p>
+<a href="https://54.255.93.19.sslip.io"><b>Live demo</b></a> ·
 <a href="#quick-start"><b>Quick start</b></a> ·
 <a href="#how-it-works"><b>How it works</b></a> ·
 <a href="#the-agent-loop"><b>Agent loop</b></a> ·

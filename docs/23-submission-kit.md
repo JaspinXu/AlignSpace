@@ -7,7 +7,7 @@ Deadline: **28 September 2026, 09:00 SGT**, posted in `#submission` (not `#round
 | # | Action | Where | Status |
 |---|---|---|---|
 | 1 | Make `JaspinXu/AlignSpace` public | GitHub → Settings → General → Danger Zone | **Done, 21 Sep** — verified by an anonymous clone; history has no secrets |
-| 2 | Deploy the tagged release and note the public URL | `scripts/deploy_lightsail.sh ubuntu@<ip> <key.pem>` (see `docs/15`) | Pending — needs instance IP |
+| 2 | Deploy the release and note the public URL | `scripts/deploy_lightsail.sh ubuntu@54.255.93.19 <key.pem>` | **Done, 21 Sep** — <https://54.255.93.19.sslip.io>, 19/19 live checks (`docs/evidence/e2e-live-run.json`) |
 | 3 | Record the narrated video and upload it (YouTube unlisted or a direct MP4 link) | Script in section 4 | Pending |
 | 4 | Fill the URL placeholders in `docs/writeup/writeup.html`, re-render (`python docs/writeup/render_pdf.py`) and link the PDF | `docs/writeup/AlignSpace-writeup.pdf` | Draft ready |
 | 5 | Run the owner trial and fill `docs/17-user-trial.md` | Local app | Pending |
@@ -26,8 +26,8 @@ Problem: Design Inspiration (Public category)
 GitHub Repo: https://github.com/JaspinXu/AlignSpace  (release tag: v1.0)
 Video (MP4 / YouTube): <VIDEO_URL>
 Write-up (PDF): <PDF_URL>
-Deployment: <https://PUBLIC_IP.sslip.io>  — running on the organiser-provided Lightsail medium instance
-Deployment evidence: docs/16-verification-report.md (live checks + date), docs/evidence/e2e-run.json
+Deployment: https://54.255.93.19.sslip.io  — running on the organiser-provided Lightsail medium instance
+Deployment evidence: docs/16-verification-report.md (live checks, 21 Sep), docs/evidence/e2e-live-run.json
 
 How to try it: open the deployment URL → "Start my room brief" → answer the questions → "Invite my designer" and open the link in a private window → add a designer constraint → resolve it → approve from both sessions.
 ```

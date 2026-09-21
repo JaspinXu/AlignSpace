@@ -1,5 +1,12 @@
 # Verification report
 
+## Live deployment — 21 September 2026
+
+- **Public URL:** <https://54.255.93.19.sslip.io> on the organiser-provided Lightsail medium instance (Ubuntu 24.04, ap-southeast-1, 4 GB / 2 vCPU / 80 GB). Released commit `a1c8bd0` via `scripts/deploy_lightsail.sh`; releases are versioned under `~/alignspace/releases/<sha>` with `.env` and data in `~/alignspace/shared`.
+- **Serving path:** Caddy on 80/443 in front of uvicorn bound to 127.0.0.1:8010; Let's Encrypt certificate issued by TLS-ALPN, valid to 20 December 2026; `ALIGNSPACE_SECURE_COOKIES=true`. Both `alignspace.service` and `caddy.service` are enabled, so they return after a reboot. The service runs with `ProtectSystem=strict`, `ProtectHome=read-only`, a single writable data path and `UMask=0077`.
+- **Two-session run against the live URL** (`ALIGNSPACE_E2E_BROWSER=msedge python scripts/e2e_golden_path.py https://54.255.93.19.sslip.io`): **19/19 checks passed**, zero console errors, 18.6 s. Result recorded in `docs/evidence/e2e-live-run.json`. This exercised the golden path plus injection, invitation replay, cross-project read, stale edit and role-spoof checks on the deployed build with synthetic data and offline note rules (no model quota used).
+- **Spot checks:** `/health` returns ok over HTTPS from outside the instance; `POST /api/demo/start` returns 201; the previous deployment's configuration, `.env` and database were backed up on the instance under `~/alignspace-backup-20260921/` before the switch, and the new release starts from an empty database.
+
 ## Update — 18 September 2026
 
 - **Automated tests:** 77 passed (`python -m pytest -q`) on Linux and on the owner's Windows machine (Python 3.11). New since 13 September: advisory belief and suggested next step (`tests/test_belief.py`).
