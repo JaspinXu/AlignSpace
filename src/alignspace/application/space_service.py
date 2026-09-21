@@ -573,8 +573,11 @@ class SpaceService:
         envelope: WriteEnvelope[dict[str, object]],
     ) -> BindingList:
         self._authorize(project_id, actor)
+        # Re-binding changes the target/material, so it is the homeowner's decision,
+        # like the original binding. Designers may still apply an existing binding.
+        self._require_homeowner(actor, "review a binding")
         data = self._data(envelope)
-        self._reject_unknown(data, {"status", "roomId", "materialOptionId"})
+        self._reject_unknown(data, {"status", "roomId", "materialOptionId", "confirmApproximation"})
         request_hash = self._request_hash(
             "review_space_binding", project_id, actor, envelope, extra={"bindingId": binding_id}
         )
@@ -601,17 +604,38 @@ class SpaceService:
                     item.id == room_id for item in plan.rooms
                 ):
                     raise KeyError(f"room {room_id} not found")
+                attribute = (
+                    next(
+                        (
+                            item
+                            for item in state.attributes
+                            if item.id == binding.attribute_id
+                        ),
+                        None,
+                    )
+                    if binding.attribute_id
+                    else None
+                )
+                if attribute is None or attribute.status is not AttributeStatus.CONFIRMED:
+                    raise SpaceStateError(
+                        "the underlying preference is no longer confirmed; the binding cannot be reactivated"
+                    )
                 material_id = data.get("materialOptionId", binding.material_option_id)
-                option = material_option(str(material_id))
-                if option is None or MaterialTarget.FLOOR not in option.targets:
-                    raise UnsupportedMaterialError(
-                        f"floor material {material_id!r} is not supported"
+                match = self._resolve_material(attribute, {"materialOptionId": material_id})
+                if (
+                    match.approximation is Approximation.APPROXIMATE
+                    and data.get("confirmApproximation") is not True
+                ):
+                    raise ApproximationConfirmationRequired(
+                        f"{match.note} 需要您明确确认后才会重新绑定。"
                     )
                 reviewed = binding.model_copy(
                     update={
                         "status": BindingStatus.ACTIVE,
                         "room_id": room_id,
-                        "material_option_id": option.id,
+                        "material_option_id": match.option_id,
+                        "approximation": match.approximation,
+                        "note": match.note,
                     }
                 )
             else:
@@ -793,16 +817,33 @@ class SpaceService:
     @staticmethod
     def _resolve_material(attribute: Attribute, data: dict[str, object]) -> MaterialMatch:
         raw_option = data.get("materialOptionId")
-        if raw_option is not None:
-            option = material_option(str(raw_option))
-            if option is None or MaterialTarget.FLOOR not in option.targets:
-                raise UnsupportedMaterialError(
-                    f"floor material {raw_option!r} is not in the supported floor catalogue"
-                )
-            return MaterialMatch(
-                option_id=option.id, approximation=Approximation.EXACT, note=""
+        if raw_option is None:
+            # No manual choice: the preference value itself must map exactly or
+            # be an explicitly labelled approximation.
+            return match_material(attribute.value, target=MaterialTarget.FLOOR)
+        option = material_option(str(raw_option))
+        if option is None or MaterialTarget.FLOOR not in option.targets:
+            raise UnsupportedMaterialError(
+                f"floor material {raw_option!r} is not in the supported floor catalogue"
             )
-        return match_material(attribute.value, target=MaterialTarget.FLOOR)
+        try:
+            matched = match_material(attribute.value, target=MaterialTarget.FLOOR)
+        except UnsupportedMaterialError:
+            # The confirmed value has no direct mapping; a deliberate manual
+            # substitution still needs an explicit acknowledgement.
+            return MaterialMatch(
+                option_id=option.id,
+                approximation=Approximation.APPROXIMATE,
+                note="手动选择的材质与已确认偏好无直接对应，属于近似替代，需确认。",
+            )
+        if matched.option_id == option.id:
+            # Selecting the catalogue target does not make an approximate mapping exact.
+            return matched
+        return MaterialMatch(
+            option_id=option.id,
+            approximation=Approximation.APPROXIMATE,
+            note="手动选择的材质与已确认偏好不完全一致，属于近似替代，需确认。",
+        )
 
     def _binding_list(self, state: Any) -> BindingList:
         return BindingList(
@@ -867,7 +908,9 @@ class SpaceService:
             space_version=latest.version if latest else None,
             space_hash=latest.content_hash if latest else None,
             approvals=approvals,
-            approved=roles == {Role.HOMEOWNER, Role.DESIGNER},
+            # A stale brief means the current plan is no longer valid, even though
+            # the historical approvals are kept for audit.
+            approved=not state.brief_stale and roles == {Role.HOMEOWNER, Role.DESIGNER},
         )
 
     @staticmethod

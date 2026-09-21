@@ -33,6 +33,7 @@ export type OpenPlan3DSection = {
   label: string;
   displayName: string;
   story: number;
+  color?: string;
 };
 
 export type OpenPlan3DHandoff = {
@@ -44,6 +45,18 @@ export type OpenPlan3DHandoff = {
   openings: never[];
   sections: OpenPlan3DSection[];
   stories: { index: number; name: string }[];
+  /** Extension consumed by the AlignSpace bridge: roomId -> material option id. */
+  alignspaceFloorMaterials?: Record<string, string>;
+};
+
+// A deterministic colour per supported floor material so a saved material change
+// is visible in the 3D preview. This is presentation only, not a material claim.
+const FLOOR_MATERIAL_COLORS: Record<string, string> = {
+  'floor.engineered-oak': '#c8a165',
+  'floor.porcelain-tile': '#d9d4cc',
+  'floor.vinyl-plank': '#b98a5a',
+  'floor.microcement': '#b9b3a8',
+  'wall.microcement': '#c9c3b8',
 };
 
 export type EditorMessage =
@@ -115,6 +128,7 @@ function objectTransform(room: SpaceRoom, heightM: number): number[] {
 export function toOpenPlan3DHandoff(plan: SpacePlan): OpenPlan3DHandoff {
   const walls: OpenPlan3DWall[] = [];
   const sections: OpenPlan3DSection[] = [];
+  const floorMaterials: Record<string, string> = {};
   for (const room of plan.rooms) {
     for (const wall of room.walls) {
       const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
@@ -127,6 +141,9 @@ export function toOpenPlan3DHandoff(plan: SpacePlan): OpenPlan3DHandoff {
         story: 0,
       });
     }
+    const materialId = room.floor.materialOptionId;
+    if (materialId) floorMaterials[room.id] = materialId;
+    const color = materialId ? FLOOR_MATERIAL_COLORS[materialId] : undefined;
     sections.push({
       center: [
         metres(room.origin.x + room.size.width / 2),
@@ -136,6 +153,7 @@ export function toOpenPlan3DHandoff(plan: SpacePlan): OpenPlan3DHandoff {
       label: room.name,
       displayName: room.name,
       story: 0,
+      ...(color ? { color } : {}),
     });
   }
   const objects: OpenPlan3DObject[] = plan.objects.map((item) => {
@@ -167,6 +185,7 @@ export function toOpenPlan3DHandoff(plan: SpacePlan): OpenPlan3DHandoff {
     openings: [],
     sections,
     stories: [{ index: 0, name: '楼层 1' }],
+    alignspaceFloorMaterials: floorMaterials,
   };
 }
 

@@ -71,6 +71,14 @@ describe('spaceAdapter', () => {
     expect(object.category.label).toBe('沙发');
   });
 
+  it('passes a saved floor material into the 3D handoff', () => {
+    const withMaterial = plan();
+    withMaterial.rooms[0].floor.materialOptionId = 'floor.engineered-oak';
+    const handoff = toOpenPlan3DHandoff(withMaterial);
+    expect(handoff.alignspaceFloorMaterials).toEqual({ 'room-a': 'floor.engineered-oak' });
+    expect(handoff.sections[0].color).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+
   it('only trusts the exact local preview origin', () => {
     expect(isAllowedPreviewOrigin(ORIGIN, ORIGIN)).toBe(true);
     expect(isAllowedPreviewOrigin('http://localhost:4173', 'http://localhost:4173')).toBe(true);

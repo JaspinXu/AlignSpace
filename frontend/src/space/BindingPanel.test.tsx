@@ -78,11 +78,16 @@ const appliedSnapshot: SpaceSnapshot = {
   plan,
 };
 
-function setup(role: 'homeowner' | 'designer' = 'homeowner') {
+function setup(
+  role: 'homeowner' | 'designer' = 'homeowner',
+  overrides: { bindings?: SpaceBindingList; plan?: SpacePlan } = {},
+) {
+  const activeBindings = overrides.bindings ?? bindingList;
+  const activePlan = overrides.plan ?? plan;
   const execute = vi.fn(async (_write: { path: string; method: string; body: string }) => appliedSnapshot);
   const client = {
     get: vi.fn(async (path: string) =>
-      path.includes('/bindings') ? bindingList : approvals,
+      path.includes('/bindings') ? activeBindings : approvals,
     ),
     execute,
   } as unknown as ApiClient;
@@ -93,12 +98,29 @@ function setup(role: 'homeowner' | 'designer' = 'homeowner') {
       projectId="p1"
       role={role}
       stateVersion={4}
-      plan={plan}
+      plan={activePlan}
       materials={materials}
       onApplied={onApplied}
     />,
   );
   return { execute, onApplied };
+}
+
+function needsReviewSetup(role: 'homeowner' | 'designer') {
+  const twoRooms: SpacePlan = {
+    ...plan,
+    rooms: [
+      plan.rooms[0],
+      { ...plan.rooms[0], id: 'room-b', name: '书房' },
+    ],
+  };
+  return setup(role, {
+    plan: twoRooms,
+    bindings: {
+      ...bindingList,
+      bindings: [{ ...bindingList.bindings[0], status: 'needs_review', appliedSpaceVersion: null }],
+    },
+  });
 }
 
 describe('BindingPanel', () => {
@@ -149,5 +171,29 @@ describe('BindingPanel', () => {
       spaceVersion: 1,
       spaceHash: 'a'.repeat(64),
     });
+  });
+});
+
+describe('BindingPanel review permissions and targets', () => {
+  it('does not let a designer review or invalidate a binding', async () => {
+    needsReviewSetup('designer');
+    expect(await screen.findByText(/需要复核/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: '重新绑定' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '作废绑定' })).toBeNull();
+  });
+
+  it('requires the homeowner to choose a review target instead of defaulting to the first room', async () => {
+    const { execute } = needsReviewSetup('homeowner');
+    await screen.findByText(/需要复核/);
+    const reassign = screen.getByRole('button', { name: '重新绑定' });
+    expect(reassign).toBeDisabled();
+
+    await userEvent.selectOptions(screen.getByLabelText(/复核目标房间/), 'room-b');
+    expect(reassign).toBeEnabled();
+    await userEvent.click(reassign);
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(execute.mock.calls[0][0].body);
+    expect(body.data.roomId).toBe('room-b');
+    expect(body.data.roomId).not.toBe('room-a');
   });
 });

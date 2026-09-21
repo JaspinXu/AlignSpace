@@ -51,6 +51,8 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
   const [roomId, setRoomId] = useState('');
   const [materialOptionId, setMaterialOptionId] = useState('');
   const [confirmApproximation, setConfirmApproximation] = useState(false);
+  const [reviewRooms, setReviewRooms] = useState<Record<string, string>>({});
+  const [reviewApproximation, setReviewApproximation] = useState<Record<string, boolean>>({});
 
   const isHomeowner = role === 'homeowner';
   const rooms = plan?.rooms ?? [];
@@ -120,9 +122,14 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
     );
   };
 
-  const reviewBinding = (binding: SpaceBinding, status: 'active' | 'invalidated', room?: string) => {
+  const reviewBinding = (
+    binding: SpaceBinding,
+    status: 'active' | 'invalidated',
+    room?: string,
+  ) => {
     const data: Record<string, unknown> = { status };
     if (room) data.roomId = room;
+    if (reviewApproximation[binding.id]) data.confirmApproximation = true;
     void run(
       prepareWrite(
         `/v1/projects/${projectId}/space/bindings/${binding.id}/review`,
@@ -234,19 +241,47 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
                   应用材质到空间
                 </button>
               )}
-              {binding.status === 'needs_review' && (
-                <>
+              {binding.status === 'needs_review' && isHomeowner && (
+                <div className="binding-review">
+                  <label htmlFor={`review-room-${binding.id}`}>复核目标房间</label>
+                  <select
+                    id={`review-room-${binding.id}`}
+                    value={reviewRooms[binding.id] ?? ''}
+                    onChange={(event) =>
+                      setReviewRooms((current) => ({ ...current, [binding.id]: event.target.value }))
+                    }
+                  >
+                    <option value="">请选择房间</option>
+                    {rooms.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {room.name}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="option">
+                    <input
+                      type="checkbox"
+                      checked={reviewApproximation[binding.id] ?? false}
+                      onChange={(event) =>
+                        setReviewApproximation((current) => ({
+                          ...current,
+                          [binding.id]: event.target.checked,
+                        }))
+                      }
+                    />
+                    如为近似替代，我确认继续
+                  </label>
                   <button
                     type="button"
-                    disabled={busy || rooms.length === 0}
-                    onClick={() => reviewBinding(binding, 'active', rooms[0]?.id)}
+                    disabled={busy || !reviewRooms[binding.id]}
+                    onClick={() => reviewBinding(binding, 'active', reviewRooms[binding.id])}
                   >
                     重新绑定
                   </button>
                   <button type="button" disabled={busy} onClick={() => reviewBinding(binding, 'invalidated')}>
                     作废绑定
                   </button>
-                </>
+                </div>
               )}
             </li>
           );

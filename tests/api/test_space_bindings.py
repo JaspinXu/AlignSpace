@@ -450,3 +450,187 @@ def test_a_brief_only_approval_does_not_count_as_joint_approval(client, joint_pr
     ).json()
     assert view["approved"] is False
     assert view["approvals"] == []
+
+
+def test_manual_material_selection_does_not_bypass_approximation(client, ready_project):
+    """Choosing a catalogue item is not the same as an exact preference match."""
+    container = client.app.state.container
+    with SqlAlchemyUnitOfWork(container.session_factory) as uow:
+        state = uow.projects.load(ready_project)
+        state = state.model_copy(
+            update={
+                "attributes": [
+                    Attribute(
+                        id="pref-floor-material",
+                        target_element="floor",
+                        dimension="material",
+                        value="natural stone",
+                        status=AttributeStatus.CONFIRMED,
+                        confidence=1.0,
+                        evidence=[
+                            Evidence(
+                                source_type=EvidenceSource.HOMEOWNER_ANSWER,
+                                source_id="cand-floor",
+                                description="Homeowner confirmed the floor material.",
+                            )
+                        ],
+                        actor=ActorKind.HOMEOWNER,
+                    )
+                ]
+            }
+        )
+        uow.projects._replace_entities(state)
+        uow.commit()
+    room_id = add_room(client, ready_project)
+
+    # The manual choice maps to the same approximation target: still approximate.
+    blocked = create_binding(
+        client,
+        ready_project,
+        room_id,
+        material_option_id="floor.porcelain-tile",
+        key="manual-same-target",
+        expected=409,
+    )
+    assert blocked.json()["error"]["code"] == "APPROXIMATION_REQUIRES_CONFIRMATION"
+
+    accepted = create_binding(
+        client,
+        ready_project,
+        room_id,
+        material_option_id="floor.porcelain-tile",
+        confirm_approximation=True,
+        key="manual-ack",
+    ).json()["bindings"][0]
+    assert accepted["approximation"] == "approximate"
+    assert accepted["note"]
+
+    # A manual substitution to a different supported option is also approximate.
+    substituted = create_binding(
+        client,
+        ready_project,
+        room_id,
+        material_option_id="floor.engineered-oak",
+        key="manual-substitute",
+        expected=409,
+    )
+    assert substituted.json()["error"]["code"] == "APPROXIMATION_REQUIRES_CONFIRMATION"
+
+
+def test_a_stale_brief_invalidates_joint_approval_but_keeps_history(client, joint_project):
+    _approve_both(client, joint_project, "1")
+    # A designer constraint change flags the brief stale without a new brief version.
+    write(
+        client,
+        "POST",
+        f"/v1/projects/{joint_project}/constraints",
+        joint_project,
+        "constraint-stale",
+        {"category": "budget", "statement": "预算约束", "severity": "important"},
+        headers=DESIGNER,
+    )
+    state = client.get(f"/v1/projects/{joint_project}/state", headers=HOMEOWNER).json()
+    assert state["projectState"]["briefStale"] is True
+
+    view = client.get(
+        f"/v1/projects/{joint_project}/space/approvals", headers=HOMEOWNER
+    ).json()
+    assert view["approved"] is False
+    # The historical approvals are retained for audit, just no longer effective.
+    assert len(view["approvals"]) == 2
+
+
+def test_only_the_homeowner_can_review_a_binding(client, floor_project):
+    room_id = add_room(client, floor_project)
+    binding = create_binding(client, floor_project, room_id).json()["bindings"][0]
+    write(
+        client,
+        "DELETE",
+        f"/v1/projects/{floor_project}/space/rooms/{room_id}",
+        floor_project,
+        "delete-room",
+        {},
+    )
+    denied = write(
+        client,
+        "POST",
+        f"/v1/projects/{floor_project}/space/bindings/{binding['id']}/review",
+        floor_project,
+        "designer-review",
+        {"status": "invalidated"},
+        headers=DESIGNER,
+        expected=403,
+    )
+    assert denied.json()["error"]["code"] == "FORBIDDEN"
+
+
+def test_rebinding_recomputes_the_approximation(client, ready_project):
+    container = client.app.state.container
+    with SqlAlchemyUnitOfWork(container.session_factory) as uow:
+        state = uow.projects.load(ready_project)
+        state = state.model_copy(
+            update={
+                "attributes": [
+                    Attribute(
+                        id="pref-floor-material",
+                        target_element="floor",
+                        dimension="material",
+                        value="natural stone",
+                        status=AttributeStatus.CONFIRMED,
+                        confidence=1.0,
+                        evidence=[
+                            Evidence(
+                                source_type=EvidenceSource.HOMEOWNER_ANSWER,
+                                source_id="cand-floor",
+                                description="Homeowner confirmed the floor material.",
+                            )
+                        ],
+                        actor=ActorKind.HOMEOWNER,
+                    )
+                ]
+            }
+        )
+        uow.projects._replace_entities(state)
+        uow.commit()
+    room_id = add_room(client, ready_project)
+    binding = create_binding(
+        client,
+        ready_project,
+        room_id,
+        material_option_id="floor.porcelain-tile",
+        confirm_approximation=True,
+        key="bind-approx",
+    ).json()["bindings"][0]
+    write(
+        client,
+        "DELETE",
+        f"/v1/projects/{ready_project}/space/rooms/{room_id}",
+        ready_project,
+        "delete-room",
+        {},
+    )
+    replacement = add_room(client, ready_project, key="room-2")
+
+    # Reactivating without an acknowledgement must fail if the mapping is approximate.
+    blocked = write(
+        client,
+        "POST",
+        f"/v1/projects/{ready_project}/space/bindings/{binding['id']}/review",
+        ready_project,
+        "rebind-no-ack",
+        {"status": "active", "roomId": replacement},
+        expected=409,
+    )
+    assert blocked.json()["error"]["code"] == "APPROXIMATION_REQUIRES_CONFIRMATION"
+
+    rebound = write(
+        client,
+        "POST",
+        f"/v1/projects/{ready_project}/space/bindings/{binding['id']}/review",
+        ready_project,
+        "rebind-ack",
+        {"status": "active", "roomId": replacement, "confirmApproximation": True},
+    ).json()["bindings"][0]
+    assert rebound["status"] == "active"
+    assert rebound["roomId"] == replacement
+    assert rebound["approximation"] == "approximate"
