@@ -14,7 +14,7 @@
 |---|---|---|
 | 后端 | `uv run pytest -q` | **336 passed** |
 | Python 静态检查 | `uv run ruff check src tests scripts` | **All checks passed** |
-| 前端单测 | `cd frontend && npm test` | **186 passed（14 文件）** |
+| 前端单测 | `cd frontend && npm test` | **187 passed（14 文件）** |
 | 类型与构建 | `cd frontend && npm run build`（含 `tsc --noEmit`） | **通过** |
 | 浏览器验收 | `cd frontend && npm run test:e2e` | **17 passed**（含真实 OpenPlan3D 与双人联合审批） |
 
@@ -73,4 +73,22 @@
 ## 8. 仍未完成（诚实边界）
 
 - 本执行环境模型不支持读图，四档及全站截图（`frontend/test-results/studio-login.png`、`studio-projects-empty.png`、`studio-page-{overview,inspiration,negotiation,space,approval}.png`、`studio-projects-list.png`、`studio-1440/820/390/320.png`）需人工目视确认。
+- 真实 DeepSeek 联调待用户配置密钥后验收。
+
+
+## 9. 三次评审修复（2026-09-22）
+
+| 评审项 | 处理 |
+|---|---|
+| [P2] 灵感页仍是大表单 + 120×90 缩略图 | 新增共享 `frontend/src/assets/AssetImage.tsx`；参考图片改为大图卡片网格（`object-fit: contain`，最大高度 240px），PreferenceBoard 的图片选择改为可点选大图卡片（选中态描边）；不再使用固定 120×90 |
+| [P2] 截图用纯黑 PNG 不能验证真实展示 | `studio-navigation.spec` 的视觉用例改用本地 canvas 绘制的室内场景（墙面、木地板、窗、床、地毯）上传，并单独截取灵感页；截图仍保存在 `frontend/test-results/` |
+| [P2] 三方合并冲突未纳入离开检查、提示在手机隐藏区 | `pendingDraftGuard` 加入 `syncConflicts`（含仅冲突无可执行操作的情况）；把同步中/409 重试/合并冲突/不支持提示统一移到 `.space-sync-status`，位于手机隐藏的编辑区之外，因此在手机上可见。新增组件测试：三方冲突时不写入、冲突可见、`guard` 为真 |
+
+此前一轮（`b96833d`）已修复：阅读说明书保留 Workspace 挂载并把空间草稿纳入离开确认、无辅助栏页面单栏、手机顶栏堆叠与空间摘要、概览预算/成员/待办、全站截图。
+
+追加实测（提交 `ef67abc`）：后端 336、前端 **187**、浏览器 **17**、Ruff/构建/`tsc` 通过。
+
+## 10. 仍未完成（诚实边界）
+
+- 本执行环境模型不支持读图：全站截图（`studio-login.png`、`studio-projects-empty.png`、`studio-page-{overview,inspiration,negotiation,space,approval}.png`、`studio-projects-list.png`、`studio-1440/820/390/320.png`）需人工目视确认大图卡片、选中态、候选偏好与确认状态的排版。
 - 真实 DeepSeek 联调待用户配置密钥后验收。
