@@ -375,6 +375,11 @@ function ProjectsScreen({
       )}
 
       <ul className="project-list">
+        {projects.length === 0 && (
+          <li className="empty-state">
+            还没有项目。创建新项目，或使用设计师提供的项目码加入。
+          </li>
+        )}
         {projects.map((project) => (
           <li key={project.id} className="project-card">
             <button type="button" className="project-open" onClick={() => onOpen(project.id)}>
