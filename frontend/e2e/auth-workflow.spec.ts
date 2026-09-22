@@ -72,6 +72,7 @@ test('two real accounts complete a shared brief, retain stale input and restore 
   try {
     await register(owner, ownerEmail);
     await register(designer, `designer-${Date.now()}@example.com`);
+    await owner.getByLabel('预算金额（新加坡元 SGD）').fill('20000');
     await owner.getByLabel('同意处理参考图片（真实上传，模拟分析）').check();
     await owner.getByRole('button', { name: '创建', exact: true }).click();
     await owner.getByRole('button', { name: '生成项目码' }).click();

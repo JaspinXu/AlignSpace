@@ -31,6 +31,14 @@ def bearer(result):
     return {"Authorization": f"Bearer {result['accessToken']}"}
 
 
+@pytest.mark.parametrize("length,expected", [(7, 422), (8, 201), (128, 201), (129, 422)])
+def test_registration_password_length_boundaries(auth_client, length, expected):
+    credentials = {"email": "boundary@example.com", "password": "x" * length}
+    assert auth_client.post("/v1/auth/register", json=credentials).status_code == expected
+    if expected == 201:
+        assert auth_client.post("/v1/auth/login", json=credentials).status_code == 200
+
+
 def test_register_normalizes_email_and_creates_real_session(auth_client):
     result = register(auth_client)
     assert result["user"]["email"] == "owner@example.com"

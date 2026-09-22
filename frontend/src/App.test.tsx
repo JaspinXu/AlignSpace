@@ -23,6 +23,41 @@ afterEach(() => {
 });
 
 describe('application session and navigation', () => {
+  it('requires a positive budget amount and submits it in fixed SGD', async () => {
+    const env = setup();
+    render(<App client={env.client} />);
+    const budget = await screen.findByRole('textbox', { name: '预算金额（新加坡元 SGD）' });
+    expect(budget).toHaveValue('');
+    expect(budget).toBeRequired();
+    const posts = () => env.fetcher.mock.calls.filter(([url, init]) => url === '/v1/projects' && init?.method === 'POST');
+    for (const invalid of ['   ', '人民币 100', '-1', '0', '12.345']) {
+      fireEvent.change(budget, { target: { value: invalid } });
+      await userEvent.click(screen.getByRole('button', { name: '创建' }));
+      expect(posts()).toHaveLength(0);
+    }
+    expect(screen.getByText('请填写大于 0 的预算金额，最多两位小数（新加坡元）。')).toBeVisible();
+    fireEvent.change(budget, { target: { value: '20000.50' } });
+    await userEvent.click(screen.getByRole('button', { name: '创建' }));
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(JSON.parse(String(posts()[0][1]?.body)).budgetBand).toBe('SGD 20000.50');
+  });
+
+  it('accepts eight-character registration passwords and rejects seven characters', async () => {
+    const env = setup();
+    vi.spyOn(env.client, 'restore').mockResolvedValue(undefined);
+    const register = vi.spyOn(env.client, 'register').mockResolvedValue(undefined);
+    render(<App client={env.client} />);
+    await userEvent.click(await screen.findByRole('tab', { name: '注册' }));
+    fireEvent.change(screen.getByLabelText('邮箱'), { target: { value: 'boundary@example.com' } });
+    for (const length of [7, 8]) {
+      fireEvent.change(screen.getByLabelText('密码', { exact: true }), { target: { value: 'x'.repeat(length) } });
+      fireEvent.change(screen.getByLabelText('确认密码'), { target: { value: 'x'.repeat(length) } });
+      await userEvent.click(screen.getByRole('button', { name: '注册' }));
+      if (length === 7) expect(register).not.toHaveBeenCalled();
+    }
+    expect(register).toHaveBeenCalledWith('boundary@example.com', 'xxxxxxxx');
+  });
+
   it('guards browser history into the reader and preserves the draft on cancellation', async () => {
     window.history.replaceState(null, '', '/?project=p1&view=brief&version=1');
     const env = setup(briefSnapshot());

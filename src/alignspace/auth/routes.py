@@ -22,7 +22,7 @@ class LoginInput(BaseModel):
 
 
 class RegisterInput(LoginInput):
-    password: str = Field(min_length=15, max_length=128)
+    password: str = Field(min_length=8, max_length=128)
 
 
 def require_origin(request: Request):

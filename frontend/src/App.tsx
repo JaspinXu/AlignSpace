@@ -20,11 +20,6 @@ const ROOM_TYPES = [
   { value: 'living_room', label: '客厅' },
   { value: 'bedroom', label: '卧室' },
 ];
-const BUDGET_BANDS = [
-  { value: 'under_15k_sgd', label: '低于 S$15,000' },
-  { value: '15k_to_30k_sgd', label: 'S$15,000 – S$30,000' },
-  { value: 'above_30k_sgd', label: '高于 S$30,000' },
-];
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -221,8 +216,8 @@ function AuthScreen({
     event.preventDefault();
     setError(null);
     if (mode === 'register') {
-      if (password.length < 15 || password.length > 128) {
-        setError('密码长度需为 15–128 个字符。');
+      if ([...password].length < 8 || [...password].length > 128) {
+        setError('密码长度需为 8–128 个字符。');
         return;
       }
       if (password !== confirm) {
@@ -322,7 +317,7 @@ function ProjectsScreen({
   onLogout: () => Promise<void>;
 }) {
   const [roomType, setRoomType] = useState('living_room');
-  const [budgetBand, setBudgetBand] = useState('15k_to_30k_sgd');
+  const [budgetBand, setBudgetBand] = useState('');
   const [consent, setConsent] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [issued, setIssued] = useState<Record<string, JoinCode>>({});
@@ -331,8 +326,13 @@ function ProjectsScreen({
   const createProject = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    const amount = budgetBand.trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(amount) || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      setError('请填写大于 0 的预算金额，最多两位小数（新加坡元）。');
+      return;
+    }
     try {
-      await client.post<Project>('/v1/projects', { roomType, budgetBand, consent });
+      await client.post<Project>('/v1/projects', { roomType, budgetBand: `SGD ${amount}`, consent });
       setConsent(false);
       await onRefresh();
     } catch (caught) {
@@ -419,14 +419,10 @@ function ProjectsScreen({
               </option>
             ))}
           </select>
-          <label htmlFor="budget-band">预算区间</label>
-          <select id="budget-band" value={budgetBand} onChange={(event) => setBudgetBand(event.target.value)}>
-            {BUDGET_BANDS.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          <label htmlFor="budget-band">预算金额（新加坡元 SGD）</label>
+          <input id="budget-band" type="text" inputMode="decimal" required value={budgetBand}
+            placeholder="例如：20000"
+            onChange={(event) => setBudgetBand(event.target.value)} />
           <label className="option">
             <input
               type="checkbox"
