@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, newIdempotencyKey, prepareWrite } from '../api';
 import { PreferenceBoard } from '../preferences/PreferenceBoard';
 import { SpaceBoard } from '../space/SpaceBoard';
+import { WorkspaceShell } from '../layout/WorkspaceShell';
+import type { WorkspacePage } from '../navigation/workspaceRoute';
 import type { Asset, Attribute, Conflict, Constraint, ProjectSnapshot } from '../types';
 
 const BROAD_OPTIONS: { label: string; keyword: string }[] = [];
@@ -84,9 +86,10 @@ function AssetThumb({ client, projectId, asset }: { client: ApiClient; projectId
   ) : null;
 }
 
-export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard }: {
+export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, page = 'overview', onNavigate }: {
   client: ApiClient; projectId: string; onOpenBrief?: (version: number) => void;
   briefLeaveGuard?: { current: (() => boolean) | null };
+  page?: WorkspacePage; onNavigate?: (page: WorkspacePage) => void;
 }) {
   const [snapshot, setSnapshot] = useState<ProjectSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -574,6 +577,12 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard }: {
   };
 
   return (
+    <WorkspaceShell
+      page={page}
+      onNavigate={(next) => onNavigate?.(next)}
+      heading={project.roomType === 'living_room' ? '客厅' : project.roomType}
+      roleLabel={ROLE_LABEL[project.role] ?? project.role}
+    >
     <div className="workspace">
       <header className="workspace-head">
         <div>
@@ -1102,5 +1111,6 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard }: {
         </aside>
       </div>
     </div>
+    </WorkspaceShell>
   );
 }

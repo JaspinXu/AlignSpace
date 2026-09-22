@@ -33,7 +33,7 @@ describe('application session and navigation', () => {
     act(() => window.history.back());
     await waitFor(() => expect(confirm).toHaveBeenCalled());
     expect(screen.getByLabelText('方案目标')).toHaveValue('历史导航未保存目标');
-    expect(window.location.search).toBe('?project=p1');
+    expect(window.location.search).toBe('?project=p1&page=approval');
     confirm.mockReturnValue(true);
     act(() => window.history.back());
     await screen.findByRole('heading', { name: '设计说明书' });
@@ -49,7 +49,7 @@ describe('application session and navigation', () => {
     expect(await screen.findByText('warm modern')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: '返回工作区' }));
     await screen.findByRole('heading', { name: '当前任务' });
-    expect(window.location.search).toBe('?project=p1');
+    expect(window.location.search).toBe('?project=p1&page=approval');
     await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
     await screen.findByRole('heading', { name: '设计说明书' });
     expect(window.location.search).toBe('?project=p1&view=brief&version=1');
@@ -115,5 +115,19 @@ describe('application session and navigation', () => {
     act(() => env.channel.onmessage?.({ data: { type: 'logout' } }));
     await waitFor(() => expect(screen.queryByRole('heading', { name: '我的项目' })).not.toBeInTheDocument());
     expect(screen.getByRole('textbox', { name: '邮箱' })).toBeInTheDocument();
+  });
+
+  it('navigates workspace pages through the URL and clears the page when switching projects', async () => {
+    window.history.replaceState(null, '', '/?project=p1');
+    const env = setup();
+    render(<App client={env.client} />);
+    await screen.findByRole('heading', { name: '当前任务' });
+    await userEvent.click(screen.getByRole('button', { name: '空间方案' }));
+    expect(new URL(window.location.href).searchParams.get('page')).toBe('space');
+    expect(screen.getByRole('button', { name: '空间方案' })).toHaveAttribute('aria-current', 'page');
+    await userEvent.click(screen.getByRole('button', { name: '返回我的项目' }));
+    const after = new URL(window.location.href).searchParams;
+    expect(after.has('page')).toBe(false);
+    expect(after.has('project')).toBe(false);
   });
 });

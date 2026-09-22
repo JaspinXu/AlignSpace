@@ -3,6 +3,7 @@ import { ApiClient, ApiError } from './api';
 import type { JoinCode, Project, Role } from './types';
 import { Workspace } from './workflow/Workspace';
 import { BriefDetail } from './briefs/BriefDetail';
+import { parseWorkspacePage, workspacePageUrl, type WorkspacePage } from './navigation/workspaceRoute';
 
 const ROLE_LABEL: Record<Role, string> = { homeowner: '屋主', designer: '设计师' };
 const STATUS_LABEL: Record<string, string> = {
@@ -34,8 +35,14 @@ function errorMessage(error: unknown): string {
 }
 
 function routeFromUrl() {
-  const params = new URL(window.location.href).searchParams;
-  return { projectId: params.get('project'), brief: params.get('view') === 'brief', version: params.get('version') };
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  return {
+    projectId: params.get('project'),
+    brief: params.get('view') === 'brief',
+    version: params.get('version'),
+    page: parseWorkspacePage(url),
+  };
 }
 
 export function App({ client: suppliedClient }: { client?: ApiClient }) {
@@ -53,6 +60,13 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
     else url.searchParams.delete('project');
     url.searchParams.delete('view');
     url.searchParams.delete('version');
+    url.searchParams.delete('page');
+    window.history[replace ? 'replaceState' : 'pushState'](null, '', url);
+    setRoute(routeFromUrl());
+  }, []);
+
+  const navigatePage = useCallback((page: WorkspacePage, replace = false) => {
+    const url = workspacePageUrl(new URL(window.location.href), page);
     window.history[replace ? 'replaceState' : 'pushState'](null, '', url);
     setRoute(routeFromUrl());
   }, []);
@@ -63,6 +77,7 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
     url.searchParams.set('project', selectedProjectId);
     url.searchParams.set('view', 'brief');
     url.searchParams.set('version', String(version));
+    url.searchParams.delete('page');
     window.history[replace ? 'replaceState' : 'pushState'](null, '', url);
     setRoute(routeFromUrl());
   }, [selectedProjectId]);
@@ -159,9 +174,9 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
           </button>
         </nav>
         {route.brief ? <BriefDetail key={`brief-${selected.id}`} client={client} projectId={selected.id}
-          version={route.version} onVersion={openBrief} onBack={() => openProject(selected.id)} />
+          version={route.version} onVersion={openBrief} onBack={() => navigatePage('approval')} />
           : <Workspace key={selected.id} client={client} projectId={selected.id} onOpenBrief={openBrief}
-              briefLeaveGuard={briefLeaveGuard} />}
+              briefLeaveGuard={briefLeaveGuard} page={route.page} onNavigate={navigatePage} />}
       </div>
     );
   }
