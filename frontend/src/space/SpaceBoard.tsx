@@ -41,9 +41,11 @@ type Props = {
   role: 'homeowner' | 'designer';
   stateVersion: number;
   onChanged?: () => void;
+  /** Set by the parent so leaving the workspace can warn about an unsynced 3D draft. */
+  pendingDraftGuard?: { current: (() => boolean) | null };
 };
 
-export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }: Props) {
+export function SpaceBoard({ client, projectId, role, stateVersion, onChanged, pendingDraftGuard }: Props) {
   const [snapshot, setSnapshot] = useState<SpaceSnapshot | null>(null);
   const [materials, setMaterials] = useState<MaterialCatalogue | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,7 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   const [syncing, setSyncing] = useState(false);
   const [syncNotes, setSyncNotes] = useState<string[]>([]);
   const [syncConflicts, setSyncConflicts] = useState<string[]>([]);
+  const [bindingSummary, setBindingSummary] = useState({ active: 0, needsReview: 0 });
   const [syncConflict, setSyncConflict] = useState(false);
   const frame = useRef<HTMLIFrameElement | null>(null);
   const planRef = useRef<SpaceSnapshot['plan']>(null);
@@ -86,6 +89,15 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
   });
   const onChangedRef = useRef(onChanged);
   onChangedRef.current = onChanged;
+
+  useEffect(() => {
+    if (!pendingDraftGuard) return;
+    pendingDraftGuard.current = () =>
+      Boolean(pendingSyncRef.current) || conflictRef.current || syncingRef.current;
+    return () => {
+      pendingDraftGuard.current = null;
+    };
+  }, [pendingDraftGuard]);
 
   const isHomeowner = role === 'homeowner';
 
@@ -430,6 +442,18 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
       </p>
       {error && <p role="alert">{error}</p>}
 
+      <div className="space-mobile-summary">
+        <p className="question-hint">
+          {snapshot?.version ? `当前版本 v${snapshot.version}` : '尚无草稿'} · 房间{' '}
+          {plan?.rooms.length ?? 0} · 家具 {plan?.objects.length ?? 0}
+        </p>
+        <p className="question-hint">
+          材质绑定 {bindingSummary.active} · 待复核 {bindingSummary.needsReview}
+        </p>
+        <p className="question-hint">手机端仅展示摘要，复杂空间编辑建议在电脑上完成。</p>
+      </div>
+
+      <div className="space-editor-full">
       <fieldset>
         <legend>添加矩形房间</legend>
         <label htmlFor="space-room-name">房间名称</label>
@@ -644,7 +668,9 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged }:
         materials={materials}
         onApplied={setSnapshot}
         onChanged={onChanged}
+        onSummary={setBindingSummary}
       />
+      </div>
     </section>
   );
 }

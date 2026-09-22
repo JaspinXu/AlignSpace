@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ownerCreatesProject, register } from './flow';
+import { ownerCreatesProject, register, uploadAsset } from './flow';
 
 test('five-page navigation keeps drafts, survives refresh/back and fits 320px', async ({
   browser,
@@ -58,6 +58,41 @@ test('five-page navigation keeps drafts, survives refresh/back and fits 320px', 
     await page.keyboard.press('Escape');
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await expect(trigger).toBeFocused();
+  } finally {
+    await context.close();
+  }
+});
+
+
+test('captures login, projects and the five pages with real images', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.goto('/');
+    await page.screenshot({ path: 'test-results/studio-login.png', fullPage: true });
+    await register(page, `studio-visual-${Date.now()}@example.com`);
+    await page.screenshot({ path: 'test-results/studio-projects-empty.png', fullPage: true });
+
+    await ownerCreatesProject(page);
+    await page.screenshot({ path: 'test-results/studio-page-overview.png', fullPage: true });
+
+    for (let index = 0; index < 3; index++) {
+      await uploadAsset(page, `studio-real-${index}.png`);
+    }
+    const pages = [
+      ['overview', '项目概览'],
+      ['inspiration', '灵感与偏好'],
+      ['negotiation', '设计协商'],
+      ['space', '空间方案'],
+      ['approval', '方案审批'],
+    ] as const;
+    for (const [name, label] of pages) {
+      await page.getByRole('button', { name: label, exact: true }).click();
+      await page.screenshot({ path: `test-results/studio-page-${name}.png`, fullPage: true });
+    }
+
+    await page.getByRole('button', { name: '返回我的项目' }).click();
+    await page.screenshot({ path: 'test-results/studio-projects-list.png', fullPage: true });
   } finally {
     await context.close();
   }

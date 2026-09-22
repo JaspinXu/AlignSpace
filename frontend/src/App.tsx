@@ -173,10 +173,14 @@ export function App({ client: suppliedClient }: { client?: ApiClient }) {
             退出登录
           </button>
         </nav>
-        {route.brief ? <BriefDetail key={`brief-${selected.id}`} client={client} projectId={selected.id}
-          version={route.version} onVersion={openBrief} onBack={() => navigatePage('approval')} />
-          : <Workspace key={selected.id} client={client} projectId={selected.id} onOpenBrief={openBrief}
-              briefLeaveGuard={briefLeaveGuard} page={route.page} onNavigate={navigatePage} />}
+        <div hidden={route.brief}>
+          <Workspace key={selected.id} client={client} projectId={selected.id} onOpenBrief={openBrief}
+              briefLeaveGuard={briefLeaveGuard} page={route.page} onNavigate={navigatePage} />
+        </div>
+        {route.brief && (
+          <BriefDetail key={`brief-${selected.id}`} client={client} projectId={selected.id}
+            version={route.version} onVersion={openBrief} onBack={() => navigatePage('approval')} />
+        )}
       </div>
     );
   }

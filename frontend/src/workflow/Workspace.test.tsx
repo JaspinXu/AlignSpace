@@ -643,3 +643,17 @@ describe('page lifecycle', () => {
     expect(screen.getByRole('region', { name: '空间草稿' })).toBe(panel);
   });
 });
+
+
+describe('overview content', () => {
+  it('shows budget, members and the next step', async () => {
+    const env = setup();
+    await env.client.restore();
+    render(<Workspace page="overview" client={env.client} projectId="p1" />);
+    const overview = await screen.findByRole('region', { name: '项目概览摘要' });
+    expect(overview).toHaveTextContent('预算');
+    expect(overview).toHaveTextContent('15k_to_30k_sgd');
+    expect(overview).toHaveTextContent('设计师已加入');
+    expect(overview).toHaveTextContent('下一步');
+  });
+});

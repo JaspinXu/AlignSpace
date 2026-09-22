@@ -70,10 +70,10 @@ test('concurrent constraint edits keep the stale tab input and allow a resubmit'
   await expect(tabB.getByText(/输入已保留/)).toBeVisible();
   await expect(tabB.getByLabel('约束内容')).toHaveValue('B 约束');
 
-  await expect(tabB.locator('.sidebar')).toContainText('A 约束');
+  await expect(tabB.getByRole('region', { name: '约束列表' })).toContainText('A 约束');
   const retried = await submitConstraint(tabB, 'B 约束');
   expect((await retried).status()).toBe(200);
-  await expect(tabB.locator('.sidebar')).toContainText('B 约束');
+  await expect(tabB.getByRole('region', { name: '约束列表' })).toContainText('B 约束');
 });
 
 test('a stale tab cannot write its old answer into the next question', async ({ browser }) => {
@@ -167,7 +167,7 @@ test('editing the same constraint from two tabs keeps the stale input and resubm
   await tabB.goto(tabA.url());
   await expect(tabB.getByRole('navigation', { name: '工作区导航' })).toBeVisible();
   await goToPage(tabB, 'negotiation');
-  await expect(tabB.locator('.sidebar')).toContainText('并发约束');
+  await expect(tabB.getByRole('region', { name: '约束列表' })).toContainText('并发约束');
 
   const first = await updateConstraint(tabA, '并发约束', '并发约束 A 版');
   expect((await first).status()).toBe(200);
@@ -177,10 +177,10 @@ test('editing the same constraint from two tabs keeps the stale input and resubm
   await expect(tabB.getByText(/输入已保留/)).toBeVisible();
   await expect(tabB.getByLabel('约束内容')).toHaveValue('并发约束 B 版');
 
-  await expect(tabB.locator('.sidebar')).toContainText('并发约束 A 版');
+  await expect(tabB.getByRole('region', { name: '约束列表' })).toContainText('并发约束 A 版');
   const retried = await updateConstraint(tabB, '并发约束 A 版', '并发约束 B 版');
   expect((await retried).status()).toBe(200);
-  await expect(tabB.locator('.sidebar')).toContainText('并发约束 B 版');
+  await expect(tabB.getByRole('region', { name: '约束列表' })).toContainText('并发约束 B 版');
 });
 
 test('deleting a question source image lets another tab reach the next step', async ({

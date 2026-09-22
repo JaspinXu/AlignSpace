@@ -115,6 +115,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
   const [editAttributeValue, setEditAttributeValue] = useState('');
   const goalsDirty = useRef(false);
   const goalsRevision = useRef(0);
+  // Live draft state of the space editor, so leaving for the reader warns about
+  // an in-flight or conflicted 3D sync.
+  const spaceDraftGuard = useRef<() => boolean>(() => false);
 
   const load = useCallback(async () => {
     try {
@@ -176,6 +179,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
     const hasInput = goalsDirty.current || hasQuestionInput || [value, reviewNote, conflictResolution,
       constraintStatement, constraintRationale, constraintAppliesTo, constraintAttributeId,
       constraintIncompatible, editAttributeValue].some((text) => text.trim());
+    if (spaceDraftGuard.current()) {
+      return window.confirm('空间草稿仍在同步或有未处理冲突，离开后可能丢失。是否继续查看设计说明书？');
+    }
     return !hasInput || window.confirm('有未保存的输入，离开后将丢弃。是否继续查看设计说明书？');
   };
 
@@ -610,7 +616,7 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
         </p>
       )}
 
-      <div className="workspace-body">
+      <div className={page === 'inspiration' || page === 'approval' ? 'workspace-body' : 'workspace-body workspace-body--single'}>
         <main className="task">
           <PersistentPanel active={page === 'overview'} id="page-overview">
           <h2>当前任务</h2>
@@ -618,12 +624,58 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             <p className="overview-status">
               状态：{STATUS_LABEL[projectState.status] ?? projectState.status} · 版本 v{project.stateVersion}
             </p>
+            <dl className="overview-facts">
+              <div>
+                <dt>预算</dt>
+                <dd>{project.budgetBand || '未填写'}</dd>
+              </div>
+              <div>
+                <dt>成员</dt>
+                <dd>
+                  {ROLE_LABEL[project.role] ?? project.role} ·{' '}
+                  {project.designerJoined ? '设计师已加入' : '等待设计师加入'}
+                </dd>
+              </div>
+              <div>
+                <dt>当前用户</dt>
+                <dd>{ROLE_LABEL[project.role] ?? project.role}</dd>
+              </div>
+            </dl>
             <ul className="overview-counts">
               <li>偏好 {projectState.attributes.length}</li>
               <li>约束 {projectState.constraints.length}</li>
               <li>冲突 {projectState.conflicts.filter((item) => item.status === 'open').length}</li>
               <li>方案版本 {projectState.briefVersions.length}</li>
             </ul>
+            <div className="overview-todo" role="status">
+              <strong>下一步：</strong>
+              {pending && pending.targetRole === project.role
+                ? '回答当前问题'
+                : pending
+                  ? `等待${ROLE_LABEL[pending.targetRole] ?? pending.targetRole}完成回答`
+                  : projectState.briefStale
+                    ? '方案已过时，请重新生成方案'
+                    : projectState.waitReason === 'designer'
+                      ? '等待设计师提交反馈'
+                      : projectState.status === 'awaiting_approval'
+                        ? '双方审批当前方案'
+                        : '暂无待办'}
+              {pending && pending.targetRole === project.role && (
+                <button type="button" onClick={() => onNavigate?.('inspiration')}>
+                  去回答
+                </button>
+              )}
+              {!pending && (projectState.briefStale || projectState.status === 'awaiting_approval') && (
+                <button type="button" onClick={() => onNavigate?.('approval')}>
+                  去审批
+                </button>
+              )}
+              {!pending && projectState.waitReason === 'designer' && (
+                <button type="button" onClick={() => onNavigate?.('negotiation')}>
+                  查看协商
+                </button>
+              )}
+            </div>
             <div className="actions">
               <button type="button" onClick={() => onNavigate?.('inspiration')}>进入灵感与偏好</button>
               <button type="button" onClick={() => onNavigate?.('negotiation')}>进入设计协商</button>
@@ -778,6 +830,159 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             </section>
           )}
 
+          <PersistentPanel active={page === 'negotiation'} id="page-aside-negotiation">
+          <section aria-label="约束列表">
+            <h3>约束</h3>
+            <ul>
+              {projectState.constraints.map((constraint: Constraint) => (
+                <li key={constraint.id}>
+                  <strong>{constraint.statement}</strong>
+                  {constraint.withdrawn && <span className="asset-missing">已撤销</span>}
+                  <div className="hint">
+                    {constraint.category} · {constraint.severity}
+                    {constraint.appliesTo ? ` · 作用对象：${constraint.appliesTo}` : ''}
+                    {constraint.attributeId ? ` · 关联偏好：${constraint.attributeId}` : ''}
+                  </div>
+                  {constraint.rationale && <div className="hint">理由：{constraint.rationale}</div>}
+                  {isDesigner && !constraint.withdrawn && (
+                    <span className="actions">
+                      <button
+                        type="button"
+                        aria-label={`编辑 ${constraint.statement}`}
+                        onClick={() => editConstraint(constraint)}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`撤销 ${constraint.statement}`}
+                        onClick={() => void withdrawConstraint(constraint)}
+                      >
+                        撤销
+                      </button>
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {isDesigner && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void createConstraint();
+                }}
+              >
+                <h4>{editingConstraintId ? '编辑约束' : '新增约束'}</h4>
+                <label htmlFor="constraint-category">约束类别</label>
+                <select
+                  id="constraint-category"
+                  value={constraintCategory}
+                  onChange={(event) => setConstraintCategory(event.target.value)}
+                >
+                  {CONSTRAINT_CATEGORIES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <label htmlFor="constraint-severity">限制性质</label>
+                <select
+                  id="constraint-severity"
+                  value={constraintSeverity}
+                  onChange={(event) => setConstraintSeverity(event.target.value)}
+                >
+                  <option value="advisory">提示</option>
+                  <option value="important">重要</option>
+                  <option value="critical">关键</option>
+                </select>
+                <label htmlFor="constraint-applies-to">作用对象</label>
+                <input
+                  id="constraint-applies-to"
+                  value={constraintAppliesTo}
+                  onChange={(event) => setConstraintAppliesTo(event.target.value)}
+                />
+                <label htmlFor="constraint-attribute">关联偏好</label>
+                <select
+                  id="constraint-attribute"
+                  value={constraintAttributeId}
+                  onChange={(event) => setConstraintAttributeId(event.target.value)}
+                >
+                  <option value="">（不关联）</option>
+                  {projectState.attributes
+                    .filter((attribute) => attribute.status === 'confirmed')
+                    .map((attribute) => (
+                      <option key={attribute.id} value={attribute.id}>
+                        {attribute.dimension}：{attribute.value}
+                      </option>
+                    ))}
+                </select>
+                <label htmlFor="constraint-statement">约束内容</label>
+                <textarea
+                  id="constraint-statement"
+                  value={constraintStatement}
+                  onChange={(event) => setConstraintStatement(event.target.value)}
+                />
+                <label htmlFor="constraint-rationale">约束理由</label>
+                <textarea
+                  id="constraint-rationale"
+                  value={constraintRationale}
+                  onChange={(event) => setConstraintRationale(event.target.value)}
+                />
+                <label htmlFor="constraint-incompatible">不兼容取值（逗号分隔）</label>
+                <input
+                  id="constraint-incompatible"
+                  value={constraintIncompatible}
+                  onChange={(event) => setConstraintIncompatible(event.target.value)}
+                />
+                <div className="actions">
+                  <button type="submit">
+                    {editingConstraintId ? '更新约束' : '保存约束'}
+                  </button>
+                  {editingConstraintId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingConstraintId(null);
+                        setConstraintStatement('');
+                        setConstraintRationale('');
+                        setConstraintIncompatible('');
+                      }}
+                    >
+                      取消编辑
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+          </section>
+          <section>
+            <h3>冲突</h3>
+            <ul>
+              {projectState.conflicts.map((conflict: Conflict) => (
+                <li key={conflict.id}>
+                  {conflict.summary}（{conflict.status}）
+                </li>
+              ))}
+            </ul>
+            {openConflict && pending?.id === `question-conflict-${openConflict.id}` && (
+              <p className="hint">请由屋主回答当前冲突问题，提交后继续对齐流程。</p>
+            )}
+            {openConflict && pending?.id !== `question-conflict-${openConflict.id}` && (
+              <div className="resolve">
+                <label htmlFor="conflict-resolution">冲突解决说明</label>
+                <textarea
+                  id="conflict-resolution"
+                  value={conflictResolution}
+                  onChange={(event) => setConflictResolution(event.target.value)}
+                />
+                <button type="button" onClick={() => void resolveConflict(openConflict)}>
+                  提交冲突决定
+                </button>
+              </div>
+            )}
+          </section>
+          </PersistentPanel>
+
           </PersistentPanel>
 
           <PersistentPanel active={page === 'inspiration'} id="page-inspiration-board">
@@ -799,6 +1004,7 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             role={project.role}
             stateVersion={project.stateVersion}
             onChanged={() => void load()}
+            pendingDraftGuard={spaceDraftGuard}
           />
 
           </PersistentPanel>
@@ -971,7 +1177,7 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
           </PersistentPanel>
         </main>
 
-        <aside className="sidebar" hidden={page === 'overview' || page === 'space'}>
+        <aside className="sidebar" hidden={page !== 'inspiration' && page !== 'approval'}>
           <h2>共享状态</h2>
           <PersistentPanel active={page === 'inspiration'} id="page-aside-preferences">
           <section>
@@ -1008,159 +1214,6 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
                 </li>
               ))}
             </ul>
-          </section>
-          </PersistentPanel>
-
-          <PersistentPanel active={page === 'negotiation'} id="page-aside-negotiation">
-          <section>
-            <h3>约束</h3>
-            <ul>
-              {projectState.constraints.map((constraint: Constraint) => (
-                <li key={constraint.id}>
-                  <strong>{constraint.statement}</strong>
-                  {constraint.withdrawn && <span className="asset-missing">已撤销</span>}
-                  <div className="hint">
-                    {constraint.category} · {constraint.severity}
-                    {constraint.appliesTo ? ` · 作用对象：${constraint.appliesTo}` : ''}
-                    {constraint.attributeId ? ` · 关联偏好：${constraint.attributeId}` : ''}
-                  </div>
-                  {constraint.rationale && <div className="hint">理由：{constraint.rationale}</div>}
-                  {isDesigner && !constraint.withdrawn && (
-                    <span className="actions">
-                      <button
-                        type="button"
-                        aria-label={`编辑 ${constraint.statement}`}
-                        onClick={() => editConstraint(constraint)}
-                      >
-                        编辑
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`撤销 ${constraint.statement}`}
-                        onClick={() => void withdrawConstraint(constraint)}
-                      >
-                        撤销
-                      </button>
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {isDesigner && (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void createConstraint();
-                }}
-              >
-                <h4>{editingConstraintId ? '编辑约束' : '新增约束'}</h4>
-                <label htmlFor="constraint-category">约束类别</label>
-                <select
-                  id="constraint-category"
-                  value={constraintCategory}
-                  onChange={(event) => setConstraintCategory(event.target.value)}
-                >
-                  {CONSTRAINT_CATEGORIES.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-                <label htmlFor="constraint-severity">限制性质</label>
-                <select
-                  id="constraint-severity"
-                  value={constraintSeverity}
-                  onChange={(event) => setConstraintSeverity(event.target.value)}
-                >
-                  <option value="advisory">提示</option>
-                  <option value="important">重要</option>
-                  <option value="critical">关键</option>
-                </select>
-                <label htmlFor="constraint-applies-to">作用对象</label>
-                <input
-                  id="constraint-applies-to"
-                  value={constraintAppliesTo}
-                  onChange={(event) => setConstraintAppliesTo(event.target.value)}
-                />
-                <label htmlFor="constraint-attribute">关联偏好</label>
-                <select
-                  id="constraint-attribute"
-                  value={constraintAttributeId}
-                  onChange={(event) => setConstraintAttributeId(event.target.value)}
-                >
-                  <option value="">（不关联）</option>
-                  {projectState.attributes
-                    .filter((attribute) => attribute.status === 'confirmed')
-                    .map((attribute) => (
-                      <option key={attribute.id} value={attribute.id}>
-                        {attribute.dimension}：{attribute.value}
-                      </option>
-                    ))}
-                </select>
-                <label htmlFor="constraint-statement">约束内容</label>
-                <textarea
-                  id="constraint-statement"
-                  value={constraintStatement}
-                  onChange={(event) => setConstraintStatement(event.target.value)}
-                />
-                <label htmlFor="constraint-rationale">约束理由</label>
-                <textarea
-                  id="constraint-rationale"
-                  value={constraintRationale}
-                  onChange={(event) => setConstraintRationale(event.target.value)}
-                />
-                <label htmlFor="constraint-incompatible">不兼容取值（逗号分隔）</label>
-                <input
-                  id="constraint-incompatible"
-                  value={constraintIncompatible}
-                  onChange={(event) => setConstraintIncompatible(event.target.value)}
-                />
-                <div className="actions">
-                  <button type="submit">
-                    {editingConstraintId ? '更新约束' : '保存约束'}
-                  </button>
-                  {editingConstraintId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingConstraintId(null);
-                        setConstraintStatement('');
-                        setConstraintRationale('');
-                        setConstraintIncompatible('');
-                      }}
-                    >
-                      取消编辑
-                    </button>
-                  )}
-                </div>
-              </form>
-            )}
-          </section>
-          <section>
-            <h3>冲突</h3>
-            <ul>
-              {projectState.conflicts.map((conflict: Conflict) => (
-                <li key={conflict.id}>
-                  {conflict.summary}（{conflict.status}）
-                </li>
-              ))}
-            </ul>
-            {openConflict && pending?.id === `question-conflict-${openConflict.id}` && (
-              <p className="hint">请由屋主回答当前冲突问题，提交后继续对齐流程。</p>
-            )}
-            {openConflict && pending?.id !== `question-conflict-${openConflict.id}` && (
-              <div className="resolve">
-                <label htmlFor="conflict-resolution">冲突解决说明</label>
-                <textarea
-                  id="conflict-resolution"
-                  value={conflictResolution}
-                  onChange={(event) => setConflictResolution(event.target.value)}
-                />
-                <button type="button" onClick={() => void resolveConflict(openConflict)}>
-                  提交冲突决定
-                </button>
-              </div>
-            )}
           </section>
           </PersistentPanel>
 

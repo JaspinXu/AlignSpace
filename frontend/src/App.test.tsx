@@ -130,4 +130,18 @@ describe('application session and navigation', () => {
     expect(after.has('page')).toBe(false);
     expect(after.has('project')).toBe(false);
   });
+
+  it('keeps the workspace mounted behind the reader so drafts are not lost', async () => {
+    window.history.replaceState(null, '', '/?project=p1');
+    const env = setup(briefSnapshot());
+    render(<App client={env.client} />);
+    await screen.findByRole('heading', { name: '当前任务' });
+    await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
+    await screen.findByRole('heading', { name: '设计说明书' });
+    const workspace = document.querySelector('.workspace-shell');
+    expect(workspace).not.toBeNull();
+    expect(workspace!.closest('[hidden]')).not.toBeNull();
+    // The hidden workspace is removed from the accessibility tree.
+    expect(screen.queryByRole('navigation', { name: '工作区导航' })).toBeNull();
+  });
 });

@@ -24,6 +24,7 @@ type Props = {
   materials: MaterialCatalogue | null;
   onApplied: (snapshot: SpaceSnapshot) => void;
   onChanged?: () => void;
+  onSummary?: (summary: { active: number; needsReview: number }) => void;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -42,7 +43,7 @@ const APPROXIMATION_LABELS: Record<string, string> = {
  * creates a new space version; an approximation must be explicitly
  * acknowledged. Joint approval requires both the brief and space hashes.
  */
-export function BindingPanel({ client, projectId, role, stateVersion, plan, materials, onApplied, onChanged }: Props) {
+export function BindingPanel({ client, projectId, role, stateVersion, plan, materials, onApplied, onChanged, onSummary }: Props) {
   const [bindingList, setBindingList] = useState<SpaceBindingList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,6 +71,14 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
   useEffect(() => {
     void load();
   }, [load, stateVersion]);
+
+  useEffect(() => {
+    const list = bindingList?.bindings ?? [];
+    onSummary?.({
+      active: list.filter((item) => item.status === 'active').length,
+      needsReview: list.filter((item) => item.status === 'needs_review').length,
+    });
+  }, [bindingList, onSummary]);
 
   const expectedVersion = Math.max(bindingList?.stateVersion ?? 0, stateVersion);
 
