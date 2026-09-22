@@ -14,9 +14,9 @@
 |---|---|---|
 | 后端 | `uv run pytest -q` | **336 passed** |
 | Python 静态检查 | `uv run ruff check src tests scripts` | **All checks passed** |
-| 前端单测 | `cd frontend && npm test` | **184 passed（14 文件）** |
+| 前端单测 | `cd frontend && npm test` | **186 passed（14 文件）** |
 | 类型与构建 | `cd frontend && npm run build`（含 `tsc --noEmit`） | **通过** |
-| 浏览器验收 | `cd frontend && npm run test:e2e` | **16 passed**（含真实 OpenPlan3D 与双人联合审批） |
+| 浏览器验收 | `cd frontend && npm run test:e2e` | **17 passed**（含真实 OpenPlan3D 与双人联合审批） |
 
 新增/更新测试：
 
@@ -57,3 +57,20 @@
 
 - `PersistentPanel` 依赖 `hidden` 与 CSS 的 `[hidden]` 规则；若后续新增 grid 规则覆盖需回归隐藏行为。
 - e2e 页面导航依赖壳层导航的可访问名称；重命名页面需同步更新 `flow.ts` 的 `PAGE_LABELS` 与相关断言。
+
+
+## 7. 二次评审修复（2026-09-22）
+
+| 评审项 | 处理 |
+|---|---|
+| [P1] 查看说明书仍卸载 Workspace，空间草稿可能丢失 | App 改为在说明书打开时**保留 Workspace 挂载**并用 `hidden` 隐藏（切页不卸载的保护延伸到阅读路径）；同时给 Workspace 增加 `spaceDraftGuard`，把 SpaceBoard 的同步中/409 草稿/待复核冲突纳入离开确认。新增 App 回归测试断言阅读时 Workspace 仍在 DOM 且移出可访问树 |
+| [P2] 桌面无用空栏 | `.workspace-body--single` 在无辅助栏的页面（概览/协商/空间）收起为单栏；约束与冲突从侧栏移入协商主栏（加 `aria-label="约束列表"`），协商页不再挤在窄侧栏 |
+| [P2] 手机排版不合格、空间页展示完整表单 | 手机端顶栏/标题纵向堆叠并禁止逐字换行；空间编辑表单 CSS 隐藏但**保持挂载**，改为展示版本/房间/家具/材质绑定摘要与“复杂编辑建议在电脑上完成”提示；保留草稿 |
+| [P2] 概览内容与视觉覆盖不完整 | 概览新增 **SGD 预算、成员信息、具体下一步待办**（含跳转按钮）；`studio-navigation.spec` 新增第二组用例，采集登录、项目列表、五页（含真实图片）截图 |
+
+追加实测（提交 `b96833d`）：后端 336、前端 **186**、浏览器 **17**、Ruff/构建/`tsc` 通过。工作区仍只剩原有 6 个未提交文件。
+
+## 8. 仍未完成（诚实边界）
+
+- 本执行环境模型不支持读图，四档及全站截图（`frontend/test-results/studio-login.png`、`studio-projects-empty.png`、`studio-page-{overview,inspiration,negotiation,space,approval}.png`、`studio-projects-list.png`、`studio-1440/820/390/320.png`）需人工目视确认。
+- 真实 DeepSeek 联调待用户配置密钥后验收。
