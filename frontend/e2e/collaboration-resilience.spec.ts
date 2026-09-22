@@ -2,6 +2,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import {
   designerAddConstraint,
   designerJoins,
+  goToPage,
   ownerCreatesProject,
   register,
   toAwaitingApproval,
@@ -55,9 +56,11 @@ test('concurrent constraint edits keep the stale tab input and allow a resubmit'
   await toDesignerWait(owner);
   const tabA = designer;
   await tabA.reload();
+  await goToPage(tabA, 'negotiation');
   const tabB = await designerContext.newPage();
   await tabB.goto(tabA.url());
-  await expect(tabB.getByRole('heading', { name: '当前任务' })).toBeVisible();
+  await expect(tabB.getByRole('navigation', { name: '工作区导航' })).toBeVisible();
+  await goToPage(tabB, 'negotiation');
 
   const first = await submitConstraint(tabA, 'A 约束');
   expect((await first).status()).toBe(200);
@@ -79,7 +82,7 @@ test('a stale tab cannot write its old answer into the next question', async ({ 
   const tabA = owner;
   const tabB = await ownerContext.newPage();
   await tabB.goto(tabA.url());
-  await expect(tabB.getByRole('heading', { name: '当前任务' })).toBeVisible();
+  await expect(tabB.getByRole('navigation', { name: '工作区导航' })).toBeVisible();
 
   const partsA = tabA.getByRole('checkbox');
   for (let index = 0; index < (await partsA.count()); index++) await partsA.nth(index).check();
@@ -105,12 +108,14 @@ test('an approval is rejected after another tab changes a constraint, then regen
   const { owner, designer } = await bootstrap(browser);
   await toAwaitingApproval(owner, designer);
   await owner.reload();
+  await goToPage(owner, 'approval');
   await expect(owner.getByRole('button', { name: '批准此版本' })).toBeVisible();
 
   // Freeze the owner's view so it still holds the pre-change brief.
   await owner.route('**/state', (route) => route.abort());
   await designer.reload();
   await designerAddConstraint(designer, '追加的预算约束');
+  await goToPage(designer, 'approval');
   await expect(designer.getByText('方案已过时，请重新生成后再审批。')).toBeVisible();
 
   const rejected = owner.waitForResponse(
@@ -137,7 +142,7 @@ test('logging out in one tab ends the session in the other tab', async ({ browse
   const { ownerContext, owner } = await bootstrap(browser);
   const second = await ownerContext.newPage();
   await second.goto(owner.url());
-  await expect(second.getByRole('heading', { name: '当前任务' })).toBeVisible();
+  await expect(second.getByRole('navigation', { name: '工作区导航' })).toBeVisible();
 
   await owner.getByRole('button', { name: '退出登录' }).click();
   await expect(second.getByLabel('邮箱', { exact: true })).toBeVisible();
@@ -154,12 +159,14 @@ test('editing the same constraint from two tabs keeps the stale input and resubm
   await toDesignerWait(owner);
   const tabA = designer;
   await tabA.reload();
+  await goToPage(tabA, 'negotiation');
   const created = await submitConstraint(tabA, '并发约束');
   expect((await created).status()).toBe(200);
 
   const tabB = await designerContext.newPage();
   await tabB.goto(tabA.url());
-  await expect(tabB.getByRole('heading', { name: '当前任务' })).toBeVisible();
+  await expect(tabB.getByRole('navigation', { name: '工作区导航' })).toBeVisible();
+  await goToPage(tabB, 'negotiation');
   await expect(tabB.locator('.sidebar')).toContainText('并发约束');
 
   const first = await updateConstraint(tabA, '并发约束', '并发约束 A 版');
@@ -184,7 +191,7 @@ test('deleting a question source image lets another tab reach the next step', as
   const tabA = owner;
   const tabB = await ownerContext.newPage();
   await tabB.goto(tabA.url());
-  await expect(tabB.getByRole('heading', { name: '当前任务' })).toBeVisible();
+  await expect(tabB.getByRole('navigation', { name: '工作区导航' })).toBeVisible();
 
   // Select two parts on different images so two detail groups exist.
   await tabA.getByRole('checkbox').nth(0).check();
@@ -217,7 +224,7 @@ test('a refresh response arriving after logout cannot restore the session', asyn
   const { ownerContext, owner } = await bootstrap(browser);
   const second = await ownerContext.newPage();
   await second.goto(owner.url());
-  await expect(second.getByRole('heading', { name: '当前任务' })).toBeVisible();
+  await expect(second.getByRole('navigation', { name: '工作区导航' })).toBeVisible();
 
   let refreshStarted!: () => void;
   const started = new Promise<void>((resolve) => {

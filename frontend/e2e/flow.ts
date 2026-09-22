@@ -1,6 +1,23 @@
 import { expect, type Page } from '@playwright/test';
 
 export const PASSWORD = 'local collaboration resilience password';
+const PAGE_LABELS = {
+  overview: '项目概览',
+  inspiration: '灵感与偏好',
+  negotiation: '设计协商',
+  space: '空间方案',
+  approval: '方案审批',
+} as const;
+
+export type WorkspacePageName = keyof typeof PAGE_LABELS;
+
+/** Navigate the workspace shell to a page and wait for it to become current. */
+export async function goToPage(page: Page, target: WorkspacePageName): Promise<void> {
+  const button = page.getByRole('button', { name: PAGE_LABELS[target], exact: true });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-current', 'page');
+}
+
 
 export async function register(page: Page, email: string): Promise<void> {
   await page.goto('/');
@@ -52,6 +69,7 @@ export async function write(
 }
 
 export async function uploadAsset(page: Page, name: string): Promise<void> {
+  await goToPage(page, 'inspiration');
   const png = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 1600;
@@ -80,6 +98,7 @@ export async function uploadAsset(page: Page, name: string): Promise<void> {
 }
 
 export async function answerBroadAndDetails(owner: Page): Promise<void> {
+  await goToPage(owner, 'inspiration');
   await write(owner, '启动分析', '/analysis-runs', 202);
   const parts = owner.getByRole('checkbox');
   const partCount = await parts.count();
@@ -103,6 +122,7 @@ export async function answerBroadAndDetails(owner: Page): Promise<void> {
         .getByText(body.pendingQuestion.text, { exact: true })
         .waitFor({ timeout: 15000 });
     } else {
+      await goToPage(owner, 'overview');
       await owner.getByText('等待设计师反馈').waitFor({ timeout: 15000 });
       break;
     }
@@ -110,6 +130,7 @@ export async function answerBroadAndDetails(owner: Page): Promise<void> {
 }
 
 export async function addExplicitPreferences(owner: Page): Promise<void> {
+  await goToPage(owner, 'inspiration');
   for (const [dimension, value] of [
     ['style', 'warm modern'],
     ['material', 'natural stone'],
@@ -129,10 +150,12 @@ export async function addExplicitPreferences(owner: Page): Promise<void> {
 export async function toDesignerWait(owner: Page): Promise<void> {
   await answerBroadAndDetails(owner);
   await addExplicitPreferences(owner);
+  await goToPage(owner, 'overview');
   await expect(owner.getByText('等待设计师反馈')).toBeVisible();
 }
 
 export async function designerAddConstraint(designer: Page, statement: string): Promise<void> {
+  await goToPage(designer, 'negotiation');
   await designer.getByLabel('作用对象').fill('living_room');
   await designer.getByLabel('约束内容').fill(statement);
   await write(designer, '保存约束', '/constraints', 200);
@@ -143,5 +166,6 @@ export async function toAwaitingApproval(owner: Page, designer: Page): Promise<v
   await designer.reload();
   await designerAddConstraint(designer, '预算档位已在项目信息中确认');
   await write(designer, '提交设计师反馈', '/designer-reviews', 200);
+  await goToPage(designer, 'approval');
   await expect(designer.getByText('方案版本 v1', { exact: false })).toBeVisible();
 }

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   designerAddConstraint,
   designerJoins,
+  goToPage,
   ownerCreatesProject,
   register,
   toAwaitingApproval,
@@ -27,6 +28,7 @@ test('two accounts jointly approve a brief+space plan and it expires after a bri
 
     // A space version must exist before a joint approval is meaningful.
     await owner.reload();
+    await goToPage(owner, 'space');
     const space = owner.getByRole('region', { name: '空间草稿' });
     const created = owner.waitForResponse(
       (response) => response.url().endsWith('/space/rooms') && response.request().method() === 'POST',
@@ -35,31 +37,36 @@ test('two accounts jointly approve a brief+space plan and it expires after a bri
     await space.getByRole('button', { name: '添加房间' }).click();
     expect((await created).status()).toBe(200);
     await expect(space.getByText(/空间版本 v1/)).toBeVisible();
-    await expect(space.getByText('尚未双方批准')).toBeVisible();
 
+    // Joint approval lives on the approval page.
+    await goToPage(owner, 'approval');
+    const ownerApproval = owner.getByRole('region', { name: '联合审批' });
+    await expect(ownerApproval.getByText('尚未双方批准')).toBeVisible();
     const ownerApproved = owner.waitForResponse(
       (response) => response.url().endsWith('/space/approvals') && response.request().method() === 'POST',
     );
-    await space.getByRole('button', { name: '联合批准当前方案' }).click();
+    await ownerApproval.getByRole('button', { name: '联合批准当前方案' }).click();
     expect((await ownerApproved).status()).toBe(200);
-    await expect(space.getByText('尚未双方批准')).toBeVisible();
+    await expect(ownerApproval.getByText('尚未双方批准')).toBeVisible();
 
     // The designer approves the exact same brief and space versions.
     await designer.reload();
-    const designerSpace = designer.getByRole('region', { name: '空间草稿' });
-    await expect(designerSpace.getByText('尚未双方批准')).toBeVisible();
+    await goToPage(designer, 'approval');
+    const designerApproval = designer.getByRole('region', { name: '联合审批' });
+    await expect(designerApproval.getByText('尚未双方批准')).toBeVisible();
     const designerApproved = designer.waitForResponse(
       (response) => response.url().endsWith('/space/approvals') && response.request().method() === 'POST',
     );
-    await designerSpace.getByRole('button', { name: '联合批准当前方案' }).click();
+    await designerApproval.getByRole('button', { name: '联合批准当前方案' }).click();
     expect((await designerApproved).status()).toBe(200);
-    await expect(designerSpace.getByText('双方已批准')).toBeVisible();
+    await expect(designerApproval.getByText('双方已批准')).toBeVisible();
 
     // A later brief change (designer constraint) expires the joint approval but
     // keeps the historical approvals visible.
     await designerAddConstraint(designer, '追加的预算约束');
     await owner.reload();
-    const after = owner.getByRole('region', { name: '空间草稿' });
+    await goToPage(owner, 'approval');
+    const after = owner.getByRole('region', { name: '联合审批' });
     await expect(after.getByText('尚未双方批准')).toBeVisible();
     await expect(after.getByText(/已记录批准：屋主、设计师/)).toBeVisible();
   } finally {

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ownerCreatesProject, register, uploadAsset } from './flow';
+import { goToPage, ownerCreatesProject, register, uploadAsset } from './flow';
 
 test('a confirmed floor preference is bound, applied and survives a reload', async ({ browser }) => {
   const ownerContext = await browser.newContext();
@@ -7,6 +7,7 @@ test('a confirmed floor preference is bound, applied and survives a reload', asy
   try {
     await register(owner, `binding-owner-${Date.now()}@example.com`);
     await ownerCreatesProject(owner);
+    await goToPage(owner, 'space');
 
     // Build a one-room draft first so a binding has a target.
     const space = owner.getByRole('region', { name: '空间草稿' });
@@ -33,9 +34,9 @@ test('a confirmed floor preference is bound, applied and survives a reload', asy
 
     // Reload so the workspace sees the new confirmed preference and version.
     await owner.reload();
+    await goToPage(owner, 'space');
     const shared = owner.getByRole('region', { name: '空间草稿' });
     await expect(shared.getByLabel('已确认地板偏好')).toBeVisible();
-    await expect(shared.getByText('联合审批（说明书 + 空间）')).toBeVisible();
 
     await shared.getByLabel('已确认地板偏好').selectOption({ index: 1 });
     // The 3D preview cannot render herringbone; acknowledge before binding.

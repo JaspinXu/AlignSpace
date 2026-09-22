@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ownerCreatesProject, register, uploadAsset } from './flow';
+import { goToPage, ownerCreatesProject, register, uploadAsset } from './flow';
 
 /**
  * Real OpenPlan3D browser acceptance. Skipped unless the pinned upstream
@@ -14,6 +14,7 @@ test('the 3D editor imports the plan, shows the material and syncs edits back', 
   try {
     await register(owner, `space3d-owner-${Date.now()}@example.com`);
     await ownerCreatesProject(owner);
+    await goToPage(owner, 'space');
 
     // One room.
     const space = owner.getByRole('region', { name: '空间草稿' });
@@ -37,6 +38,7 @@ test('the 3D editor imports the plan, shows the material and syncs edits back', 
     await expect(board.getByText(/已确认：herringbone/)).toBeVisible();
 
     await owner.reload();
+    await goToPage(owner, 'space');
     const shared = owner.getByRole('region', { name: '空间草稿' });
     await shared.getByLabel('已确认地板偏好').selectOption({ index: 1 });
     // An unrenderable laying pattern must be acknowledged before binding.

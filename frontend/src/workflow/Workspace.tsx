@@ -615,7 +615,7 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
           <PersistentPanel active={page === 'overview'} id="page-overview">
           <h2>当前任务</h2>
           <section aria-label="项目概览摘要">
-            <p className="meta">
+            <p className="overview-status">
               状态：{STATUS_LABEL[projectState.status] ?? projectState.status} · 版本 v{project.stateVersion}
             </p>
             <ul className="overview-counts">

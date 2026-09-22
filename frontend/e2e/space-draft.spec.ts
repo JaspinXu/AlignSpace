@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { designerJoins, ownerCreatesProject, register } from './flow';
+import { designerJoins, goToPage, ownerCreatesProject, register } from './flow';
 
 test('a homeowner and designer share a persisted space draft; only the owner deletes', async ({
   browser,
@@ -11,6 +11,7 @@ test('a homeowner and designer share a persisted space draft; only the owner del
   try {
     await register(owner, `space-owner-${Date.now()}@example.com`);
     const code = await ownerCreatesProject(owner);
+    await goToPage(owner, 'space');
 
     const space = owner.getByRole('region', { name: '空间草稿' });
     await expect(space.getByText('尚无空间版本')).toBeVisible();
@@ -33,6 +34,7 @@ test('a homeowner and designer share a persisted space draft; only the owner del
     // The designer shares edit access but cannot delete.
     await register(designer, `space-designer-${Date.now()}@example.com`);
     await designerJoins(designer, code);
+    await goToPage(designer, 'space');
     const designerSpace = designer.getByRole('region', { name: '空间草稿' });
     await expect(designerSpace.getByLabel('房间 客厅')).toBeVisible();
     const shared = designer.waitForResponse(

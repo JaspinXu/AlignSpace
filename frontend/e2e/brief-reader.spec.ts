@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { designerJoins, ownerCreatesProject, register, toAwaitingApproval, uploadAsset, write } from './flow';
+import { designerJoins, goToPage, ownerCreatesProject, register, toAwaitingApproval, uploadAsset, write } from './flow';
 
 test('both members read immutable brief versions without changing the project', async ({ browser }, testInfo) => {
   const ownerContext = await browser.newContext();
@@ -14,6 +14,7 @@ test('both members read immutable brief versions without changing the project', 
     for (let i = 0; i < 3; i++) await uploadAsset(owner, `reader-${i}.png`);
     await toAwaitingApproval(owner, designer);
     await owner.reload();
+    await goToPage(owner, 'approval');
     await expect(owner.getByRole('button', { name: '查看设计说明书' })).toBeVisible();
 
     await owner.getByLabel('方案目标').fill('保留祖传书柜 · 第二版');
@@ -62,7 +63,7 @@ test('both members read immutable brief versions without changing the project', 
     expect(after.projectState).toEqual(before.projectState);
     expect(writes).toEqual([]);
     await owner.getByRole('button', { name: '返回工作区' }).click();
-    await expect(owner.getByRole('heading', { name: '当前任务' })).toBeVisible();
+    await expect(owner.getByRole('heading', { name: '方案审批' })).toBeVisible();
     await expect(owner).not.toHaveURL(/view=brief/);
     await owner.getByLabel('方案目标').fill('后退时保留的草稿');
     owner.once('dialog', (dialog) => dialog.dismiss());

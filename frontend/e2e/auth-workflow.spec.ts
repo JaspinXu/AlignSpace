@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { goToPage } from './flow';
 
 const password = 'local browser acceptance password';
 
@@ -85,6 +86,7 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     expect(owner.url()).toBe(projectUrl);
     expect(refreshes).toBe(2); // initial anonymous restore + explicit reload
 
+    await goToPage(owner, 'inspiration');
     for (let i = 0; i < 3; i++) await uploadAsset(owner, `room-${i}.png`);
     await uploadAsset(owner, 'to-delete.png');
     const deletion = owner.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/assets/'));
@@ -118,11 +120,13 @@ test('two real accounts complete a shared brief, retain stale input and restore 
           .getByText(body.pendingQuestion.text, { exact: true })
           .waitFor({ timeout: 15000 });
       } else {
+        await goToPage(owner, 'overview');
         await owner.getByText('等待设计师反馈').waitFor({ timeout: 15000 });
         break;
       }
     }
 
+    await goToPage(owner, 'inspiration');
     for (const [dimension, value] of [
       ['style', 'warm modern'], ['material', 'natural stone'],
       ['layout', 'clear conversational seating'],
@@ -135,10 +139,12 @@ test('two real accounts complete a shared brief, retain stale input and restore 
       await expect(owner.getByLabel('偏好内容')).toHaveValue('');
       await expect(owner.locator('.sidebar')).toContainText(value);
     }
+    await goToPage(owner, 'overview');
     await expect(owner.getByText('等待设计师反馈')).toBeVisible();
 
     // Designer enters a real constraint linked to a confirmed preference.
     await designer.reload();
+    await goToPage(designer, 'negotiation');
     await designer.getByLabel('作用对象').fill('worktop');
     await designer.getByLabel('关联偏好').selectOption('manual-material');
     await designer.getByLabel('约束内容').fill('天然石材工作台超出当前预算档位');
@@ -146,14 +152,18 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     await designer.getByLabel('不兼容取值（逗号分隔）').fill('natural stone');
     await write(designer, '保存约束', '/constraints', 200);
     await write(designer, '提交设计师反馈', '/designer-reviews', 202);
+    await goToPage(designer, 'overview');
     await expect(designer.getByText('等待屋主回答')).toBeVisible();
 
     await owner.reload();
+    await goToPage(owner, 'inspiration');
     await expect(owner.locator('.question-text')).toContainText('trade-off');
     await owner.getByLabel('您的回答').fill('Use the lower-cost stone-effect finish.');
     await write(owner, '提交回答', '/answer');
+    await goToPage(owner, 'approval');
     await expect(owner.getByText('方案版本 v1', { exact: false })).toBeVisible();
     await designer.reload();
+    await goToPage(designer, 'approval');
     await expect(designer.getByLabel('方案目标')).toBeVisible();
 
     // Keep the owner's snapshot stale while the designer changes the real backend.
@@ -184,8 +194,10 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     await expect(owner.locator('.meta')).toContainText('已批准');
 
     // Post-approval constraint change: brief becomes stale, must regenerate before re-approval.
+    await goToPage(designer, 'negotiation');
     await designer.getByLabel('约束内容').fill('追加的预算约束');
     await write(designer, '保存约束', '/constraints', 200);
+    await goToPage(designer, 'approval');
     await expect(designer.getByText('方案已过时，请重新生成后再审批。')).toBeVisible();
     await expect(designer.getByRole('button', { name: '批准此版本' })).toHaveCount(0);
     await write(designer, '重新生成方案', '/realign', 200);
@@ -215,10 +227,12 @@ test('two real accounts complete a shared brief, retain stale input and restore 
     await owner.getByLabel('密码', { exact: true }).fill(password);
     await owner.getByRole('button', { name: '登录', exact: true }).click();
     await expect(owner.getByRole('heading', { name: '我的项目' })).toBeVisible();
+    await owner.setViewportSize({ width: 1280, height: 900 });
     await owner.getByRole('button', { name: /客厅.*屋主/ }).click();
+    await goToPage(owner, 'approval');
     await expect(owner.getByText('设计师已批准 v4')).toBeVisible();
     expect(refreshes).toBe(refreshesBeforeLogin);
-    await expect(designer.getByRole('heading', { name: '当前任务' })).toBeVisible();
+    await expect(designer.getByRole('navigation', { name: '工作区导航' })).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
     await testInfo.attach('auth-request-statuses', { body: authEvents.join('\n'), contentType: 'text/plain' });
