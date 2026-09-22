@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError, prepareWrite, type ApiClient } from '../api';
+import { AssetImage } from '../assets/AssetImage';
 import type {
   Asset,
   Candidate,
@@ -147,22 +148,29 @@ export function PreferenceBoard({ client, projectId, role, assets, stateVersion 
         <div>
           <fieldset>
             <legend>选择图片</legend>
-            {activeAssets.map((asset) => (
-              <label key={asset.id} className="option">
-                <input
-                  type="checkbox"
-                  checked={selected.includes(asset.id)}
-                  onChange={(event) =>
-                    setSelected((current) =>
-                      event.target.checked
-                        ? [...current, asset.id]
-                        : current.filter((item) => item !== asset.id),
-                    )
-                  }
-                />
-                选择图片 {asset.originalFilename}
-              </label>
-            ))}
+            <div className="image-picker">
+              {activeAssets.map((asset) => {
+                const checked = selected.includes(asset.id);
+                return (
+                  <label key={asset.id} className={checked ? 'image-pick is-selected' : 'image-pick'}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      aria-label={`选择图片 ${asset.originalFilename}`}
+                      onChange={(event) =>
+                        setSelected((current) =>
+                          event.target.checked
+                            ? [...current, asset.id]
+                            : current.filter((item) => item !== asset.id),
+                        )
+                      }
+                    />
+                    <AssetImage client={client} projectId={projectId} asset={asset} decorative />
+                    <span className="image-pick__name">{asset.originalFilename}</span>
+                  </label>
+                );
+              })}
+            </div>
           </fieldset>
           <label htmlFor="preference-description">喜欢这张图的哪些部分</label>
           <textarea

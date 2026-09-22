@@ -476,17 +476,75 @@ form {
 }
 
 .assets {
-  color: var(--muted);
-  padding-left: 1.1rem;
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
 }
 
-.asset-thumb {
+.asset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.asset-image {
   display: block;
-  width: 120px;
-  max-width: 100%;
-  height: 90px;
+  width: 100%;
+  max-height: 240px;
   object-fit: contain;
   background: var(--paper);
+  border-radius: 8px;
+}
+
+.asset-image--empty {
+  min-height: 120px;
+}
+
+.image-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.image-pick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 8px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.image-pick.is-selected {
+  border-color: var(--olive);
+  box-shadow: 0 0 0 3px rgba(86, 93, 61, 0.15);
+}
+
+.image-pick input {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 22px;
+  min-height: 22px;
+  accent-color: var(--olive);
+}
+
+.image-pick__name {
+  font-size: 0.85rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .asset-missing {

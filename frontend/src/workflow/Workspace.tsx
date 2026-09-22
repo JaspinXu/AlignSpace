@@ -4,6 +4,7 @@ import { PreferenceBoard } from '../preferences/PreferenceBoard';
 import { SpaceBoard } from '../space/SpaceBoard';
 import { JointApproval } from '../space/JointApproval';
 import { WorkspaceShell } from '../layout/WorkspaceShell';
+import { useAssetUrl } from '../assets/AssetImage';
 import { PersistentPanel } from '../layout/PersistentPanel';
 import type { WorkspacePage } from '../navigation/workspaceRoute';
 import type { Asset, Attribute, Conflict, Constraint, ProjectSnapshot } from '../types';
@@ -62,30 +63,14 @@ function draftText(draft: QuestionDraft): string {
 }
 
 function AssetThumb({ client, projectId, asset }: { client: ApiClient; projectId: string; asset: Asset }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (asset.deleted) return;
-    let active = true;
-    let objectUrl: string | null = null;
-    client
-      .blob(`/v1/projects/${projectId}/assets/${asset.id}/content`)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [client, projectId, asset.id, asset.deleted]);
+  const url = useAssetUrl(client, projectId, asset);
   if (asset.deleted) return <span className="asset-missing">已删除</span>;
-  return url ? (
+  if (!url) return <span className="asset-image asset-image--empty" aria-hidden="true" />;
+  return (
     <a href={url} target="_blank" rel="noreferrer" aria-label={`查看原图：${asset.originalFilename}`}>
-      <img className="asset-thumb" src={url} alt={asset.originalFilename} />
+      <img className="asset-image" src={url} alt={asset.originalFilename} loading="lazy" />
     </a>
-  ) : null;
+  );
 }
 
 export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, page = 'overview', onNavigate }: {
@@ -1030,7 +1015,7 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             </>}
             <ul className="assets">
               {project.assets.map((asset: Asset) => (
-                <li key={asset.id}>
+                <li key={asset.id} className="asset-card">
                   <AssetThumb client={client} projectId={projectId} asset={asset} />
                   <span>
                     {asset.originalFilename}（{asset.mediaType}）

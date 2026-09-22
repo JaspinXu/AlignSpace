@@ -329,3 +329,82 @@ describe('SpaceBoard refresh and retry base binding', () => {
     expect(writes.some((write) => write.path.includes('obj-a'))).toBe(true);
   });
 });
+
+
+describe('SpaceBoard merge conflicts', () => {
+  it('flags a three-way merge conflict, keeps it visible and guards leaving', async () => {
+    const base = snapshot();
+    const withObject: SpaceSnapshot = {
+      ...base,
+      plan: {
+        ...base.plan!,
+        objects: [
+          { id: 'obj-a', roomId: 'room-a', kind: 'furniture', label: 'A', geometry: { x: 1000, y: 1000, width: 800, depth: 600, height: 800 } },
+        ],
+      },
+    };
+    let serverSnapshot = withObject;
+    const moved: SpaceSnapshot = {
+      ...withObject,
+      stateVersion: withObject.stateVersion + 3,
+      plan: {
+        ...withObject.plan!,
+        objects: [
+          { id: 'obj-a', roomId: 'room-a', kind: 'furniture', label: 'A', geometry: { x: 3000, y: 1000, width: 800, depth: 600, height: 800 } },
+        ],
+      },
+    };
+    const execute = vi.fn(async () => serverSnapshot);
+    const client = {
+      get: vi.fn(async (path: string) => (path.endsWith('/materials') ? catalogue : serverSnapshot)),
+      blob: vi.fn(async () => new Blob()),
+      execute,
+    } as unknown as ApiClient;
+    const guard: { current: (() => boolean) | null } = { current: null };
+    const view = render(
+      <SpaceBoard client={client} projectId="p1" role="homeowner" stateVersion={withObject.stateVersion} pendingDraftGuard={guard} />,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: '打开 3D 预览' }));
+
+    const walls = [
+      { id: 'n', start: { x: 0, y: 0 }, end: { x: 400, y: 0 } },
+      { id: 'e', start: { x: 400, y: 0 }, end: { x: 400, y: 500 } },
+      { id: 's', start: { x: 400, y: 500 }, end: { x: 0, y: 500 } },
+      { id: 'w', start: { x: 0, y: 500 }, end: { x: 0, y: 0 } },
+    ];
+    const dispatch = (data: unknown) =>
+      act(() => {
+        window.dispatchEvent(new MessageEvent('message', { origin: 'http://127.0.0.1:4173', data }));
+      });
+    dispatch({ type: 'alignspace:ready', protocol: 1 });
+    dispatch({ type: 'alignspace:applied', protocol: 1 });
+
+    // The collaborator moves the object on the server after the editor imported it.
+    serverSnapshot = moved;
+    view.rerender(
+      <SpaceBoard client={client} projectId="p1" role="homeowner" stateVersion={moved.stateVersion} pendingDraftGuard={guard} />,
+    );
+    await waitFor(() => expect(screen.getAllByText(/当前版本 v2/).length).toBeGreaterThan(0));
+
+    // The editor moved the same object differently: a three-way conflict, no write.
+    dispatch({
+      type: 'alignspace:project',
+      protocol: 1,
+      project: {
+        activeFloorId: 'f',
+        floors: [
+          {
+            id: 'f',
+            walls,
+            rooms: [{ id: 'r', name: '客厅', walls: ['n', 'e', 's', 'w'], alignspaceRoomId: 'room-a' }],
+            furniture: [{ id: 'obj-a', position: { x: 200, y: 100 }, width: 80, depth: 60, height: 80 }],
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByText(/位置被双方修改/)).toBeVisible();
+    expect(execute).not.toHaveBeenCalled();
+    expect(guard.current?.()).toBe(true);
+  });
+});

@@ -93,11 +93,14 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged, p
   useEffect(() => {
     if (!pendingDraftGuard) return;
     pendingDraftGuard.current = () =>
-      Boolean(pendingSyncRef.current) || conflictRef.current || syncingRef.current;
+      Boolean(pendingSyncRef.current) ||
+      conflictRef.current ||
+      syncingRef.current ||
+      syncConflicts.length > 0;
     return () => {
       pendingDraftGuard.current = null;
     };
-  }, [pendingDraftGuard]);
+  }, [pendingDraftGuard, syncConflicts]);
 
   const isHomeowner = role === 'homeowner';
 
@@ -453,6 +456,32 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged, p
         <p className="question-hint">手机端仅展示摘要，复杂空间编辑建议在电脑上完成。</p>
       </div>
 
+      <div className="space-sync-status">
+        {syncing && <p className="question-hint">正在将 3D 编辑同步回后端…</p>}
+        {syncConflict && (
+          <p role="alert">
+            3D 编辑与服务器版本冲突，草稿已保留。
+            <button type="button" disabled={syncing} onClick={() => void retrySync()}>
+              重试同步
+            </button>
+          </p>
+        )}
+        {syncConflicts.length > 0 && (
+          <ul role="alert">
+            {syncConflicts.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        )}
+        {syncNotes.length > 0 && (
+          <ul role="note">
+            {syncNotes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="space-editor-full">
       <fieldset>
         <legend>添加矩形房间</legend>
@@ -616,31 +645,8 @@ export function SpaceBoard({ client, projectId, role, stateVersion, onChanged, p
             />
             <p className="question-hint">
               预览仅连接本机 OpenPlan3D（{PREVIEW_URL}），不调用上游云分享、统计或账户；访问令牌不会放入 URL。
-              {syncing ? ' 正在将 3D 编辑同步回后端…' : ''}
               {previewNote ? ` ${previewNote}` : ''}
             </p>
-            {syncConflict && (
-              <p role="alert">
-                3D 编辑与服务器版本冲突，草稿已保留。
-                <button type="button" disabled={syncing} onClick={() => void retrySync()}>
-                  重试同步
-                </button>
-              </p>
-            )}
-            {syncConflicts.length > 0 && (
-              <ul role="alert">
-                {syncConflicts.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
-            )}
-            {syncNotes.length > 0 && (
-              <ul role="note">
-                {syncNotes.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
-            )}
             {!isAllowedPreviewOrigin(PREVIEW_URL, PREVIEW_URL) && <p role="alert">预览地址不受信任。</p>}
           </>
         )}

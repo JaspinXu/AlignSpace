@@ -82,6 +82,7 @@ function setup(initial: CandidateBoard, role: 'homeowner' | 'designer' = 'homeow
   const execute = vi.fn(async (_write: { path: string; method: string; body: string }) => initial);
   const client = {
     get: vi.fn(async () => initial),
+    blob: vi.fn(async () => new Blob()),
     execute,
   } as unknown as ApiClient;
   render(

@@ -45,7 +45,7 @@ async function uploadAsset(page: Page, name: string) {
   const preview = page.getByRole('img', { name, exact: true });
   await expect(preview).toBeVisible();
   await expect.poll(() => preview.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(1600);
-  expect((await preview.boundingBox())!.width).toBeLessThanOrEqual(120);
+  expect((await preview.boundingBox())!.width).toBeLessThanOrEqual(360);
   await expect(page.getByRole('link', { name: `查看原图：${name}`, exact: true })).toHaveAttribute('href', /^blob:/);
 }
 

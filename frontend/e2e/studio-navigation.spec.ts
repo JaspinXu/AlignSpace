@@ -1,5 +1,48 @@
 import { expect, test } from '@playwright/test';
-import { ownerCreatesProject, register, uploadAsset } from './flow';
+import { goToPage, ownerCreatesProject, register } from './flow';
+
+
+/** Upload a drawn room scene so screenshots show real image content, not a blank tile. */
+async function uploadRoomImage(page: import('@playwright/test').Page, name: string): Promise<void> {
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 900;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#f2ede3';
+    ctx.fillRect(0, 0, 1200, 900);
+    ctx.fillStyle = '#c9a06a';
+    ctx.fillRect(0, 540, 1200, 360);
+    ctx.strokeStyle = '#a8814f';
+    ctx.lineWidth = 4;
+    for (let x = 0; x <= 1200; x += 120) {
+      ctx.beginPath();
+      ctx.moveTo(x, 540);
+      ctx.lineTo(x, 900);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#bcd6e8';
+    ctx.fillRect(760, 120, 320, 300);
+    ctx.strokeStyle = '#5c6b52';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(760, 120, 320, 300);
+    ctx.fillStyle = '#6d7a5a';
+    ctx.fillRect(120, 420, 480, 260);
+    ctx.fillStyle = '#e8e2d4';
+    ctx.fillRect(150, 380, 180, 90);
+    ctx.fillStyle = '#d8cbb6';
+    ctx.fillRect(640, 620, 420, 180);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  const response = page.waitForResponse(
+    (r) => r.url().endsWith('/assets') && r.request().method() !== 'GET',
+  );
+  await page
+    .getByLabel('上传参考图片')
+    .setInputFiles({ name, mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  expect((await response).status()).toBe(201);
+  await expect(page.getByRole('img', { name, exact: true })).toBeVisible();
+}
 
 test('five-page navigation keeps drafts, survives refresh/back and fits 320px', async ({
   browser,
@@ -76,9 +119,11 @@ test('captures login, projects and the five pages with real images', async ({ br
     await ownerCreatesProject(page);
     await page.screenshot({ path: 'test-results/studio-page-overview.png', fullPage: true });
 
+    await goToPage(page, 'inspiration');
     for (let index = 0; index < 3; index++) {
-      await uploadAsset(page, `studio-real-${index}.png`);
+      await uploadRoomImage(page, `studio-room-${index}.png`);
     }
+    await page.screenshot({ path: 'test-results/studio-page-inspiration.png', fullPage: true });
     const pages = [
       ['overview', '项目概览'],
       ['inspiration', '灵感与偏好'],
