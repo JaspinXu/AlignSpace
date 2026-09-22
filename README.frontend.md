@@ -162,3 +162,17 @@ uv run ruff check src tests
   marks the brief stale; the brief must be regenerated ("重新生成方案") before it
   can be approved again. Unresolved conflicts are never auto-resolved.
 - The SQLite migrations are SQLite-specific.
+
+## 2026-09-22: five-page workspace
+
+The project workspace is organised into five pages reachable from the left
+navigation (or the mobile menu below 1024px): 项目概览 (overview), 灵感与偏好
+(inspiration), 设计协商 (negotiation), 空间方案 (space) and 方案审批 (approval).
+The active page is stored in the URL as `?project=<id>&page=<page>`, so refresh,
+back/forward and deep links keep working. A legacy `?project=<id>&view=brief&version=<n>`
+link still opens the read-only brief reader; returning lands on the approval page.
+
+Pages hide with the native `hidden` attribute so unsaved forms and the space
+editor are not unmounted when you switch tabs. The global "查看设计说明书"
+button lives in the workspace top bar, so the leave-protection prompt works from
+any page. Automated checks: `npm test`, `npm run build`, `npm run test:e2e`.
