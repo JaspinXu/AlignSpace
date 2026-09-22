@@ -4,7 +4,6 @@ import { ApiError, prepareWrite, type ApiClient } from '../api';
 import { previewPatternNote } from './spaceAdapter';
 import type {
   MaterialCatalogue,
-  SpaceApprovalView,
   SpaceBinding,
   SpaceBindingList,
   SpacePlan,
@@ -45,7 +44,6 @@ const APPROXIMATION_LABELS: Record<string, string> = {
  */
 export function BindingPanel({ client, projectId, role, stateVersion, plan, materials, onApplied, onChanged }: Props) {
   const [bindingList, setBindingList] = useState<SpaceBindingList | null>(null);
-  const [approvals, setApprovals] = useState<SpaceApprovalView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [attributeId, setAttributeId] = useState('');
@@ -62,12 +60,7 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
 
   const load = useCallback(async () => {
     try {
-      const [nextBindings, nextApprovals] = await Promise.all([
-        client.get<SpaceBindingList>(`/v1/projects/${projectId}/space/bindings`),
-        client.get<SpaceApprovalView>(`/v1/projects/${projectId}/space/approvals`),
-      ]);
-      setBindingList(nextBindings);
-      setApprovals(nextApprovals);
+      setBindingList(await client.get<SpaceBindingList>(`/v1/projects/${projectId}/space/bindings`));
       setError(null);
     } catch (caught) {
       setError(messageOf(caught));
@@ -78,11 +71,7 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
     void load();
   }, [load, stateVersion]);
 
-  const expectedVersion = Math.max(
-    bindingList?.stateVersion ?? 0,
-    approvals?.stateVersion ?? 0,
-    stateVersion,
-  );
+  const expectedVersion = Math.max(bindingList?.stateVersion ?? 0, stateVersion);
 
   const run = async (write: ReturnType<typeof prepareWrite>, applied: boolean) => {
     setBusy(true);
@@ -143,22 +132,8 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
     );
   };
 
-  const jointApprove = () => {
-    if (!approvals?.briefVersion || !approvals.spaceVersion) return;
-    void run(
-      prepareWrite(`/v1/projects/${projectId}/space/approvals`, 'POST', expectedVersion, {
-        briefVersion: approvals.briefVersion,
-        briefHash: approvals.briefHash,
-        spaceVersion: approvals.spaceVersion,
-        spaceHash: approvals.spaceHash,
-      }),
-      false,
-    );
-  };
-
   const floorPreferences = bindingList?.floorPreferences ?? [];
   const bindings = bindingList?.bindings ?? [];
-  const approvalRecords = Array.isArray(approvals?.approvals) ? approvals.approvals : [];
   const selectedPreference = floorPreferences.find((item) => item.attributeId === attributeId);
   // A confirmed pattern the 3D preview cannot render must be acknowledged, not
   // silently presented as a full match.
@@ -307,33 +282,6 @@ export function BindingPanel({ client, projectId, role, stateVersion, plan, mate
         })}
       </ul>
 
-      <h4>联合审批（说明书 + 空间）</h4>
-      {approvals ? (
-        <div aria-label="联合审批">
-          <p className="question-hint">
-            说明书 v{approvals.briefVersion ?? '—'} · 空间 v{approvals.spaceVersion ?? '—'} ·{' '}
-            {approvals.approved ? '双方已批准' : '尚未双方批准'}
-          </p>
-          <p className="question-hint">
-            已记录批准：
-            {approvalRecords.length === 0
-              ? '（无）'
-              : approvalRecords.map((item) => (item.role === 'homeowner' ? '屋主' : '设计师')).join('、')}
-          </p>
-          <button
-            type="button"
-            disabled={busy || !approvals.briefVersion || !approvals.spaceVersion}
-            onClick={jointApprove}
-          >
-            联合批准当前方案
-          </button>
-          <p className="question-hint">
-            仅当说明书与空间版本和哈希都匹配当前值时才计入；旧审批不会自动适用于新版本。
-          </p>
-        </div>
-      ) : (
-        <p className="question-hint">尚无审批信息。</p>
-      )}
     </div>
   );
 }

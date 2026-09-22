@@ -1,10 +1,12 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiClient } from '../api';
 import { BRIEF_HASH, briefSnapshot, conflictSnapshot, snapshot } from '../test/fixtures';
 import type { ProjectSnapshot } from '../types';
 import { Workspace } from './Workspace';
+import type { WorkspacePage } from '../navigation/workspaceRoute';
 
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 
@@ -61,7 +63,7 @@ describe('read-only brief entry', () => {
     await env.client.restore();
     const open = vi.fn();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    render(<Workspace client={env.client} projectId="p1" onOpenBrief={open} />);
+    render(<Workspace page={label === '约束内容' ? 'negotiation' : 'inspiration'} client={env.client} projectId="p1" onOpenBrief={open} />);
     fireEvent.change(await screen.findByLabelText(label), { target: { value: '未保存的内容' } });
     await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
     expect(confirm).toHaveBeenCalled();
@@ -79,7 +81,7 @@ describe('question draft recovery', () => {
     const initial = detailSnapshot();
     const env = setup('homeowner', initial);
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     fireEvent.change(await screen.findByLabelText('您的回答'), { target: { value: '未提交的暖光想法' } });
     env.setState({ ...initial, pendingQuestion: transition === 'changes'
       ? { ...initial.pendingQuestion!, id: 'detail-layout', text: '您喜欢什么样的布局？' } : null });
@@ -99,7 +101,7 @@ describe('question draft recovery', () => {
     const initial = snapshot();
     const env = setup('homeowner', initial);
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await userEvent.click(await screen.findByRole('checkbox', { name: /wall/ }));
     env.setState(detailSnapshot());
     await act(async () => { fireEvent.focus(window); });
@@ -114,7 +116,7 @@ describe('question draft recovery', () => {
     const initial = detailSnapshot();
     const env = setup('homeowner', initial);
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     const field = await screen.findByLabelText('您的回答');
     fireEvent.change(field, { target: { value: '原回答' } });
     const held = env.holdWrite();
@@ -138,7 +140,7 @@ describe('question draft recovery', () => {
   it('keeps the question draft on a rejected write', async () => {
     const env = setup('homeowner', detailSnapshot());
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     fireEvent.change(await screen.findByLabelText('您的回答'), { target: { value: '保留回答' } });
     env.conflict();
     await userEvent.click(screen.getByRole('button', { name: '提交回答' }));
@@ -155,7 +157,7 @@ describe('role-aware work area', () => {
       repetitionFingerprint: 'detail:lighting:lighting', text: '您喜欢什么样的灯光？',
     } });
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await screen.findByText('您喜欢什么样的灯光？');
     expect(screen.queryByRole('checkbox', { name: /暖色灯光/ })).not.toBeInTheDocument();
     await userEvent.type(screen.getByRole('textbox', { name: '您的回答' }), '2700K 暖色间接光');
@@ -167,7 +169,7 @@ describe('role-aware work area', () => {
   it('creates separate attributes when the owner saves multiple preferences', async () => {
     const env = setup();
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     const field = await screen.findByRole('textbox', { name: '偏好内容' });
     await userEvent.type(field, '温暖现代');
     await userEvent.click(screen.getByRole('button', { name: '保存偏好' }));
@@ -185,12 +187,12 @@ describe('role-aware work area', () => {
     const env = setup('homeowner', { ...base, pendingQuestion: null,
       projectState: { ...base.projectState, waitReason: 'designer' } });
     await env.client.restore();
-    const view = render(<Workspace client={env.client} projectId="p1" />);
+    const view = render(<Workspace page="overview" client={env.client} projectId="p1" />);
     await screen.findByRole('heading', { name: '当前任务' });
     vi.useFakeTimers();
     // Remount so the polling interval is installed on the controlled clock.
     view.unmount();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="overview" client={env.client} projectId="p1" />);
     try {
       await act(async () => {});
       const before = env.fetcher.mock.calls.length;
@@ -205,7 +207,7 @@ describe('role-aware work area', () => {
   it('lets the homeowner pick parts and sends structured parts', async () => {
     const env = setup();
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await userEvent.click(await screen.findByRole('checkbox', { name: /lighting/ }));
     await userEvent.click(screen.getByRole('button', { name: '提交回答' }));
     await waitFor(() => expect(env.writes).toHaveLength(1));
@@ -217,7 +219,7 @@ describe('role-aware work area', () => {
   it('shows a designer the shared state without homeowner answer or sample controls', async () => {
     const env = setup('designer');
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="overview" client={env.client} projectId="p1" />);
     await screen.findByText('等待屋主回答');
     expect(screen.queryByRole('button', { name: '提交回答' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '登记演示样本' })).not.toBeInTheDocument();
@@ -227,7 +229,7 @@ describe('role-aware work area', () => {
   it('lets a designer view reference images without upload or delete controls', async () => {
     const env = setup('designer');
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await screen.findByRole('heading', { name: '参考图片' });
     expect(screen.getAllByText(/room\.png/).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('上传参考图片')).not.toBeInTheDocument();
@@ -237,7 +239,7 @@ describe('role-aware work area', () => {
   it('preserves an edited attribute on 409, refetches and uses a new key/version on deliberate resubmit', async () => {
     const env = setup();
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     const field = await screen.findByRole('textbox', { name: /偏好内容/ });
     await userEvent.clear(field);
     await userEvent.type(field, '柔和的阅读灯');
@@ -258,7 +260,7 @@ describe('role-aware work area', () => {
   it('refreshes on focus and stops listening on navigation', async () => {
     const env = setup('designer');
     await env.client.restore();
-    const view = render(<Workspace client={env.client} projectId="p1" />);
+    const view = render(<Workspace page="overview" client={env.client} projectId="p1" />);
     await screen.findByText('等待屋主回答');
     const before = env.fetcher.mock.calls.length;
     fireEvent.focus(window);
@@ -274,7 +276,7 @@ describe('preference and conflict decisions', () => {
   it('lets the homeowner confirm a proposed visual observation', async () => {
     const env = setup('homeowner', conflictSnapshot('homeowner'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await userEvent.click(await screen.findByRole('button', { name: '确认 warm ambient' }));
     await waitFor(() => expect(env.writes).toHaveLength(1));
     const body = JSON.parse(String(env.writes[0].body));
@@ -285,7 +287,7 @@ describe('preference and conflict decisions', () => {
   it('lets the homeowner reject a proposed visual observation', async () => {
     const env = setup('homeowner', conflictSnapshot('homeowner'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await userEvent.click(await screen.findByRole('button', { name: '拒绝 warm ambient' }));
     await waitFor(() => expect(env.writes).toHaveLength(1));
     const body = JSON.parse(String(env.writes[0].body));
@@ -295,7 +297,7 @@ describe('preference and conflict decisions', () => {
   it('hides homeowner preference controls from the designer', async () => {
     const env = setup('designer', conflictSnapshot('designer'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await screen.findByText(/天然石材与预算冲突/);
     expect(screen.queryByRole('button', { name: '确认 warm ambient' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '拒绝 warm ambient' })).not.toBeInTheDocument();
@@ -304,7 +306,7 @@ describe('preference and conflict decisions', () => {
   it('resolves an open conflict with a written decision', async () => {
     const env = setup('homeowner', conflictSnapshot('homeowner'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="negotiation" client={env.client} projectId="p1" />);
     const field = await screen.findByRole('textbox', { name: /冲突解决说明/ });
     await userEvent.type(field, '改用低成本的石材效果饰面');
     await userEvent.click(screen.getByRole('button', { name: '提交冲突决定' }));
@@ -319,7 +321,7 @@ describe('designer review and brief approval', () => {
     const initial = briefSnapshot();
     const env = setup('homeowner', initial);
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="approval" client={env.client} projectId="p1" />);
     const field = await screen.findByLabelText('方案目标');
     fireEvent.change(field, { target: { value: '提交目标 A' } });
     const held = env.holdWrite();
@@ -361,7 +363,7 @@ describe('designer review and brief approval', () => {
   it('requires saving the displayed draft before approving a server version', async () => {
     const env = setup('homeowner', briefSnapshot());
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="approval" client={env.client} projectId="p1" />);
     const field = await screen.findByLabelText('方案目标');
     await waitFor(() => expect(field).toHaveValue('warm modern'));
     await userEvent.type(field, ' with softer lighting');
@@ -371,7 +373,7 @@ describe('designer review and brief approval', () => {
     const initial = briefSnapshot();
     const env = setup('homeowner', initial);
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="approval" client={env.client} projectId="p1" />);
     const field = await screen.findByLabelText('方案目标');
     await waitFor(() => expect(field).toHaveValue('warm modern'));
     await userEvent.clear(field);
@@ -394,7 +396,7 @@ describe('designer review and brief approval', () => {
     };
     const env = setup('designer', initial);
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="negotiation" client={env.client} projectId="p1" />);
     const field = await screen.findByRole('textbox', { name: /设计师反馈/ });
     await userEvent.type(field, '预算内可用石材效果替代');
     await userEvent.click(screen.getByRole('button', { name: '提交设计师反馈' }));
@@ -406,7 +408,7 @@ describe('designer review and brief approval', () => {
   it('approves the exact brief version and content hash shown', async () => {
     const env = setup('homeowner', briefSnapshot('homeowner'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="approval" client={env.client} projectId="p1" />);
     await screen.findByText(/方案版本 v1/);
     await userEvent.click(await screen.findByRole('button', { name: '批准此版本' }));
     await waitFor(() => expect(env.writes).toHaveLength(1));
@@ -417,14 +419,14 @@ describe('designer review and brief approval', () => {
   it('shows an existing approval from the other party', async () => {
     const env = setup('designer', briefSnapshot('designer'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="approval" client={env.client} projectId="p1" />);
     expect(await screen.findByText(/屋主已批准 v1/)).toBeInTheDocument();
   });
 
   it('edits the brief into a new version using the full payload', async () => {
     const env = setup('designer', briefSnapshot('designer'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="approval" client={env.client} projectId="p1" />);
     const field = await screen.findByRole('textbox', { name: /方案目标/ });
     await waitFor(() => expect(field).toHaveValue('warm modern'));
     await userEvent.clear(field);
@@ -441,7 +443,7 @@ describe('real image uploads', () => {
   it('uploads a selected file with the current version and a new key', async () => {
     const env = setup('homeowner');
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     const input = await screen.findByLabelText('上传参考图片');
     const file = new File([new Uint8Array([1, 2, 3])], 'room.png', { type: 'image/png' });
     await userEvent.upload(input, file);
@@ -463,7 +465,7 @@ describe('real image uploads', () => {
     };
     const env = setup('homeowner', initial);
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     expect(await screen.findByText('来源图片已删除')).toBeInTheDocument();
   });
 });
@@ -472,7 +474,7 @@ describe('designer constraints', () => {
   it('lets the designer create a constraint and shows the rationale to everyone', async () => {
     const env = setup('designer', conflictSnapshot('designer'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="negotiation" client={env.client} projectId="p1" />);
     expect(await screen.findByText(/理由：/)).toBeInTheDocument();
 
     await userEvent.type(
@@ -492,7 +494,7 @@ describe('designer constraints', () => {
   it('hides constraint write controls from the homeowner', async () => {
     const env = setup('homeowner', conflictSnapshot('homeowner'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="negotiation" client={env.client} projectId="p1" />);
     expect(await screen.findByText(/理由：/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '保存约束' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^撤销 / })).not.toBeInTheDocument();
@@ -501,7 +503,7 @@ describe('designer constraints', () => {
   it('lets the designer withdraw a constraint', async () => {
     const env = setup('designer', conflictSnapshot('designer'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="negotiation" client={env.client} projectId="p1" />);
     await userEvent.click(
       await screen.findByRole('button', { name: '撤销 天然石材超出预算' }),
     );
@@ -515,7 +517,7 @@ describe('constraint editing and preference revision', () => {
   it('lets the designer edit an existing constraint', async () => {
     const env = setup('designer', conflictSnapshot('designer'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="negotiation" client={env.client} projectId="p1" />);
     await userEvent.click(
       await screen.findByRole('button', { name: '编辑 天然石材超出预算' }),
     );
@@ -533,7 +535,7 @@ describe('constraint editing and preference revision', () => {
   it('sends declared incompatible values from the constraint form', async () => {
     const env = setup('designer', conflictSnapshot('designer'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="negotiation" client={env.client} projectId="p1" />);
     await userEvent.type(await screen.findByLabelText('约束内容'), '新约束');
     await userEvent.type(screen.getByLabelText('不兼容取值（逗号分隔）'), 'warm ambient, pale oak');
     await userEvent.click(screen.getByRole('button', { name: '保存约束' }));
@@ -545,7 +547,7 @@ describe('constraint editing and preference revision', () => {
   it('lets the homeowner revise an existing confirmed preference', async () => {
     const env = setup('homeowner', conflictSnapshot('homeowner'));
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await userEvent.selectOptions(
       await screen.findByLabelText('选择偏好'),
       'mock-lighting-lighting',
@@ -563,7 +565,7 @@ describe('structured homeowner interview', () => {
   it('sends a confirmed detail selection together with a note', async () => {
     const env = setup('homeowner', detailSnapshot());
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await userEvent.click(await screen.findByRole('button', { name: '喜欢' }));
     await userEvent.type(screen.getByLabelText('您的回答'), '备注文字');
     await userEvent.click(screen.getByRole('button', { name: '提交回答' }));
@@ -585,7 +587,7 @@ describe('structured homeowner interview', () => {
   it('marks a detail option as not applicable and skips without preferences', async () => {
     const env = setup('homeowner', detailSnapshot());
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     await userEvent.click(await screen.findByRole('button', { name: '不在意' }));
     await userEvent.click(screen.getByRole('button', { name: '提交回答' }));
     await waitFor(() => expect(env.writes).toHaveLength(1));
@@ -601,7 +603,43 @@ describe('structured homeowner interview', () => {
   it('labels the free-text field as a note the system does not parse', async () => {
     const env = setup('homeowner', detailSnapshot());
     await env.client.restore();
-    render(<Workspace client={env.client} projectId="p1" />);
+    render(<Workspace page="inspiration" client={env.client} projectId="p1" />);
     expect(await screen.findByText(/系统不会自动理解/)).toBeInTheDocument();
+  });
+});
+
+
+describe('page lifecycle', () => {
+  it('keeps an unsaved preference draft across page switches', async () => {
+    const env = setup();
+    await env.client.restore();
+    function Harness() {
+      const [page, setPage] = useState<WorkspacePage>('inspiration');
+      return (
+        <Workspace page={page} onNavigate={setPage} client={env.client} projectId="p1" />
+      );
+    }
+    render(<Harness />);
+    fireEvent.change(await screen.findByLabelText('偏好内容'), { target: { value: '暖白与橄榄绿' } });
+    await userEvent.click(screen.getByRole('button', { name: '方案审批' }));
+    expect(screen.queryByRole('textbox', { name: '偏好内容' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: '灵感与偏好' }));
+    expect(screen.getByLabelText('偏好内容')).toHaveValue('暖白与橄榄绿');
+  });
+
+  it('keeps the space panel mounted when switching pages', async () => {
+    const env = setup();
+    await env.client.restore();
+    function Harness() {
+      const [page, setPage] = useState<WorkspacePage>('space');
+      return (
+        <Workspace page={page} onNavigate={setPage} client={env.client} projectId="p1" />
+      );
+    }
+    render(<Harness />);
+    const panel = await screen.findByRole('region', { name: '空间草稿' });
+    await userEvent.click(screen.getByRole('button', { name: '设计协商' }));
+    await userEvent.click(screen.getByRole('button', { name: '空间方案' }));
+    expect(screen.getByRole('region', { name: '空间草稿' })).toBe(panel);
   });
 });

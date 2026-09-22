@@ -48,7 +48,7 @@ describe('application session and navigation', () => {
     await screen.findByRole('heading', { name: '设计说明书' });
     expect(await screen.findByText('warm modern')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: '返回工作区' }));
-    await screen.findByRole('heading', { name: '当前任务' });
+    await screen.findByRole('heading', { name: '方案审批' });
     expect(window.location.search).toBe('?project=p1&page=approval');
     await userEvent.click(screen.getByRole('button', { name: '查看设计说明书' }));
     await screen.findByRole('heading', { name: '设计说明书' });

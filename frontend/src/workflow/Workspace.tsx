@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, newIdempotencyKey, prepareWrite } from '../api';
 import { PreferenceBoard } from '../preferences/PreferenceBoard';
 import { SpaceBoard } from '../space/SpaceBoard';
+import { JointApproval } from '../space/JointApproval';
 import { WorkspaceShell } from '../layout/WorkspaceShell';
+import { PersistentPanel } from '../layout/PersistentPanel';
 import type { WorkspacePage } from '../navigation/workspaceRoute';
 import type { Asset, Attribute, Conflict, Constraint, ProjectSnapshot } from '../types';
 
@@ -582,6 +584,13 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
       onNavigate={(next) => onNavigate?.(next)}
       heading={project.roomType === 'living_room' ? '客厅' : project.roomType}
       roleLabel={ROLE_LABEL[project.role] ?? project.role}
+      actions={
+        onOpenBrief && latestBrief ? (
+          <button type="button" onClick={openBrief}>
+            查看设计说明书
+          </button>
+        ) : undefined
+      }
     >
     <div className="workspace">
       <header className="workspace-head">
@@ -603,7 +612,29 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
 
       <div className="workspace-body">
         <main className="task">
+          <PersistentPanel active={page === 'overview'} id="page-overview">
           <h2>当前任务</h2>
+          <section aria-label="项目概览摘要">
+            <p className="meta">
+              状态：{STATUS_LABEL[projectState.status] ?? projectState.status} · 版本 v{project.stateVersion}
+            </p>
+            <ul className="overview-counts">
+              <li>偏好 {projectState.attributes.length}</li>
+              <li>约束 {projectState.constraints.length}</li>
+              <li>冲突 {projectState.conflicts.filter((item) => item.status === 'open').length}</li>
+              <li>方案版本 {projectState.briefVersions.length}</li>
+            </ul>
+            <div className="actions">
+              <button type="button" onClick={() => onNavigate?.('inspiration')}>进入灵感与偏好</button>
+              <button type="button" onClick={() => onNavigate?.('negotiation')}>进入设计协商</button>
+              <button type="button" onClick={() => onNavigate?.('space')}>进入空间方案</button>
+              <button type="button" onClick={() => onNavigate?.('approval')}>进入方案审批</button>
+            </div>
+          </section>
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'inspiration'} id="page-inspiration">
+          <h2>灵感与偏好</h2>
 
           {Object.entries(questionDrafts).filter(([id, draft]) => id !== pending?.id && draftText(draft))
             .map(([id, draft]) => (
@@ -615,6 +646,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
               </section>
             ))}
 
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'overview'} id="page-overview-waiting">
           {pending && pending.targetRole !== project.role && (
             <p className="waiting">等待{ROLE_LABEL[pending.targetRole] ?? pending.targetRole}回答</p>
           )}
@@ -623,6 +657,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             <p className="waiting">等待设计师反馈</p>
           )}
 
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'inspiration'} id="page-inspiration-interview">
           {pending && pending.targetRole === 'homeowner' && isHomeowner && (
             <section aria-label={isBroadQuestion ? '广泛偏好问题' : '当前问题'}>
               <p className="question-text">{pending.text}</p>
@@ -723,6 +760,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             </section>
           )}
 
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'negotiation'} id="page-negotiation">
           {projectState.waitReason === 'designer' && !isHomeowner && (
             <section aria-label="设计师反馈">
               <p className="question-text">请提交当前支持的约束反馈。</p>
@@ -738,6 +778,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             </section>
           )}
 
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'inspiration'} id="page-inspiration-board">
           <PreferenceBoard
             client={client}
             projectId={projectId}
@@ -746,6 +789,10 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             stateVersion={project.stateVersion}
           />
 
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'space'} id="page-space">
+          <h2>空间方案</h2>
           <SpaceBoard
             client={client}
             projectId={projectId}
@@ -754,6 +801,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             onChanged={() => void load()}
           />
 
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'inspiration'} id="page-inspiration-assets">
           <section aria-label="参考图片">
             <h3>参考图片</h3>
             {isHomeowner && <>
@@ -863,10 +913,13 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
             </section>
           )}
 
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'approval'} id="page-approval">
+          <h2>方案审批</h2>
           {latestBrief && (
             <section aria-label="设计方案">
               <h3>设计方案</h3>
-              {onOpenBrief && <button type="button" onClick={openBrief}>查看设计说明书</button>}
               <p>
                 方案版本 v{latestBrief.version} · 完整度{' '}
                 {Math.round(latestBrief.completeness * 100)}%
@@ -909,10 +962,18 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
               )}
             </section>
           )}
+          <JointApproval
+            client={client}
+            projectId={projectId}
+            stateVersion={project.stateVersion}
+            onChanged={() => void load()}
+          />
+          </PersistentPanel>
         </main>
 
-        <aside className="sidebar">
+        <aside className="sidebar" hidden={page === 'overview' || page === 'space'}>
           <h2>共享状态</h2>
+          <PersistentPanel active={page === 'inspiration'} id="page-aside-preferences">
           <section>
             <h3>偏好</h3>
             <ul>
@@ -948,6 +1009,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
               ))}
             </ul>
           </section>
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'negotiation'} id="page-aside-negotiation">
           <section>
             <h3>约束</h3>
             <ul>
@@ -1098,6 +1162,9 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
               </div>
             )}
           </section>
+          </PersistentPanel>
+
+          <PersistentPanel active={page === 'approval'} id="page-aside-approval">
           <section>
             <h3>审批</h3>
             <ul>
@@ -1108,6 +1175,7 @@ export function Workspace({ client, projectId, onOpenBrief, briefLeaveGuard, pag
               ))}
             </ul>
           </section>
+          </PersistentPanel>
         </aside>
       </div>
     </div>

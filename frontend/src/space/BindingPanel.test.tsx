@@ -159,19 +159,6 @@ describe('BindingPanel', () => {
     await waitFor(() => expect(onApplied).toHaveBeenCalledWith(appliedSnapshot));
   });
 
-  it('sends both brief and space hashes for joint approval', async () => {
-    const { execute } = setup();
-    await userEvent.click(await screen.findByRole('button', { name: '联合批准当前方案' }));
-    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
-    const write = execute.mock.calls[0][0];
-    expect(write.path).toBe('/v1/projects/p1/space/approvals');
-    expect(JSON.parse(write.body).data).toEqual({
-      briefVersion: 1,
-      briefHash: 'b'.repeat(64),
-      spaceVersion: 1,
-      spaceHash: 'a'.repeat(64),
-    });
-  });
 });
 
 describe('BindingPanel review permissions and targets', () => {
