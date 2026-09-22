@@ -18,6 +18,7 @@ from typing import NamedTuple, Protocol
 
 from pydantic import ValidationError
 
+from alignspace.domain.enums import EvidenceSource
 from alignspace.domain.preferences import ProviderMode
 from alignspace.providers.preference import (
     PreferenceAnalysisRequest,
@@ -32,12 +33,17 @@ SYSTEM_PROMPT = (
     "can read a value and 'uncertain' with a null value when you cannot.\n"
     "3. Do not decide what the homeowner wants; confirmation happens elsewhere.\n"
     "Only cover parts and dimensions the description mentions. Never assume the "
-    "homeowner likes an entire image. Cite the source image id in evidence.\n"
+    "homeowner likes an entire image. Each reference image is immediately preceded "
+    "by its exact assetId. Use only those provided assetIds for sourceAssetId and "
+    "image evidence sourceId; never invent, shorten, translate, or copy an id from "
+    "this schema example. Image evidence sourceId must equal its entry's "
+    "sourceAssetId.\n"
     "Reply with json only, matching this example shape exactly:\n"
-    '{"entries":[{"sourceAssetId":"asset-1","targetElement":"bed",'
+    '{"entries":[{"sourceAssetId":"<provided-asset-id>","targetElement":"bed",'
     '"attentionDimensions":["colour"],"candidates":[{"dimension":"colour",'
     '"certainty":"inferred","proposedValue":"warm grey","evidence":'
-    '[{"sourceType":"image","sourceId":"asset-1","description":"..."}]}]}]}'
+    '[{"sourceType":"image","sourceId":"<provided-asset-id>",'
+    '"description":"..."}]}]}]}'
 )
 
 
@@ -166,15 +172,14 @@ class DeepSeekPreferenceAnalysisProvider:
         messages: list[dict],
         response: TransportResponse,
     ) -> PreferenceAnalysisResult:
-        del request
         try:
-            return self._validate(response)
+            return self._validate(request, response)
         except (ValidationError, ProviderOutputError) as first_error:
             repair = self._transport.post(
                 self.endpoint,
                 headers=self._headers(),
                 payload=self._payload(
-                    [*messages, self._repair_message(first_error)]
+                    [*messages, self._repair_message(request, first_error)]
                 ),
                 timeout=self._timeout,
             )
@@ -184,13 +189,15 @@ class DeepSeekPreferenceAnalysisProvider:
                     retryable=False,
                 )
             try:
-                return self._validate(repair)
+                return self._validate(request, repair)
             except (ValidationError, ProviderOutputError) as second_error:
                 raise ProviderOutputError(
                     "deepseek output invalid after two attempts"
                 ) from second_error
 
-    def _validate(self, response: TransportResponse) -> PreferenceAnalysisResult:
+    def _validate(
+        self, request: PreferenceAnalysisRequest, response: TransportResponse
+    ) -> PreferenceAnalysisResult:
         content = self._content(response)
         try:
             data = json.loads(content)
@@ -199,13 +206,30 @@ class DeepSeekPreferenceAnalysisProvider:
         if not isinstance(data, dict):
             raise ProviderOutputError("deepseek content was not a JSON object")
         entries = data.get("entries", [])
-        return PreferenceAnalysisResult.model_validate(
+        result = PreferenceAnalysisResult.model_validate(
             {
                 "entries": entries,
                 "model": self.model,
                 "provider_mode": ProviderMode.DEEPSEEK.value,
             }
         )
+        allowed_ids = {asset.id for asset in request.assets}
+        for entry in result.entries:
+            if entry.source_asset_id not in allowed_ids:
+                raise ProviderOutputError(
+                    f"deepseek returned unknown sourceAssetId {entry.source_asset_id!r}"
+                )
+            for candidate in entry.candidates:
+                for evidence in candidate.evidence:
+                    if (
+                        evidence.source_type is EvidenceSource.IMAGE
+                        and evidence.source_id != entry.source_asset_id
+                    ):
+                        raise ProviderOutputError(
+                            "deepseek image evidence sourceId did not match its "
+                            f"entry sourceAssetId {entry.source_asset_id!r}"
+                        )
+        return result
 
     @staticmethod
     def _content(response: TransportResponse) -> str:
@@ -233,6 +257,12 @@ class DeepSeekPreferenceAnalysisProvider:
             encoded = base64.b64encode(asset.data).decode("ascii")
             parts.append(
                 {
+                    "type": "text",
+                    "text": f"Reference image assetId: {asset.id}",
+                }
+            )
+            parts.append(
+                {
                     "type": "image_url",
                     "image_url": {"url": f"data:{asset.media_type};base64,{encoded}"},
                 }
@@ -242,7 +272,10 @@ class DeepSeekPreferenceAnalysisProvider:
             {"role": "user", "content": parts},
         ]
 
-    def _repair_message(self, error: Exception) -> dict:
+    def _repair_message(
+        self, request: PreferenceAnalysisRequest, error: Exception
+    ) -> dict:
+        allowed_ids = ", ".join(asset.id for asset in request.assets)
         return {
             "role": "user",
             "content": [
@@ -251,7 +284,9 @@ class DeepSeekPreferenceAnalysisProvider:
                     "text": (
                         "Your previous answer was invalid "
                         f"({type(error).__name__}). Return a JSON object with "
-                        'an "entries" array matching the agreed schema.'
+                        'an "entries" array matching the agreed schema. The only '
+                        f"allowed sourceAssetId values are: {allowed_ids}. Every image "
+                        "evidence sourceId must equal its entry sourceAssetId."
                     ),
                 }
             ],

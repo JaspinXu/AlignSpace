@@ -22,7 +22,13 @@
 
 - `model` 默认 `deepseek-flash`，端点 `{base_url}/chat/completions`，Header `Authorization: Bearer <key>`。
 - 图片以 `data:{media_type};base64,...` 内联；文本与图片同属一个 content 数组。
+- 每个图片块前都发送 `Reference image assetId: <真实 ID>`；system prompt 中的 JSON
+  示例只使用 `<provided-asset-id>` 占位符，并明确禁止模型虚构、缩写或复制示例 ID。
 - `SYSTEM_PROMPT` 显式包含 “json” 与目标 JSON 示例；payload 固定 `response_format={"type":"json_object"}`、`max_tokens=4096`、`temperature=0`。
+- Pydantic 结构校验后还会按本次请求做语义校验：所有 `sourceAssetId` 必须属于输入
+  图片集合，且 `sourceType=image` 的 `evidence.sourceId` 必须等于所属条目的
+  `sourceAssetId`。违约会进入一次修复；第二次仍违约则整体返回 `ProviderOutputError`，
+  不创建分析运行、候选条目或正式偏好。系统不会把未知 ID 静默映射到第一张图片。
 - 错误映射：400/401/402/403/422 → 终止（401/403 归为 `ProviderAuthError`，402 单列余额不足）；429/5xx → 可重试 `ProviderRequestError`；结构化输出非法 → 一次修复重试后 `ProviderOutputError`。
 - 空/非 JSON 内容按 `ProviderOutputError` 处理（对应官方“偶发空内容”提示）。
 - **密钥仅来自后端环境变量**，不写入日志、错误信息、测试快照或 Git；测试断言错误信息不含密钥。
@@ -35,4 +41,6 @@
 4. 计费与限流：本地写幂等**不代表**模型请求只计费一次；真实联调前需确认预算与限流设置。
 5. 文档页面为 SPA，抓取时以 `-L` 跟随 302；后续复核应以官方当前页面为准，若与本文件冲突，以官方为准。
 
-> **真实 DeepSeek 联调待用户配置密钥后验收。**
+> 2026-09-23 已完成一次真实 DeepSeek 调用，确认模型曾把旧提示词示例中的
+> `asset-1` 当作来源 ID 返回；本次请求绑定与输出校验即针对该实测缺陷。修复后的
+> 真实多图复测仍需单独执行并记录，自动化契约测试通过不等于真实识图质量已验收。
