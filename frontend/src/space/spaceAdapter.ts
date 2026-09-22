@@ -760,11 +760,17 @@ export function upstreamDiff(
       theirGeometry.width !== baseGeometry.width ||
       theirGeometry.depth !== baseGeometry.depth ||
       theirGeometry.height !== baseGeometry.height;
+    // Start from the server's current geometry and override only the field
+    // groups the editor actually changed. A size-only collaborator change must
+    // survive an editor move, and vice versa.
+    const geometry: Record<string, unknown> = { ...theirObject.geometry };
     let apply = false;
     if (movedByUser) {
       if (movedByThem && (theirGeometry.x !== mine.geometry.x || theirGeometry.y !== mine.geometry.y)) {
         conflicts.push(`家具「${baseObject.label || objectId}」位置被双方修改，保留协作者版本。`);
       } else {
+        geometry.x = mine.geometry.x;
+        geometry.y = mine.geometry.y;
         apply = true;
       }
     }
@@ -777,11 +783,14 @@ export function upstreamDiff(
       ) {
         conflicts.push(`家具「${baseObject.label || objectId}」尺寸被双方修改，保留协作者版本。`);
       } else {
+        geometry.width = mine.geometry.width;
+        geometry.depth = mine.geometry.depth;
+        geometry.height = mine.geometry.height;
         apply = true;
       }
     }
     if (apply) {
-      ops.push({ op: 'update_object', objectId, geometry: { ...mine.geometry } });
+      ops.push({ op: 'update_object', objectId, geometry });
     }
   }
 

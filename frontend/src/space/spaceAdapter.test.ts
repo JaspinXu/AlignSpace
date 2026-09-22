@@ -12,6 +12,7 @@ import {
   toOpenPlan3DHandoff,
   upstreamDiff,
   upstreamPatches,
+  type SpaceSyncOp,
 } from './spaceAdapter';
 
 const ORIGIN = 'http://127.0.0.1:4173';
@@ -473,5 +474,86 @@ describe('spaceAdapter three-way merge', () => {
     };
     const diff = upstreamDiff(upstream, theirs, 'homeowner', { basePlan: base });
     expect(diff.ops.some((op) => op.op === 'update_room')).toBe(false);
+  });
+});
+
+
+describe('spaceAdapter independent field merge', () => {
+  it('merges a user move with a collaborator size change on the same object', () => {
+    const base = planWithTwoObjects();
+    const theirs: SpacePlan = {
+      ...base,
+      objects: base.objects.map((item) =>
+        item.id === 'obj-a' ? { ...item, geometry: { ...item.geometry, width: 1200 } } : item,
+      ),
+    };
+    // The editor only moved obj-a; its width is still the base width.
+    const upstream = upstreamWithFurniture({ 'obj-a': { x: 150, y: 100 }, 'obj-b': { x: 100, y: 100 } });
+    const diff = upstreamDiff(upstream, theirs, 'homeowner', { basePlan: base });
+    const update = diff.ops.find((op) => op.op === 'update_object' && op.objectId === 'obj-a') as
+      | Extract<SpaceSyncOp, { op: 'update_object' }>
+      | undefined;
+    expect(update?.geometry).toMatchObject({ x: 1500, y: 1000, width: 1200 });
+    expect(diff.conflicts).toEqual([]);
+  });
+
+  it('merges a user size change with a collaborator move on the same object', () => {
+    const base = planWithTwoObjects();
+    const theirs: SpacePlan = {
+      ...base,
+      objects: base.objects.map((item) =>
+        item.id === 'obj-a' ? { ...item, geometry: { ...item.geometry, x: 3000 } } : item,
+      ),
+    };
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls: rectWalls,
+          rooms: [roomWithId],
+          furniture: [
+            { id: 'obj-a', position: { x: 100, y: 100 }, width: 100, depth: 60, height: 80 },
+            { id: 'obj-b', position: { x: 100, y: 100 }, width: 80, depth: 60, height: 80 },
+          ],
+        },
+      ],
+    };
+    const diff = upstreamDiff(upstream, theirs, 'homeowner', { basePlan: base });
+    const update = diff.ops.find((op) => op.op === 'update_object' && op.objectId === 'obj-a') as
+      | Extract<SpaceSyncOp, { op: 'update_object' }>
+      | undefined;
+    expect(update?.geometry).toMatchObject({ x: 3000, width: 1000 });
+    expect(diff.conflicts).toEqual([]);
+  });
+
+  it('still applies a size change when only the position conflicts', () => {
+    const base = planWithTwoObjects();
+    const theirs: SpacePlan = {
+      ...base,
+      objects: base.objects.map((item) =>
+        item.id === 'obj-a' ? { ...item, geometry: { ...item.geometry, x: 3000 } } : item,
+      ),
+    };
+    const upstream = {
+      activeFloorId: 'f',
+      floors: [
+        {
+          id: 'f',
+          walls: rectWalls,
+          rooms: [roomWithId],
+          furniture: [
+            { id: 'obj-a', position: { x: 200, y: 100 }, width: 100, depth: 60, height: 80 },
+            { id: 'obj-b', position: { x: 100, y: 100 }, width: 80, depth: 60, height: 80 },
+          ],
+        },
+      ],
+    };
+    const diff = upstreamDiff(upstream, theirs, 'homeowner', { basePlan: base });
+    const update = diff.ops.find((op) => op.op === 'update_object' && op.objectId === 'obj-a') as
+      | Extract<SpaceSyncOp, { op: 'update_object' }>
+      | undefined;
+    expect(update?.geometry).toMatchObject({ x: 3000, width: 1000 });
+    expect(diff.conflicts.join(' ')).toMatch(/位置被双方修改/);
   });
 });
