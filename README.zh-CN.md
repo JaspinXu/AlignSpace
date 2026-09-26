@@ -18,6 +18,7 @@
 
 <p>
 <a href="https://54.255.93.19.sslip.io"><b>在线演示</b></a> ·
+<a href="https://youtu.be/sNSFf_3h71E"><b>演示视频（10 分钟）</b></a> ·
 <a href="#快速启动"><b>快速启动</b></a> ·
 <a href="#它是怎么工作的"><b>工作原理</b></a> ·
 <a href="#智能体循环"><b>智能体循环</b></a> ·
@@ -38,6 +39,11 @@
 <img src="docs/assets/readme/demo.gif" alt="黄金路径演示：业主作答、设计师通过私密链接加入、约束触发冲突、双方批准同一份简报" width="92%">
 </p>
 <p align="center"><sub>两个浏览器会话、合成数据、离线笔记规则，约 3 倍速。</sub></p>
+
+<p align="center">
+<a href="https://youtu.be/sNSFf_3h71E"><img src="https://i.ytimg.com/vi/sNSFf_3h71E/maxresdefault.jpg" alt="在 YouTube 观看 10 分钟 AlignSpace 演示视频" width="64%"></a><br>
+<sub><b>▶ 在 YouTube 观看 10 分钟演示视频</b></sub>
+</p>
 
 ## 功能亮点
 

@@ -16,25 +16,28 @@
     <div class="kind">Business Proposal</div>
     <p class="lede">Turn “I like this” into a living-room brief that the homeowner and the interior designer both sign — before the first concept, not after the third revision.</p>
   </div>
-  <div class="hero"><img src="../assets/readme/hero.webp" alt="AlignSpace product overview"></div>
+  <div class="hero"><img src="../assets/readme/hero.webp" alt="AlignSpace product overview" style="height:74mm;object-fit:cover"></div>
   <div class="toc"><div class="eyebrow">Inside</div>
     <ol>
       <li>Executive summary</li><li>The problem, as an SME feels it</li><li>Customers and users</li><li>The solution</li>
       <li>Market and competition</li><li>Business model and unit economics</li><li>Go-to-market</li>
       <li>Pilot plan and measurable outcomes</li><li>Feasibility and scalability</li><li>Risks and mitigations</li>
-      <li>Social impact</li><li>Roadmap</li><li>Team and honest status</li>
+      <li>Social impact</li><li>Roadmap</li><li>Team and evidence</li>
     </ol>
   </div>
   <div class="facts">
+    <div class="facts-grid">
     <table class="kv">
       <tr><td>Team</td><td>Four Wolf Kings · team code <b>8QFDUS2I</b></td></tr>
       <tr><td>Members</td><td>Chen Xiaoming · Xing Yiyuan · Xu Tengyang · Xu Zhaobin</td></tr>
-      <tr><td>Problem statement</td><td>Design Inspiration — homeowners find it hard to put design preferences into words and spend time collecting inspiration; designers compile references by hand; misaligned expectations lead to repeated design revisions before both sides agree.</td></tr>
+      <tr><td>Problem statement</td><td>Design Inspiration — preferences are hard to put into words, designers compile references by hand, and misaligned expectations cause repeated revisions before both sides agree.</td></tr>
       <tr><td>Product</td><td>Live at <a href="https://54.255.93.19.sslip.io">https://54.255.93.19.sslip.io</a> (AWS Lightsail, Singapore region) · code at <a href="https://github.com/JaspinXu/AlignSpace">github.com/JaspinXu/AlignSpace</a></td></tr>
-      <tr><td>Companion document</td><td>Technical Document — architecture, agents, guardrails, evaluation and AWS deployment evidence</td></tr>
+      <tr><td>Demo video</td><td><a href="https://youtu.be/sNSFf_3h71E">youtu.be/sNSFf_3h71E</a> — 10-minute product demo on YouTube</td></tr>
       <tr><td>Date</td><td>26 September 2026</td></tr>
     </table>
-    <p class="note">Evidence labels used throughout: <span class="tag measured">Measured</span> observed in our build or live deployment · <span class="tag src">Source</span> published figure, cited in the references · <span class="tag assume">Assumption</span> a planning input we chose · <span class="tag hyp">Hypothesis</span> to be tested in the pilot. We do not claim any time-saving, satisfaction or revenue result yet.</p>
+    <a class="qr-card" href="https://youtu.be/sNSFf_3h71E"><img src="qr-video.svg" alt="QR code linking to the demo video"><span>Scan to watch the 10-minute demo</span></a>
+    </div>
+    <p class="note">Companion: <b>Technical Document</b> (architecture, agents, guardrails, evaluation, AWS deployment evidence). Evidence labels used throughout: <span class="tag measured">Measured</span> observed in our build or live deployment · <span class="tag src">Source</span> published figure, cited in the references · <span class="tag assume">Assumption</span> a planning input we chose · <span class="tag hyp">Hypothesis</span> to be tested in the pilot. We do not claim any time-saving, satisfaction or revenue result yet.</p>
   </div>
 </section>
 
@@ -53,7 +56,7 @@
   <div class="card">
     <h3>Proven now <span class="tag measured">Measured</span></h3>
     <ul>
-      <li>Running on the organiser’s AWS Lightsail instance (Singapore) over HTTPS since 21 September.</li>
+      <li>Live on the organiser’s AWS Lightsail instance in Singapore, over HTTPS, since 21 September.</li>
       <li>19 of 19 two-session browser checks passed against the live site on 26 September — golden path plus adversarial cases such as prompt injection, invitation replay and role spoofing.</li>
       <li>77 of 77 automated tests pass; continuous integration on every push.</li>
       <li>A real Claude Sonnet 4.5 analysis on the public site turned a homeowner note into five evidence-linked proposals, although the note contained none of the option words.</li>
@@ -71,6 +74,7 @@
   </div>
 </div>
 <div class="callout"><b>Our ask.</b> One or two Singapore ID firms with 3–20 designers to run a free, six-week pilot on 10–20 consenting living-room projects, measured against their current chat-and-screenshots process.</div>
+<p class="small">See it working: <a href="https://54.255.93.19.sslip.io">live product</a> · <a href="https://youtu.be/sNSFf_3h71E">10-minute demo video</a> · <a href="https://github.com/JaspinXu/AlignSpace">source code and evidence</a>.</p>
 
 <h2><span class="n">02</span> The problem, as an SME feels it</h2>
 <div class="callout plain"><span class="eyebrow">Problem statement · Design Inspiration</span><p style="margin-top:3pt">Homeowners find it hard to communicate design preferences in words and spend time collecting inspiration; designers compile references manually. Misaligned expectations lead to repeated design revisions before both sides agree.</p></div>
@@ -120,7 +124,7 @@
 <p class="small muted"><b>What AlignSpace is not:</b> an AI render generator, a quotation or contract tool, or construction, structural, electrical or regulatory advice. It sits upstream of those tools and exports a brief they can use.</p>
 
 <h2><span class="n">05</span> Market and competition</h2>
-<p><b>Demand.</b> About 45,600 HDB households a year start from a newly completed or resale flat (2025: about 19,600 completions <sup class="ref">[2]</sup> plus 26,042 resale applications <sup class="ref">[3]</sup>), before condominiums and landed homes. <b>Supply.</b> CaseTrust-accredited renovation businesses number 268 today and are targeted to reach 500 by 2027 <sup class="ref">[1]</sup>, alongside many non-accredited firms. We size the opportunity by <i>firms</i>, because firms pay.</p>
+<p><b>Demand.</b> About 45,600 HDB households a year start from a newly completed or resale flat (2025: about 19,600 completions <sup class="ref">[2]</sup> plus 26,042 resale applications <sup class="ref">[3]</sup>), before condominiums and landed homes. <b>Supply.</b> CaseTrust-accredited renovation businesses numbered 268 in January 2026, with a target of 500 by 2027 <sup class="ref">[1]</sup>, alongside many non-accredited firms. We size the opportunity by <i>firms</i>, because firms pay.</p>
 <table>
   <tr><th>Illustrative scenario <span class="tag assume">Assumption</span></th><th class="num">Paying firms</th><th class="num">Designer seats (5 per firm)</th><th class="num">Price per seat / month</th><th class="num">Annual recurring revenue</th></tr>
   <tr><td>Year 1 — design partners convert</td><td class="num">10</td><td class="num">50</td><td class="num">S$49</td><td class="num">S$29,400</td></tr>
@@ -148,7 +152,7 @@
       <tr><td>Studio</td><td>S$49 per designer seat per month</td><td>Firms; unlimited homeowners, fair-use analysis cap per project</td></tr>
       <tr><td>Per brief</td><td>S$15 per dual-approved brief</td><td>Freelancers and low volume</td></tr>
     </table>
-    <p class="small"><b>Break-even for a firm.</b> At S$49 per seat, the tool pays for itself if it saves a designer about one hour a month <span class="tag assume">Assumption</span> S$50 loaded hourly cost — about ten minutes per project at six projects a month. The pilot measures review time and revision counts against the firm’s own baseline.</p>
+    <p class="small"><b>Break-even for a firm.</b> At S$49 per seat, the tool pays for itself if it saves a designer about one hour a month, at an assumed loaded cost of S$50 an hour — roughly ten minutes per project at six projects a month <span class="tag assume">Assumption</span>. The pilot measures review time and revision counts against the firm’s own baseline.</p>
   </div>
   <div>
     <h3>Cost to serve</h3>
@@ -165,7 +169,7 @@
 
 <h2><span class="n">07</span> Go-to-market</h2>
 <div class="grid3">
-  <div class="card"><div class="eyebrow">Phase 0 · Oct–Dec 2026</div><h3>Design partners</h3><p>One or two ID SMEs through our network and hackathon-ecosystem introductions. Free six-week pilot, 45-minute onboarding, weekly metric and safety review. No CRM integration required.</p></div>
+  <div class="card"><div class="eyebrow">Phase 0 · Oct–Dec 2026</div><h3>Design partners</h3><p>One or two ID SMEs recruited through our own network and the hackathon’s SME community. A free six-week pilot, 45-minute onboarding and a weekly metric and safety review; no CRM integration required.</p></div>
   <div class="card"><div class="eyebrow">Phase 1 · H1 2027</div><h3>Early adopters</h3><p>Quality-focused and CaseTrust-accredited studios, reached through pilot case studies, designer referrals and bilingual “how to brief your designer” guides for homeowners.</p></div>
   <div class="card"><div class="eyebrow">Phase 2 · H2 2027 onward</div><h3>Scale</h3><p>JSON export into quotation and CRM tools, partnerships with inspiration platforms, more rooms, and a firm dashboard that tracks alignment across projects.</p></div>
 </div>
@@ -234,27 +238,26 @@
   <tr><td><b>Later</b> · 2027</td><td>Whole-home briefs with professional review for wet areas; firm dashboard; integrations with quotation and CRM tools; Malay and Tamil copy.</td></tr>
 </table>
 
-<h2><span class="n">13</span> Team and honest status</h2>
+<h2><span class="n">13</span> Team and evidence</h2>
 <p><b>Four Wolf Kings (8QFDUS2I)</b> — Chen Xiaoming, Xing Yiyuan, Xu Tengyang and Xu Zhaobin — built AlignSpace for the NUS-ISS Show Me Your Agents hackathon (public category).</p>
 <table>
   <tr><th style="width:36%">What we claim</th><th>Evidence</th></tr>
-  <tr><td>A working two-sided product on AWS</td><td><span class="tag measured">Measured</span> Live URL; deployment snapshot and 19/19 live checks on 26 September (Technical Document §9)</td></tr>
+  <tr><td>A working two-sided product on AWS</td><td><span class="tag measured">Measured</span> Live URL; <a href="https://youtu.be/sNSFf_3h71E">10-minute demo video</a>; deployment snapshot and 19/19 live checks on 26 September (Technical Document §08)</td></tr>
   <tr><td>Guardrails that hold under adversarial checks</td><td><span class="tag measured">Measured</span> 19 two-session checks and 77 automated tests</td></tr>
   <tr><td>Real model integration with bounded cost</td><td><span class="tag measured">Measured</span> Live call record with model, prompt version, tokens and latency (21 September)</td></tr>
   <tr><td>Business outcomes</td><td><span class="tag hyp">Hypothesis</span> Not yet measured. No user study, time saving or revenue is claimed; the pilot above is designed to measure them.</td></tr>
 </table>
 
-<h2><span class="n">—</span> References</h2>
+<h2><span class="n">—</span> References <span class="muted" style="font:400 8.5pt Carlito,Calibri,Arial,sans-serif;margin-left:6pt">web sources accessed 26 September 2026 and reported as published</span></h2>
 <ol class="refs">
-  <li>Consumers Association of Singapore (CASE), media release, 9 February 2026: renovation contractors 787 complaints in 2025 (962 in 2024), fourth-highest industry; 268 CaseTrust-accredited renovation businesses as of January 2026, target 500 by 2027. <a href="https://www.case.org.sg/wp-content/uploads/2026/02/Media-Release%E2%80%94%E2%80%9476.2-per-cent-surge-in-beauty-complaints-in-2025-with-consumers-losing-over-2.1m.pdf">case.org.sg</a></li>
-  <li>Mothership, 8 January 2026, reporting HDB: about 19,600 flats completed in 2025; about 55,000 flats from 2025 to 2027. <a href="https://mothership.sg/2026/01/hdb-bto-2026/">mothership.sg/2026/01/hdb-bto-2026</a></li>
-  <li>ERA Singapore, 2 January 2026, HDB flash estimates: 26,042 resale applications in 2025 (28,986 in 2024). <a href="https://www.era.com.sg/press-release/4q-2025-hdb-flash-estimates-hdb-resale-transactions-moderate-to-end-2025">era.com.sg</a></li>
-  <li>Qanvast, 12 February 2026, expected 2026 renovation costs from 2025 medians across 341 BTO and 449 resale projects: 4-room BTO S$50,000–60,000; 4-room resale S$70,000–81,600. <a href="https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568">qanvast.com</a></li>
-  <li>AlignSpace live model-call record, 21 September 2026: 1,873 input and 426 output tokens, one attempt, 7.5 s. <a href="https://github.com/JaspinXu/AlignSpace/blob/main/docs/evidence/gateway-live-check.json">docs/evidence/gateway-live-check.json</a></li>
-  <li>Anthropic, Claude pricing: Claude Sonnet 4.5 US$3 per million input and US$15 per million output tokens; regional endpoints 10% above global. <a href="https://platform.claude.com/docs/en/about-claude/pricing">platform.claude.com</a></li>
-  <li>Amazon Lightsail pricing: Linux instance with 4 GB memory, 2 vCPUs, 80 GB SSD and 4 TB transfer, US$24 per month. <a href="https://aws.amazon.com/lightsail/pricing/">aws.amazon.com/lightsail/pricing</a></li>
+  <li>CASE media release, 9 February 2026 — renovation contractors: 787 complaints in 2025 (962 in 2024), fourth-highest industry; 268 CaseTrust-accredited renovation businesses in January 2026, target 500 by 2027. <a href="https://www.case.org.sg/wp-content/uploads/2026/02/Media-Release%E2%80%94%E2%80%9476.2-per-cent-surge-in-beauty-complaints-in-2025-with-consumers-losing-over-2.1m.pdf">case.org.sg</a></li>
+  <li>Mothership, 8 January 2026, citing HDB — about 19,600 flats completed in 2025; about 55,000 flats in 2025–2027. <a href="https://mothership.sg/2026/01/hdb-bto-2026/">mothership.sg</a></li>
+  <li>ERA Singapore, 2 January 2026, HDB flash estimates — 26,042 resale applications in 2025 (28,986 in 2024). <a href="https://www.era.com.sg/press-release/4q-2025-hdb-flash-estimates-hdb-resale-transactions-moderate-to-end-2025">era.com.sg</a></li>
+  <li>Qanvast, 12 February 2026 — expected 2026 costs from 2025 medians (341 BTO, 449 resale projects): 4-room BTO S$50,000–60,000; 4-room resale S$70,000–81,600. <a href="https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568">qanvast.com</a></li>
+  <li>AlignSpace live model-call record, 21 September 2026 — 1,873 input and 426 output tokens, one attempt, 7.5 s. <a href="https://github.com/JaspinXu/AlignSpace/blob/v1.1/docs/evidence/gateway-live-check.json">gateway-live-check.json</a></li>
+  <li>Anthropic pricing — Claude Sonnet 4.5: US$3 per million input and US$15 per million output tokens; regional endpoints 10% above global. <a href="https://platform.claude.com/docs/en/about-claude/pricing">platform.claude.com</a></li>
+  <li>Amazon Lightsail pricing — Linux, 4 GB memory, 2 vCPUs, 80 GB SSD, 4 TB transfer: US$24 per month. <a href="https://aws.amazon.com/lightsail/pricing/">aws.amazon.com</a></li>
 </ol>
-<p class="small muted">All web sources accessed 26 September 2026. Figures from sources are reported as published; scenario and cost-per-seat figures are our arithmetic on the assumptions stated beside them.</p>
 
 </body>
 </html>

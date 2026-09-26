@@ -20,6 +20,7 @@ References, notes and practical constraints become one versioned living-room bri
 
 <p>
 <a href="https://54.255.93.19.sslip.io"><b>Live demo</b></a> ·
+<a href="https://youtu.be/sNSFf_3h71E"><b>Demo video (10 min)</b></a> ·
 <a href="#quick-start"><b>Quick start</b></a> ·
 <a href="#how-it-works"><b>How it works</b></a> ·
 <a href="#the-agent-loop"><b>Agent loop</b></a> ·
@@ -41,6 +42,11 @@ A reference image does not say whether someone likes its oak, its lighting, its 
 <img src="docs/assets/readme/demo.gif" alt="Golden-path demo: homeowner answers, designer joins by private link, a constraint opens a conflict, both approve the same brief" width="92%">
 </p>
 <p align="center"><sub>Two browser sessions, synthetic data, offline note rules, sped up about 3×. Full captioned recording: <code>python scripts/e2e_golden_path.py &lt;url&gt; video</code>.</sub></p>
+
+<p align="center">
+<a href="https://youtu.be/sNSFf_3h71E"><img src="https://i.ytimg.com/vi/sNSFf_3h71E/maxresdefault.jpg" alt="Watch the 10-minute AlignSpace demo on YouTube" width="64%"></a><br>
+<sub><b>▶ Watch the 10-minute demo on YouTube</b></sub>
+</p>
 
 ## Highlights
 
@@ -259,7 +265,7 @@ Documents under `docs/` include design proposals that are **not** what runs toda
 <details>
 <summary><b>Hackathon delivery</b></summary>
 
-- Final submission: **28 September 2026, 09:00 SGT**, by email with the subject `SMYA Final Submission - 8QFDUS2I`: team code, problem statement, GitHub URL, [business proposal](docs/submission/AlignSpace-Business-Proposal.pdf) and [technical document](docs/submission/AlignSpace-Technical-Document.pdf) as PDFs, demo video URL, and deployment evidence (live URL plus the [26 September snapshot](docs/evidence/deployment-snapshot-2026-09-26.txt)).
+- Final submission: **28 September 2026, 09:00 SGT**, by email with the subject `SMYA Final Submission - 8QFDUS2I`: team code, problem statement, GitHub URL, [business proposal](docs/submission/AlignSpace-Business-Proposal.pdf) and [technical document](docs/submission/AlignSpace-Technical-Document.pdf) as PDFs, the [demo video](https://youtu.be/sNSFf_3h71E), and deployment evidence (live URL plus the [26 September snapshot](docs/evidence/deployment-snapshot-2026-09-26.txt)).
 - Finale: **10 October 2026, 08:30 SGT**, face-to-face demo; finalist updates in `#final-submission`.
 - Assessed build on one organiser Lightsail medium instance, using the organiser's inference allocation.
 - Ready-to-send email, link check and video script: [submission kit](docs/23-submission-kit.md).

@@ -25,14 +25,18 @@
     </ol>
   </div>
   <div class="facts">
+    <div class="facts-grid">
     <table class="kv">
       <tr><td>Team</td><td>Four Wolf Kings · <b>8QFDUS2I</b> · Chen Xiaoming, Xing Yiyuan, Xu Tengyang, Xu Zhaobin</td></tr>
       <tr><td>Live deployment</td><td><a href="https://54.255.93.19.sslip.io">https://54.255.93.19.sslip.io</a> — organiser AWS Lightsail medium instance, ap-southeast-1</td></tr>
       <tr><td>Source code</td><td><a href="https://github.com/JaspinXu/AlignSpace">github.com/JaspinXu/AlignSpace</a> (MIT) · branch <code>main</code> · release <code>v1.1</code></td></tr>
+      <tr><td>Demo video</td><td><a href="https://youtu.be/sNSFf_3h71E">youtu.be/sNSFf_3h71E</a> — 10-minute product demo on YouTube</td></tr>
       <tr><td>Stack</td><td>Python 3.11, FastAPI, Pydantic, SQLite (WAL), vanilla JavaScript (English/中文), Caddy, systemd, Ubuntu 24.04</td></tr>
       <tr><td>Model</td><td>Claude Sonnet 4.5 through the organiser’s JSON API (Amazon Bedrock); no fine-tuning</td></tr>
       <tr><td>Verify in five minutes</td><td>Open the live URL → <i>Try a guided sample</i>; or run <code>python -m pytest -q</code> (77 tests) and <code>scripts/e2e_golden_path.py &lt;url&gt;</code> (19 checks)</td></tr>
     </table>
+    <a class="qr-card" href="https://youtu.be/sNSFf_3h71E"><img src="qr-video.svg" alt="QR code linking to the demo video"><span>Scan to watch the 10-minute demo</span></a>
+    </div>
     <p class="note">Evidence labels: <span class="tag measured">Measured</span> observed in this repository or on the live deployment · <span class="tag hyp">Target</span> not yet measured. Companion: <b>Business Proposal</b> (problem, customers, value, pilot, economics). Date: 26 September 2026.</p>
   </div>
 </section>
@@ -65,7 +69,7 @@
 <ol>
   <li><b>Observe.</b> An answer, note, saved home or constraint arrives as a typed action; the orchestrator applies it to the state under an optimistic version check.</li>
   <li><b>Estimate.</b> For each decision, the belief combines the evidence so far (below). Must-avoid items and active constraints remove options before anything is scored.</li>
-  <li><b>Decide.</b> The Interview Agent picks the question with the highest expected uncertainty removed × impact for that role; the Next-Step Agent ranks safe actions.</li>
+  <li><b>Decide.</b> The Interview Agent picks the question with the highest expected uncertainty reduction × impact for that role; the Next-Step Agent ranks the safe actions available to each role.</li>
   <li><b>Check.</b> The Alignment Agent recomputes coverage, conflicts, blockers and stage. The brief is approvable only with full coverage, no open conflict, no unreviewed critical constraint and no blocker.</li>
   <li><b>Stop.</b> Both roles approve the same content hash. Otherwise the loop returns to the person who owns the missing decision.</li>
 </ol>

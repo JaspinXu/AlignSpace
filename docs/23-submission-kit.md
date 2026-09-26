@@ -2,17 +2,17 @@
 
 Deadline as briefed: **28 September 2026, 09:00 SGT**. The organisers' final instructions (email to all four members, following the Slack announcement) ask for one email in a fixed format. Send it by 27 September evening; if the Slack announcement also asks for a post in `#submission`, post the same text there.
 
-## 1. Status
+## 1. Status — everything is ready
 
-| Item the email must include | Ready? | Where |
+| Item the email must include | Status | Where |
 |---|---|---|
-| Team Code | Yes | 8QFDUS2I |
-| Problem Statement | Yes | Design Inspiration (public category) — wording in section 2 |
-| GitHub Repository URL | Yes | <https://github.com/JaspinXu/AlignSpace> (public), release `v1.1` |
-| Business Proposal (PDF) | Yes | `docs/submission/AlignSpace-Business-Proposal.pdf`, 10 pages |
-| Technical Document (PDF) | Yes | `docs/submission/AlignSpace-Technical-Document.pdf`, 10 pages |
-| Demo Video (YouTube/cloud URL) | Recorded by the team | Paste the link; YouTube must be *Unlisted*, not *Private* |
-| Deployment Evidence (URL/artifact) | Yes | Live URL + 26 September snapshot + live 19/19 run |
+| Team Code | Ready | 8QFDUS2I |
+| Problem Statement | Ready | Design Inspiration (public category), wording in section 2 |
+| GitHub Repository URL | Ready | <https://github.com/JaspinXu/AlignSpace> (public), release `v1.1` |
+| Business Proposal (PDF) | Ready | `docs/submission/AlignSpace-Business-Proposal.pdf`, 9 pages |
+| Technical Document (PDF) | Ready | `docs/submission/AlignSpace-Technical-Document.pdf`, 10 pages |
+| Demo Video | Ready | <https://youtu.be/sNSFf_3h71E> — public, 10:00, “AlignSpace \| Bridging Homeowners and Interior Designers” |
+| Deployment Evidence | Ready | Live URL, 26 September snapshot, live 19/19 two-session run |
 
 ## 2. The email (copy exactly)
 
@@ -23,34 +23,35 @@ Deadline as briefed: **28 September 2026, 09:00 SGT**. The organisers' final ins
 ```
 Dear NUS-ISS Show Me Your Agents Hackathon Team,
 
-Please find below the final submission of Team Four Wolf Kings.
+Please find below the final submission of Team Four Wolf Kings (8QFDUS2I).
 
 Team Code: 8QFDUS2I
 Team: Four Wolf Kings (Chen Xiaoming, Xing Yiyuan, Xu Tengyang, Xu Zhaobin)
 Project: AlignSpace - Design Inspiration Agents
 
-Problem Statement: Design Inspiration (Public category).
+Problem Statement: Design Inspiration (Public category)
 Homeowners find it hard to communicate design preferences in words and spend
-time collecting inspiration; designers compile references manually; misaligned
-expectations lead to repeated design revisions before both sides agree.
-AlignSpace is a two-sided agent workspace that turns a homeowner's references
-and notes and a designer's practical constraints into one versioned
-living-room brief that both people explicitly approve.
+time collecting inspiration, while designers compile references manually;
+misaligned expectations lead to repeated design revisions before both sides
+agree. AlignSpace is a two-sided agent workspace that turns a homeowner's
+references and notes, and a designer's practical constraints, into one
+versioned living-room brief that both people explicitly approve.
 
 GitHub Repository URL: https://github.com/JaspinXu/AlignSpace
-(release v1.1: https://github.com/JaspinXu/AlignSpace/releases/tag/v1.1)
+Final release (v1.1): https://github.com/JaspinXu/AlignSpace/releases/tag/v1.1
 
-Business Proposal (PDF): attached - AlignSpace-Business-Proposal.pdf
-https://github.com/JaspinXu/AlignSpace/releases/download/v1.1/AlignSpace-Business-Proposal.pdf
+Business Proposal (PDF): attached (AlignSpace-Business-Proposal.pdf)
+Also at: https://github.com/JaspinXu/AlignSpace/releases/download/v1.1/AlignSpace-Business-Proposal.pdf
 
-Technical Document (PDF): attached - AlignSpace-Technical-Document.pdf
-https://github.com/JaspinXu/AlignSpace/releases/download/v1.1/AlignSpace-Technical-Document.pdf
+Technical Document (PDF): attached (AlignSpace-Technical-Document.pdf)
+Also at: https://github.com/JaspinXu/AlignSpace/releases/download/v1.1/AlignSpace-Technical-Document.pdf
 
-Demo Video: <VIDEO_URL>
+Demo Video (YouTube, 10 minutes): https://youtu.be/sNSFf_3h71E
 
 Deployment Evidence:
-- Live URL: https://54.255.93.19.sslip.io (organiser-provided AWS Lightsail
-  instance, ap-southeast-1; health check: https://54.255.93.19.sslip.io/health)
+- Live application: https://54.255.93.19.sslip.io
+  (organiser-provided AWS Lightsail instance, ap-southeast-1)
+- Health check: https://54.255.93.19.sslip.io/health
 - Deployment snapshot, 26 Sep 2026:
   https://github.com/JaspinXu/AlignSpace/blob/v1.1/docs/evidence/deployment-snapshot-2026-09-26.txt
 - Live two-session browser checks, 19/19 passed, 26 Sep 2026:
@@ -58,16 +59,19 @@ Deployment Evidence:
 - Verification report:
   https://github.com/JaspinXu/AlignSpace/blob/v1.1/docs/16-verification-report.md
 
+Thank you for organising the hackathon.
+
 Best regards,
-Xu Zhaobin, on behalf of Four Wolf Kings (8QFDUS2I)
+Xu Zhaobin
+on behalf of Four Wolf Kings (8QFDUS2I)
 ```
 
 ## 3. Before pressing send
 
-- [ ] Replace `<VIDEO_URL>` and play it in a private (signed-out) window.
+- [x] Video link plays signed out (public, 10:00).
 - [ ] Both PDFs attached; each opens.
 - [ ] Every link above opens in a private window (repository, release, live URL, `/health`, evidence files).
-- [ ] Recipient: reply to the organisers' "SMYA Final Submission" email, or use the address it names; copy the three teammates.
+- [ ] Recipient: reply to the organisers' “SMYA Final Submission” email, or use the address it names; copy the three teammates.
 - [ ] Keep the sent email (or a screenshot) as the receipt.
 
 ## 4. Release assets
@@ -83,8 +87,10 @@ gh release upload v1.1 docs/submission/AlignSpace-Business-Proposal.pdf docs/sub
 
 Deliverables:
 
-- `alignspace-golden-path-demo.mp4` (2 min 12 s): automatically recorded from two browser sessions with captions, synthetic data and offline note rules. Use it as B-roll or as the backup if a live demo fails. Regenerate with `python scripts/e2e_golden_path.py <url> video`.
-- The narrated submission video: record the screen with OBS or the Windows Game Bar while following the script below against the deployed URL. The target is 8–12 minutes unless organisers confirm 30 minutes is required. If it is, extend sections D and E rather than padding.
+- **Demo video (submitted):** <https://youtu.be/sNSFf_3h71E> — public on YouTube, 10:00, recorded by the team.
+- **Captioned golden-path reel (fallback):** `alignspace-golden-path-demo.mp4`, 2 min 12 s, recorded automatically from two browser sessions with synthetic data and offline note rules; attached to the `v1.1` release. Regenerate with `python scripts/e2e_golden_path.py <url> video`.
+
+The narration script below is kept for the finale pitch.
 
 | Time | Section | On screen | Say (condensed) |
 |---|---|---|---|

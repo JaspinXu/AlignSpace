@@ -62,7 +62,7 @@ figcaption { font-size: 8.3pt; color: var(--muted); margin-top: 3pt; line-height
 .terminal .c { color: var(--lime); }
 .terminal .d { color: #a9abc8; }
 .formula { background: var(--tint); border-left: 3px solid var(--violet); padding: 5pt 8pt; margin: 4pt 0 8pt; font-size: 8.4pt; break-inside: avoid; }
-.refs li { font-size: 8.4pt; margin-bottom: 3pt; word-break: break-word; }
+.refs li { font-size: 8.2pt; margin-bottom: 2pt; word-break: break-word; }
 
 /* Cover */
 .cover { height: 297mm; padding: 16mm 16mm 14mm; display: flex; flex-direction: column; break-after: page; }
@@ -86,3 +86,8 @@ table.flow tr { break-inside: avoid; }
 table.compact { font-size: 8.3pt; margin: 3pt 0 7pt; }
 table.compact th, table.compact td { padding: 2.6pt 5pt; }
 table.compact code { font-size: 7.4pt; }
+.cover .facts-grid { display: grid; grid-template-columns: 1fr 33mm; gap: 10pt; align-items: start; }
+.qr-card { display: block; text-align: center; border: 1px solid var(--line); border-radius: 8pt; padding: 6pt 6pt 5pt; background: #fff; color: var(--muted); }
+.qr-card img { width: 100%; display: block; }
+.qr-card span { display: block; font-size: 7.6pt; line-height: 1.3; margin-top: 3pt; }
+.cover .band, .cover .toc, .cover .facts { flex-shrink: 0; }

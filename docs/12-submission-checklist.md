@@ -7,9 +7,9 @@ Updated 26 September 2026. The organisers' final instructions (email to all four
 - [x] Team code: 8QFDUS2I — Four Wolf Kings (Chen Xiaoming, Xing Yiyuan, Xu Tengyang, Xu Zhaobin).
 - [x] Problem statement: Design Inspiration (public category), with our one-paragraph framing in the email.
 - [x] GitHub repository URL: <https://github.com/JaspinXu/AlignSpace> — public; `main` carries the submitted code; release `v1.1` (final submission package). The earlier `v1.0` release stays as the shortlisting snapshot.
-- [x] Business Proposal (PDF): `docs/submission/AlignSpace-Business-Proposal.pdf` (10 pages), also a `v1.1` release asset. Source `business-proposal.html`; re-render with `python docs/submission/render_pdfs.py`.
+- [x] Business Proposal (PDF): `docs/submission/AlignSpace-Business-Proposal.pdf` (9 pages), also a `v1.1` release asset. Source `business-proposal.html`; re-render with `python docs/submission/render_pdfs.py`.
 - [x] Technical Document (PDF): `docs/submission/AlignSpace-Technical-Document.pdf` (10 pages), also a `v1.1` release asset.
-- [ ] Demo video URL: recorded by the team; paste the YouTube (unlisted) or cloud link into the email and check it plays signed out.
+- [x] Demo video: <https://youtu.be/sNSFf_3h71E> — public on YouTube, 10:00, “AlignSpace | Bridging Homeowners and Interior Designers”; linked in the email, both READMEs and both PDFs (with a QR code on each cover).
 - [x] Deployment evidence: <https://54.255.93.19.sslip.io>, `docs/evidence/deployment-snapshot-2026-09-26.txt`, `docs/evidence/e2e-live-run-2026-09-26.json` (19/19) and the 26 September entry in `docs/16`.
 - [ ] Formal topic-selection record checked by the team (the organiser email already addresses the team by code).
 - [ ] Owner trial results collected; external user/SME validation clearly distinguished. Neither PDF claims user results.
