@@ -1,0 +1,69 @@
+# AlignSpace deployment snapshot — captured read-only with scripts/capture_deployment_evidence.sh
+# Host: 54.255.93.19.sslip.io (organiser AWS Lightsail instance). No secret values are printed.
+# Command: ssh -i <key> ubuntu@54.255.93.19 "HOST=54.255.93.19.sslip.io bash -s" < scripts/capture_deployment_evidence.sh
+
+## captured_at_utc
+2026-09-26T10:08:33Z
+## os
+Ubuntu 24.04.4 LTS, kernel 6.17.0-1019-aws
+## resources
+vcpus=2
+memory_total_mb=3834, used_mb=871
+disk_size=77G, used=6.8G, avail=70G
+## uptime
+up 1 week, 6 days, 16 hours, 41 minutes
+booted_at=2026-09-12 17:26:48
+## instance_metadata
+placement/region=ap-southeast-1
+placement/availability-zone=ap-southeast-1a
+instance-type=t3.medium
+## release
+current=/home/ubuntu/alignspace/releases/a1c8bd0
+release=a1c8bd0
+## services
+alignspace enabled=enabled active=active since=Fri 2026-09-25 06:30:15 UTC restarts=0
+caddy enabled=enabled active=active since=Mon 2026-09-21 08:42:33 UTC restarts=0
+## alignspace_unit_hardening
+Restart=on-failure
+UMask=0077
+User=ubuntu
+PrivateTmp=yes
+ProtectHome=read-only
+ProtectSystem=strict
+NoNewPrivileges=yes
+## listening_sockets
+State Local
+LISTEN 127.0.0.1:8010
+LISTEN *:80
+LISTEN *:443
+## tls_certificate
+subject=CN = 54.255.93.19.sslip.io
+issuer=C = US, O = Let's Encrypt, CN = YE1
+notBefore=Sep 21 07:44:06 2026 GMT
+notAfter=Dec 20 07:44:05 2026 GMT
+## public_https_checks
+GET / -> http=200 ssl_verify=0 time=0.219700s
+GET /health -> {"status":"ok","service":"alignspace"}
+GET /api/runtime -> {"analysisMode":"gateway","imageAnalysisEnabled":false,"projectRunLimit":20}
+GET http://54.255.93.19.sslip.io/health -> http=308 redirect=https://54.255.93.19.sslip.io/health
+## security_headers
+content-security-policy: default-src 'self'; img-src 'self' blob: https://d1hy6t2xeg0mdl.cloudfront.net https://api-neo.qanvast.com; style-src 'self' 'unsafe-in
+referrer-policy: no-referrer
+x-content-type-options: nosniff
+## configured_limits
+ALIGNSPACE_ANALYSIS_MODE=gateway
+ALIGNSPACE_ALLOW_IMAGES=false
+ALIGNSPACE_SECURE_COOKIES=true
+ALIGNSPACE_PROJECT_RUN_LIMIT=20
+ALIGNSPACE_DAILY_RUN_LIMIT=40
+env_file_mode=600 owner=ubuntu
+## usage_ledger_aggregates
+projects= 13
+audit_events= 70
+analysis_runs_total= 5
+analysis_runs[completed,gateway_notes]= 1
+analysis_runs[completed,offline_notes]= 4
+analysis_runs_last_24h= 1
+## backups
+/home/ubuntu/alignspace-backup-20260921
+## end

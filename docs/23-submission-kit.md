@@ -1,49 +1,85 @@
-# Submission kit — shortlisting round
+# Submission kit — final submission by email
 
-Deadline: **28 September 2026, 09:00 SGT**, posted in `#submission` (not `#round1-submission`). Aim to post by 27 September evening.
+Deadline as briefed: **28 September 2026, 09:00 SGT**. The organisers' final instructions (email to all four members, following the Slack announcement) ask for one email in a fixed format. Send it by 27 September evening; if the Slack announcement also asks for a post in `#submission`, post the same text there.
 
-## 1. What only a person can do
+## 1. Status
 
-| # | Action | Where | Status |
-|---|---|---|---|
-| 1 | Make `JaspinXu/AlignSpace` public | GitHub → Settings → General → Danger Zone | **Done, 21 Sep** — verified by an anonymous clone; history has no secrets |
-| 2 | Deploy the release and note the public URL | `scripts/deploy_lightsail.sh ubuntu@54.255.93.19 <key.pem>` | **Done, 21 Sep** — <https://54.255.93.19.sslip.io>, 19/19 live checks (`docs/evidence/e2e-live-run.json`) |
-| 3 | Record the narrated video and upload it (YouTube unlisted or a direct MP4 link) | Script in section 4 | Pending |
-| 4 | Fill the URL placeholders in `docs/writeup/writeup.html`, re-render (`python docs/writeup/render_pdf.py`) and link the PDF | `docs/writeup/AlignSpace-writeup.pdf` | Draft ready |
-| 5 | Run the owner trial and fill `docs/17-user-trial.md` | Local app | Pending |
-| 6 | Ask the organisers the open questions in section 3 | `#admin-related` | Pending |
-| 7 | Publish the GitHub release `v1.0` with the PDF and demo MP4 attached | `gh release create` (section 6) | Done 21 Sep — <https://github.com/JaspinXu/AlignSpace/releases/tag/v1.0> (tag on `4fb6ae4`) |
-| 8 | Check every link in a private/signed-out window, then post | Slack `#submission` | Pending |
+| Item the email must include | Ready? | Where |
+|---|---|---|
+| Team Code | Yes | 8QFDUS2I |
+| Problem Statement | Yes | Design Inspiration (public category) — wording in section 2 |
+| GitHub Repository URL | Yes | <https://github.com/JaspinXu/AlignSpace> (public), release `v1.1` |
+| Business Proposal (PDF) | Yes | `docs/submission/AlignSpace-Business-Proposal.pdf`, 10 pages |
+| Technical Document (PDF) | Yes | `docs/submission/AlignSpace-Technical-Document.pdf`, 10 pages |
+| Demo Video (YouTube/cloud URL) | Recorded by the team | Paste the link; YouTube must be *Unlisted*, not *Private* |
+| Deployment Evidence (URL/artifact) | Yes | Live URL + 26 September snapshot + live 19/19 run |
 
-## 2. Slack post (text only; do not attach the video)
+## 2. The email (copy exactly)
+
+**Subject:** `SMYA Final Submission - 8QFDUS2I`
+
+**Attach:** `AlignSpace-Business-Proposal.pdf` and `AlignSpace-Technical-Document.pdf` (from `docs/submission/` or the `v1.1` release).
 
 ```
+Dear NUS-ISS Show Me Your Agents Hackathon Team,
+
+Please find below the final submission of Team Four Wolf Kings.
+
 Team Code: 8QFDUS2I
-Team: Four Wolf Kings
-Project Name: AlignSpace — Design Inspiration Agents
-Problem: Design Inspiration (Public category)
+Team: Four Wolf Kings (Chen Xiaoming, Xing Yiyuan, Xu Tengyang, Xu Zhaobin)
+Project: AlignSpace - Design Inspiration Agents
 
-GitHub Repo: https://github.com/JaspinXu/AlignSpace  (release tag: v1.0)
-Video (MP4 / YouTube): <VIDEO_URL>
-Write-up (PDF): https://github.com/JaspinXu/AlignSpace/releases/download/v1.0/AlignSpace-writeup.pdf
-Deployment: https://54.255.93.19.sslip.io  — running on the organiser-provided Lightsail medium instance
-Deployment evidence: docs/16-verification-report.md (live checks, 21 Sep), docs/evidence/e2e-live-run.json
+Problem Statement: Design Inspiration (Public category).
+Homeowners find it hard to communicate design preferences in words and spend
+time collecting inspiration; designers compile references manually; misaligned
+expectations lead to repeated design revisions before both sides agree.
+AlignSpace is a two-sided agent workspace that turns a homeowner's references
+and notes and a designer's practical constraints into one versioned
+living-room brief that both people explicitly approve.
 
-How to try it: open the deployment URL → "Start my room brief" → answer the questions → "Invite my designer" and open the link in a private window → add a designer constraint → resolve it → approve from both sessions.
+GitHub Repository URL: https://github.com/JaspinXu/AlignSpace
+(release v1.1: https://github.com/JaspinXu/AlignSpace/releases/tag/v1.1)
+
+Business Proposal (PDF): attached - AlignSpace-Business-Proposal.pdf
+https://github.com/JaspinXu/AlignSpace/releases/download/v1.1/AlignSpace-Business-Proposal.pdf
+
+Technical Document (PDF): attached - AlignSpace-Technical-Document.pdf
+https://github.com/JaspinXu/AlignSpace/releases/download/v1.1/AlignSpace-Technical-Document.pdf
+
+Demo Video: <VIDEO_URL>
+
+Deployment Evidence:
+- Live URL: https://54.255.93.19.sslip.io (organiser-provided AWS Lightsail
+  instance, ap-southeast-1; health check: https://54.255.93.19.sslip.io/health)
+- Deployment snapshot, 26 Sep 2026:
+  https://github.com/JaspinXu/AlignSpace/blob/v1.1/docs/evidence/deployment-snapshot-2026-09-26.txt
+- Live two-session browser checks, 19/19 passed, 26 Sep 2026:
+  https://github.com/JaspinXu/AlignSpace/blob/v1.1/docs/evidence/e2e-live-run-2026-09-26.json
+- Verification report:
+  https://github.com/JaspinXu/AlignSpace/blob/v1.1/docs/16-verification-report.md
+
+Best regards,
+Xu Zhaobin, on behalf of Four Wolf Kings (8QFDUS2I)
 ```
 
-Before posting: replace every `<...>`, open each link in a private window, and keep a screenshot of the post as the receipt.
+## 3. Before pressing send
 
-## 3. Questions for organisers (`#admin-related`)
+- [ ] Replace `<VIDEO_URL>` and play it in a private (signed-out) window.
+- [ ] Both PDFs attached; each opens.
+- [ ] Every link above opens in a private window (repository, release, live URL, `/health`, evidence files).
+- [ ] Recipient: reply to the organisers' "SMYA Final Submission" email, or use the address it names; copy the three teammates.
+- [ ] Keep the sent email (or a screenshot) as the receipt.
 
-1. The briefing lists video "duration: 30mins". Is 30 minutes a maximum or a required length? Would a 5–10 minute demo plus walkthrough be acceptable?
-2. Must the GitHub repository be public, or is adding specific judge accounts acceptable? If so, which accounts?
-3. What counts as "deployment evidence" — is a public URL enough, or do you also want screenshots of the Lightsail console?
-4. Is there a page limit or template for the PDF write-up?
-5. Please confirm our topic selection (Design Inspiration, Public category) is recorded for team 8QFDUS2I.
-6. Between the shortlisting deadline and the finale window (29 September – 5 October), does our Lightsail instance stay available, and should the deployment URL remain reachable for judging during that time?
+## 4. Release assets
 
-## 4. Video plan and narration script
+`v1.1` carries both PDFs and the captioned golden-path demo (`alignspace-golden-path-demo.mp4`, 2 min 12 s, synthetic data, offline note rules) as a fallback reel. To replace a PDF after an edit:
+
+```bash
+python docs/submission/render_pdfs.py
+gh release upload v1.1 docs/submission/AlignSpace-Business-Proposal.pdf docs/submission/AlignSpace-Technical-Document.pdf --clobber
+```
+
+## 5. Video plan and narration script (reuse for the finale)
 
 Deliverables:
 
@@ -65,28 +101,7 @@ Deliverables:
 
 Recording checklist: 1920×1080, browser zoom 100%, notifications off, synthetic data only, no API keys or `.env` on screen, audio check first, one clean take per section is fine.
 
-## 5. Link and packaging check (27 September)
 
-- [x] `main` contains the final code; tag `v1.0` created and pushed on the submitted commit `4fb6ae4` (21 Sep), CI green on that commit. If code changes after this, re-tag (`git tag -f v1.0 <sha> && git push -f origin v1.0`) and edit the release, or cut `v1.1`.
-- [ ] Repository opens in a private window; README renders; LICENSE present.
-- [ ] Deployment URL opens in a private window; `/health` returns ok; guided sample works; designer invitation works in a second private window.
-- [ ] Video link plays in a private window (unlisted, not private).
-- [ ] PDF link downloads in a private window.
-- [ ] `docs/16` updated with the live URL, date and checks; `docs/17` filled.
-- [ ] Post in `#submission`; screenshot the post.
+## 6. Finale (only if shortlisted)
 
-## 6. Release assets
-
-A GitHub release gives permanent direct links for the write-up and the demo video, which also satisfies the "URL to download the video in MP4 format" requirement without YouTube:
-
-```bash
-gh release create v1.0 --title "AlignSpace v1.0 (shortlisting submission)" \
-  --notes "Shortlisting submission for NUS-ISS Show Me Your Agents. Deployment: <URL>." \
-  docs/writeup/AlignSpace-writeup.pdf "output/alignspace-golden-path-demo.mp4#Golden-path demo (2m12s, captioned)"
-```
-
-The asset links are then `https://github.com/JaspinXu/AlignSpace/releases/download/v1.0/<filename>`. Check both in a private window before posting.
-
-## 7. Finale (only if shortlisted)
-
-Finalists: 10 October 2026, 08:30 SGT, face-to-face. Updated artifacts go to `#final-submission`. Prepare: five-minute pitch (`docs/11`), live demo on the deployed URL with the captioned MP4 as fallback, three clean rehearsals, and answers to the judge Q&A in `docs/11`.
+Finalists: 10 October 2026, 08:30 SGT, face-to-face. Updated artifacts go to `#final-submission`. Prepare: five-minute pitch (`docs/11`), live demo on the deployed URL with the captioned MP4 as fallback, three clean rehearsals, and answers to the judge Q&A in `docs/11`. Keep the Lightsail instance running through the finale.

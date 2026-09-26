@@ -1,0 +1,88 @@
+/* Shared print styles for the AlignSpace submission documents (A4, rendered by Chromium). */
+@page { size: A4; margin: 15mm 16mm 17mm 16mm; }
+@page :first { margin: 0; }
+:root {
+  --violet: #6543ee; --violet-deep: #4a2fd0; --ink: #1f2140; --muted: #5b5d72; --line: #e3e4ef;
+  --soft: #f0ecff; --tint: #f7f6fc; --lime: #ddff72; --ok: #2d7511; --warn: #fff5d1; --warn-ink: #7a5a00;
+}
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; color: var(--ink); font: 10pt/1.46 "Carlito", "Calibri", "Segoe UI", Arial, "Noto Sans CJK SC", sans-serif; }
+h1, h2, h3, .display { font-family: "Poppins", "Segoe UI", Arial, sans-serif; letter-spacing: -0.2pt; }
+h2 { font-size: 14.5pt; font-weight: 600; margin: 16pt 0 6pt; padding-top: 6pt; border-top: 1.5px solid var(--ink); break-after: avoid; display: flex; gap: 8pt; align-items: baseline; }
+h2 .n { color: var(--violet); font-size: 10pt; font-weight: 700; letter-spacing: 0.5pt; }
+h3 { font-size: 10.4pt; font-weight: 600; margin: 11pt 0 3pt; break-after: avoid; }
+p { margin: 0 0 6.5pt; }
+ul, ol { margin: 0 0 7pt; padding-left: 14pt; } li { margin-bottom: 2.2pt; }
+a { color: var(--violet-deep); text-decoration: none; }
+b, strong { font-weight: 700; }
+.muted { color: var(--muted); }
+.small { font-size: 8.8pt; }
+.eyebrow { font: 700 7.6pt/1.2 "Poppins", Arial, sans-serif; letter-spacing: 1.2pt; text-transform: uppercase; color: var(--violet); }
+.break { break-before: page; }
+.keep { break-inside: avoid; }
+code, .mono { font-family: "DejaVu Sans Mono", "Consolas", monospace; font-size: 7.9pt; }
+code { background: #f2f1f8; padding: 0.3pt 2.5pt; border-radius: 2.5pt; }
+sup.ref { font-size: 6.5pt; color: var(--violet-deep); font-weight: 700; margin-left: 0.5pt; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 5pt 0 9pt; font-size: 9pt; break-inside: avoid; }
+th, td { text-align: left; vertical-align: top; padding: 3.6pt 5pt; border-bottom: 1px solid var(--line); }
+th { background: var(--soft); font-weight: 700; font-size: 8.6pt; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+tr.total td { font-weight: 700; border-top: 1.5px solid var(--ink); }
+.kv td:first-child { width: 28%; color: var(--muted); font-weight: 700; }
+
+/* Labels */
+.tag { display: inline-block; font: 700 6.8pt/1 "Poppins", Arial, sans-serif; letter-spacing: 0.4pt; text-transform: uppercase; padding: 2.4pt 4.5pt; border-radius: 8pt; vertical-align: 1pt; white-space: nowrap; }
+.tag.measured { background: #e3f6d8; color: var(--ok); }
+.tag.hyp { background: var(--warn); color: var(--warn-ink); }
+.tag.assume { background: #eceef6; color: var(--muted); }
+.tag.src { background: var(--soft); color: var(--violet-deep); }
+.pass { color: var(--ok); font-weight: 700; }
+
+/* Blocks */
+.callout { background: var(--soft); border-radius: 7pt; padding: 7pt 9pt; margin: 5pt 0 9pt; break-inside: avoid; }
+.callout.plain { background: var(--tint); }
+.callout.warn { background: var(--warn); }
+.callout p:last-child { margin-bottom: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9pt; align-items: start; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8pt; align-items: stretch; }
+.card { border: 1px solid var(--line); border-radius: 7pt; padding: 7pt 8pt; break-inside: avoid; background: #fff; }
+.card h3 { margin-top: 0; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7pt; margin: 6pt 0 10pt; break-inside: avoid; }
+.kpi { background: var(--tint); border-radius: 7pt; padding: 7pt 8pt 6pt; border-top: 3px solid var(--violet); }
+.kpi .v { font: 700 16pt/1.1 "Poppins", Arial, sans-serif; color: var(--ink); }
+.kpi .l { font-size: 8.4pt; line-height: 1.35; color: var(--muted); margin-top: 3pt; }
+figure { margin: 5pt 0 9pt; break-inside: avoid; }
+figure img { width: 100%; display: block; border-radius: 6pt; border: 1px solid var(--line); }
+figure.bare img { border: 0; }
+figcaption { font-size: 8.3pt; color: var(--muted); margin-top: 3pt; line-height: 1.4; }
+.terminal { background: #1f2140; color: #e8e8f5; border-radius: 7pt; padding: 7pt 9pt; font: 7.1pt/1.42 "DejaVu Sans Mono", Consolas, monospace; white-space: pre-wrap; break-inside: avoid; margin: 5pt 0 9pt; }
+.terminal .c { color: var(--lime); }
+.terminal .d { color: #a9abc8; }
+.formula { background: var(--tint); border-left: 3px solid var(--violet); padding: 5pt 8pt; margin: 4pt 0 8pt; font-size: 8.4pt; break-inside: avoid; }
+.refs li { font-size: 8.4pt; margin-bottom: 3pt; word-break: break-word; }
+
+/* Cover */
+.cover { height: 297mm; padding: 16mm 16mm 14mm; display: flex; flex-direction: column; break-after: page; }
+.cover .band { background: linear-gradient(135deg, #6543ee 0%, #5134e0 100%); color: #fff; border-radius: 14pt; padding: 18pt 20pt 16pt; position: relative; overflow: hidden; }
+.cover .band .eyebrow { color: #d9d2ff; }
+.cover .band h1 { font-size: 34pt; line-height: 1.02; margin: 6pt 0 4pt; color: #fff; font-weight: 700; }
+.cover .band .kind { display: inline-block; background: var(--lime); color: var(--ink); font: 700 9pt/1 "Poppins", Arial, sans-serif; padding: 5pt 9pt; border-radius: 10pt; margin-bottom: 9pt; }
+.cover .band .lede { font-size: 11.2pt; line-height: 1.45; max-width: 150mm; color: #f3f1ff; margin: 0; }
+.cover .hero { margin: 9pt 0 8pt; }
+.cover .hero img { width: 100%; border-radius: 10pt; display: block; }
+.cover .facts { margin-top: auto; }
+.cover .facts table { font-size: 9.2pt; margin: 0; }
+.cover .note { font-size: 8.2pt; color: var(--muted); margin-top: 6pt; }
+.cover .toc { margin: 2pt 0 8pt; padding: 7pt 10pt; background: var(--tint); border-radius: 8pt; }
+.cover .toc ol { columns: 3; column-gap: 12pt; margin: 4pt 0 0; padding-left: 16pt; font-size: 9pt; }
+.cover .toc li { margin-bottom: 1.5pt; }
+.cover .toc li::marker { color: var(--violet); font-weight: 700; }
+table.flow { break-inside: auto; }
+table.flow tr { break-inside: avoid; }
+.terminal.nowrap { white-space: pre; overflow: hidden; font-size: 7pt; }
+table.compact { font-size: 8.3pt; margin: 3pt 0 7pt; }
+table.compact th, table.compact td { padding: 2.6pt 5pt; }
+table.compact code { font-size: 7.4pt; }

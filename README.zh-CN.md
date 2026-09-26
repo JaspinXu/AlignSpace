@@ -22,7 +22,8 @@
 <a href="#它是怎么工作的"><b>工作原理</b></a> ·
 <a href="#智能体循环"><b>智能体循环</b></a> ·
 <a href="#安全与验证"><b>安全与验证</b></a> ·
-<a href="docs/writeup/AlignSpace-writeup.pdf"><b>书面报告（PDF）</b></a> ·
+<a href="docs/submission/AlignSpace-Business-Proposal.pdf"><b>商业计划书（PDF）</b></a> ·
+<a href="docs/submission/AlignSpace-Technical-Document.pdf"><b>技术文档（PDF）</b></a> ·
 <a href="README.md"><b>English</b></a>
 </p>
 

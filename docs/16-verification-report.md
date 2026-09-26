@@ -1,5 +1,12 @@
 # Verification report
 
+## Update — 26 September 2026 (final submission)
+
+- **Deployment snapshot** (`scripts/capture_deployment_evidence.sh`, read-only, run over SSH at 10:08 UTC): Ubuntu 24.04.4 LTS on the organiser Lightsail instance (ap-southeast-1a, t3.medium class, 2 vCPU, 3.8 GB memory, 77 GB disk), up 13 days; release `a1c8bd0` current; `alignspace` and `caddy` enabled and active with zero automatic restarts; hardened unit (`ProtectSystem=strict`, `ProtectHome=read-only`, `NoNewPrivileges`, `PrivateTmp`, `UMask=0077`); app bound to 127.0.0.1:8010 behind Caddy on 80/443; Let's Encrypt certificate valid 21 September to 20 December 2026; public `GET /` 200 with a verified certificate, `/health` ok, HTTP redirects to HTTPS; `analysisMode` gateway, image analysis off, limits 20 per project and 40 per day; `.env` mode 600 (values not printed). Raw output: `docs/evidence/deployment-snapshot-2026-09-26.txt`.
+- **Two-session browser run against the live URL** (Edge, `scripts/e2e_golden_path.py https://54.255.93.19.sslip.io`, 09:57 UTC): **19/19 checks passed**, zero console errors, 20.7 s. Result: `docs/evidence/e2e-live-run-2026-09-26.json`; screenshots of the live run in `docs/evidence/live-2026-09-26/`. Offline note rules were used, so no model quota was consumed.
+- **Automated tests:** 77 passed on the release snapshot (Linux).
+- **Submission documents:** the combined write-up is superseded by the Business Proposal and Technical Document in `docs/submission/`, as requested by the organisers' final email format.
+
 ## Live deployment — 21 September 2026
 
 - **Public URL:** <https://54.255.93.19.sslip.io> on the organiser-provided Lightsail medium instance (Ubuntu 24.04, ap-southeast-1, 4 GB / 2 vCPU / 80 GB). Released commit `a1c8bd0` via `scripts/deploy_lightsail.sh`; releases are versioned under `~/alignspace/releases/<sha>` with `.env` and data in `~/alignspace/shared`.

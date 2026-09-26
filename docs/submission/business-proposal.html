@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AlignSpace — Business Proposal</title>
+<meta name="author" content="Four Wolf Kings (8QFDUS2I)">
+<meta name="description" content="Business proposal for AlignSpace, NUS-ISS Show Me Your Agents hackathon, Design Inspiration problem statement.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section class="cover">
+  <div class="band">
+    <div class="eyebrow">NUS-ISS Show Me Your Agents · Public category · Design Inspiration</div>
+    <h1>AlignSpace</h1>
+    <div class="kind">Business Proposal</div>
+    <p class="lede">Turn “I like this” into a living-room brief that the homeowner and the interior designer both sign — before the first concept, not after the third revision.</p>
+  </div>
+  <div class="hero"><img src="../assets/readme/hero.webp" alt="AlignSpace product overview"></div>
+  <div class="toc"><div class="eyebrow">Inside</div>
+    <ol>
+      <li>Executive summary</li><li>The problem, as an SME feels it</li><li>Customers and users</li><li>The solution</li>
+      <li>Market and competition</li><li>Business model and unit economics</li><li>Go-to-market</li>
+      <li>Pilot plan and measurable outcomes</li><li>Feasibility and scalability</li><li>Risks and mitigations</li>
+      <li>Social impact</li><li>Roadmap</li><li>Team and honest status</li>
+    </ol>
+  </div>
+  <div class="facts">
+    <table class="kv">
+      <tr><td>Team</td><td>Four Wolf Kings · team code <b>8QFDUS2I</b></td></tr>
+      <tr><td>Members</td><td>Chen Xiaoming · Xing Yiyuan · Xu Tengyang · Xu Zhaobin</td></tr>
+      <tr><td>Problem statement</td><td>Design Inspiration — homeowners find it hard to put design preferences into words and spend time collecting inspiration; designers compile references by hand; misaligned expectations lead to repeated design revisions before both sides agree.</td></tr>
+      <tr><td>Product</td><td>Live at <a href="https://54.255.93.19.sslip.io">https://54.255.93.19.sslip.io</a> (AWS Lightsail, Singapore region) · code at <a href="https://github.com/JaspinXu/AlignSpace">github.com/JaspinXu/AlignSpace</a></td></tr>
+      <tr><td>Companion document</td><td>Technical Document — architecture, agents, guardrails, evaluation and AWS deployment evidence</td></tr>
+      <tr><td>Date</td><td>26 September 2026</td></tr>
+    </table>
+    <p class="note">Evidence labels used throughout: <span class="tag measured">Measured</span> observed in our build or live deployment · <span class="tag src">Source</span> published figure, cited in the references · <span class="tag assume">Assumption</span> a planning input we chose · <span class="tag hyp">Hypothesis</span> to be tested in the pilot. We do not claim any time-saving, satisfaction or revenue result yet.</p>
+  </div>
+</section>
+
+<h2><span class="n">01</span> Executive summary</h2>
+<p>Every renovation starts with a conversation about taste. In a small interior-design (ID) firm that conversation is mostly screenshots in a chat, adjectives such as “warm” or “hotel-like”, and a designer decoding them before the first concept. When the two sides read the same picture differently, the gap surfaces later as another revision, a delay or a dispute — usually before a contract is signed and the time can be billed.</p>
+<p><b>AlignSpace</b> is a two-sided agent workspace for that first mile. The homeowner browses real Singapore homes and records notes and must-avoid items; agents turn that evidence into proposals, ask one high-value question at a time, and surface conflicts with the designer’s practical constraints. Nothing counts until a person confirms it, and the brief is released only when both people approve the same version.</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">787</div><div class="l">renovation-contractor complaints to CASE in 2025 — the 4th most-complained industry <sup class="ref">[1]</sup> <span class="tag src">Source</span></div></div>
+  <div class="kpi"><div class="v">≈45,600</div><div class="l">HDB homes completed (≈19,600) or resold (26,042) in 2025 — each a likely renovation <sup class="ref">[2][3]</sup> <span class="tag src">Source</span></div></div>
+  <div class="kpi"><div class="v">S$50–82k</div><div class="l">expected 2026 renovation cost of a 4-room HDB flat, new (BTO) to resale <sup class="ref">[4]</sup> <span class="tag src">Source</span></div></div>
+  <div class="kpi"><div class="v">US$0.012</div><div class="l">model cost of one note analysis, from tokens measured on our live deployment <sup class="ref">[5][6]</sup> <span class="tag measured">Measured</span></div></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h3>Proven now <span class="tag measured">Measured</span></h3>
+    <ul>
+      <li>Running on the organiser’s AWS Lightsail instance (Singapore) over HTTPS since 21 September.</li>
+      <li>19 of 19 two-session browser checks passed against the live site on 26 September — golden path plus adversarial cases such as prompt injection, invitation replay and role spoofing.</li>
+      <li>77 of 77 automated tests pass; continuous integration on every push.</li>
+      <li>A real Claude Sonnet 4.5 analysis on the public site turned a homeowner note into five evidence-linked proposals, although the note contained none of the option words.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>To prove in the pilot <span class="tag hyp">Hypothesis</span></h3>
+    <ul>
+      <li>≥ 80% of required decisions read the same way by homeowner and designer.</li>
+      <li>Designers review a draft brief in ≤ 10 minutes (median).</li>
+      <li>≥ 60% of invited homeowners reach a draft brief.</li>
+      <li>Fewer concept revisions than the firm’s own baseline.</li>
+      <li>Firms will pay about S$49 per designer per month.</li>
+    </ul>
+  </div>
+</div>
+<div class="callout"><b>Our ask.</b> One or two Singapore ID firms with 3–20 designers to run a free, six-week pilot on 10–20 consenting living-room projects, measured against their current chat-and-screenshots process.</div>
+
+<h2><span class="n">02</span> The problem, as an SME feels it</h2>
+<div class="callout plain"><span class="eyebrow">Problem statement · Design Inspiration</span><p style="margin-top:3pt">Homeowners find it hard to communicate design preferences in words and spend time collecting inspiration; designers compile references manually. Misaligned expectations lead to repeated design revisions before both sides agree.</p></div>
+<h3>How it plays out in a small firm</h3>
+<table>
+  <tr><th style="width:17%">Stage</th><th>What happens today</th><th style="width:31%">What it costs</th></tr>
+  <tr><td>Lead</td><td>The homeowner sends 10–30 screenshots from inspiration sites and social media, plus “we like warm and cosy, not too dark”.</td><td>No record of <i>which</i> element of each image matters.</td></tr>
+  <tr><td>Consultation</td><td>The designer interprets on the spot and remembers rather than records.</td><td>Interpretation lives in one person’s head.</td></tr>
+  <tr><td>First concept</td><td>“I liked the lighting in that photo, not the walnut.”</td><td>A revision round, usually unbilled before contract.</td></tr>
+  <tr><td>Constraints</td><td>Existing floors, pets or low-maintenance needs surface after the homeowner has fallen for a look.</td><td>Disappointment, renegotiation, lost trust.</td></tr>
+  <tr><td>Later</td><td>“That is not what we agreed.”</td><td>No shared record of what was confirmed, by whom, or when.</td></tr>
+</table>
+<h3>Why it persists</h3>
+<ul>
+  <li><b>An image carries many attributes.</b> “I like this” does not say whether the person likes the oak, the light, the layout or the whole room.</li>
+  <li><b>Words mean different things to each side.</b> “Warm”, “minimalist” and “hotel-like” are interpreted differently by a first-time homeowner and a trained designer.</li>
+  <li><b>Constraints arrive late</b>, and no tool puts a practical constraint next to the preference it contradicts.</li>
+  <li><b>Nothing records agreement.</b> Chat threads and mood-board PDFs do not show what was confirmed, rejected or still open.</li>
+</ul>
+<h3>Why it matters now</h3>
+<ul>
+  <li><b>Renovation remains a top consumer-complaint category.</b> CASE received 787 complaints about renovation contractors in 2025 (962 in 2024), the fourth-highest industry <sup class="ref">[1]</sup>. Not every complaint is about expectations, but a jointly approved record of requirements is exactly the documentation that helps both sides when expectations are questioned.</li>
+  <li><b>The industry is investing in trust.</b> CaseTrust had accredited 268 renovation businesses by January 2026, with a target of 500 by 2027 <sup class="ref">[1]</sup>. Firms that compete on professionalism and documentation are natural early adopters.</li>
+  <li><b>The volume is steady and the stakes are high.</b> HDB completed about 19,600 flats in 2025 and is on track for about 55,000 in 2025–2027 <sup class="ref">[2]</sup>; 26,042 resale applications were recorded in 2025 <sup class="ref">[3]</sup>. A 4-room renovation is expected to cost S$50,000–60,000 for a new flat and S$70,000–81,600 for a resale flat in 2026 <sup class="ref">[4]</sup>.</li>
+</ul>
+
+<h2><span class="n">03</span> Customers and users</h2>
+<table>
+  <tr><th style="width:16%">Role</th><th style="width:22%">Who</th><th>Job to be done</th><th style="width:30%">What they get</th></tr>
+  <tr><td><b>Buyer</b></td><td>Owner or design lead of an ID SME with 3–20 client-facing designers</td><td>“Help my team align projects without adding operational risk.”</td><td>Consistent intake, fewer unbilled revision loops, an auditable approval trail.</td></tr>
+  <tr><td><b>User</b></td><td>Designer (“Arjun”)</td><td>“Turn scattered references into a usable brief with fewer clarification loops.”</td><td>A structured brief with constraints and open decisions visible before the first concept.</td></tr>
+  <tr><td><b>User</b></td><td>Homeowner, often a first-time renovator (“Mei”)</td><td>“Help me show what I mean and confirm that my designer understands it.”</td><td>Plain-language questions in English or Chinese, and control over every suggestion.</td></tr>
+</table>
+<p><b>Beachhead.</b> Pre-concept alignment for living rooms in HDB and condominium projects, started by the designer after lead qualification. The living room carries rich preferences (style, colour, material, light, layout, mood, function, maintenance) with fewer safety-critical issues than kitchens and bathrooms.</p>
+
+<h2><span class="n">04</span> The solution</h2>
+<figure class="bare"><img src="../assets/readme/tour.webp" alt="Four AlignSpace screens"><figcaption>Figure 1. Discover real Singapore homes; answer one question at a time with a suggested next step; see a designer constraint open a conflict instead of a silent override; approve one versioned brief together. Screens from the running product with synthetic data.</figcaption></figure>
+<figure class="bare"><img src="../assets/readme/workflow-light.png" alt="Collect, suggest, ask, align, approve"><figcaption>Figure 2. The alignment loop. Agents propose and ask; people confirm, resolve and approve; the loop returns to whoever owns the missing decision.</figcaption></figure>
+<table>
+  <tr><th style="width:23%">Pain today</th><th>AlignSpace response</th><th style="width:30%">Evidence</th></tr>
+  <tr><td>“I like this” is ambiguous</td><td>Notes become attribute-level proposals that quote their source; the homeowner confirms or rejects each one.</td><td><span class="tag measured">Measured</span> live call returned 5 proposals, each quoting the note</td></tr>
+  <tr><td>Words mean different things</td><td>One question at a time with plain options and “not sure” always available; the agent picks the question that removes the most uncertainty.</td><td><span class="tag hyp">Hypothesis</span> ≥ 80% alignment in the pilot</td></tr>
+  <tr><td>Constraints arrive late</td><td>The designer joins from a private single-use link; a constraint that contradicts a confirmed preference opens a visible conflict and blocks approval.</td><td><span class="tag measured">Measured</span> live checks: conflict opened, approval blocked</td></tr>
+  <tr><td>Nothing records agreement</td><td>A versioned brief; both approve the same content fingerprint from their own sessions; any later edit clears both approvals; JSON and PDF export.</td><td><span class="tag measured">Measured</span> live checks: same fingerprint, edit clears approvals</td></tr>
+  <tr><td>AI could overreach</td><td>Suggestions stay “proposed”; instructions hidden in notes are ignored; no construction, pricing or compliance advice.</td><td><span class="tag measured">Measured</span> live check: injected instruction not executed</td></tr>
+</table>
+<p class="small muted"><b>What AlignSpace is not:</b> an AI render generator, a quotation or contract tool, or construction, structural, electrical or regulatory advice. It sits upstream of those tools and exports a brief they can use.</p>
+
+<h2><span class="n">05</span> Market and competition</h2>
+<p><b>Demand.</b> About 45,600 HDB households a year start from a newly completed or resale flat (2025: about 19,600 completions <sup class="ref">[2]</sup> plus 26,042 resale applications <sup class="ref">[3]</sup>), before condominiums and landed homes. <b>Supply.</b> CaseTrust-accredited renovation businesses number 268 today and are targeted to reach 500 by 2027 <sup class="ref">[1]</sup>, alongside many non-accredited firms. We size the opportunity by <i>firms</i>, because firms pay.</p>
+<table>
+  <tr><th>Illustrative scenario <span class="tag assume">Assumption</span></th><th class="num">Paying firms</th><th class="num">Designer seats (5 per firm)</th><th class="num">Price per seat / month</th><th class="num">Annual recurring revenue</th></tr>
+  <tr><td>Year 1 — design partners convert</td><td class="num">10</td><td class="num">50</td><td class="num">S$49</td><td class="num">S$29,400</td></tr>
+  <tr><td>Year 2 — early adopters</td><td class="num">40</td><td class="num">200</td><td class="num">S$49</td><td class="num">S$117,600</td></tr>
+  <tr><td>Year 3 — referral-led growth</td><td class="num">100</td><td class="num">500</td><td class="num">S$49</td><td class="num">S$294,000</td></tr>
+</table>
+<p class="small muted">Arithmetic on our assumptions, not a forecast. For scale, the Year-3 scenario equals one-fifth of the CaseTrust target of 500 accredited renovation businesses <sup class="ref">[1]</sup>. Expansion beyond the beachhead: other rooms (with added professional review for wet areas), whole-home briefs, and other markets where homeowners and designers work across English and Chinese.</p>
+<h3>Competitive landscape</h3>
+<table>
+  <tr><th style="width:21%">Alternative</th><th style="width:22%">Good at</th><th>Leaves open</th><th style="width:29%">AlignSpace position</th></tr>
+  <tr><td>Chat, screenshots and PDF mood boards (status quo)</td><td>Fast, familiar, free</td><td>No structure; no record of what was confirmed; constraints arrive late</td><td>Replaces the ad-hoc intake; chat stays for conversation</td></tr>
+  <tr><td>Inspiration platforms such as Pinterest, Houzz and Qanvast</td><td>Discovery and a huge supply of images</td><td>A saved image is not a stated preference; one-sided</td><td>Links out to attributed homes and treats saves as weak evidence only</td></tr>
+  <tr><td>AI image and render generators</td><td>Inspiring visuals quickly</td><td>Pictures, not requirements; can set expectations the site or budget cannot meet</td><td>Produces agreement on requirements; visuals remain the designer’s craft</td></tr>
+  <tr><td>Quotation, CRM and project tools for renovation firms</td><td>Downstream execution</td><td>Assume the brief already exists and is agreed</td><td>Upstream of them; exports schema-valid JSON</td></tr>
+</table>
+<p><b>Defensibility.</b> Not the base model — any capable model can sit behind our adapter. What compounds is the two-party preference and conflict data (with consent), the question policy and its evaluation set, bilingual design vocabulary, and the approval step embedded in a firm’s intake.</p>
+
+<h2><span class="n">06</span> Business model and unit economics</h2>
+<div class="grid2">
+  <div>
+    <h3>Pricing <span class="tag hyp">Hypothesis</span></h3>
+    <table>
+      <tr><th>Plan</th><th>Price</th><th>For</th></tr>
+      <tr><td>Pilot</td><td>Free, 6 weeks</td><td>1–2 design partners</td></tr>
+      <tr><td>Studio</td><td>S$49 per designer seat per month</td><td>Firms; unlimited homeowners, fair-use analysis cap per project</td></tr>
+      <tr><td>Per brief</td><td>S$15 per dual-approved brief</td><td>Freelancers and low volume</td></tr>
+    </table>
+    <p class="small"><b>Break-even for a firm.</b> At S$49 per seat, the tool pays for itself if it saves a designer about one hour a month <span class="tag assume">Assumption</span> S$50 loaded hourly cost — about ten minutes per project at six projects a month. The pilot measures review time and revision counts against the firm’s own baseline.</p>
+  </div>
+  <div>
+    <h3>Cost to serve</h3>
+    <table>
+      <tr><th>Item</th><th class="num">Cost</th></tr>
+      <tr><td>One note analysis: 1,873 input + 426 output tokens <span class="tag measured">Measured</span> × Claude Sonnet 4.5 list price US$3 / US$15 per million <sup class="ref">[6]</sup></td><td class="num">US$0.012</td></tr>
+      <tr><td>Model cost per project at 1–5 analyses <span class="tag assume">Assumption</span>; hard cap of 20 per project</td><td class="num">US$0.01–0.06<br><span class="muted">cap ≤ US$0.24</span></td></tr>
+      <tr><td>Hosting: one Lightsail instance, 2 vCPU, 4 GB, 80 GB <sup class="ref">[7]</sup></td><td class="num">US$24 / month</td></tr>
+      <tr><td>Per seat per month: 6 projects × 3 analyses, 50 seats sharing one instance <span class="tag assume">Assumption</span></td><td class="num">≈ US$0.70</td></tr>
+    </table>
+    <p class="small muted">On 26 September the live instance used 0.9 of 3.8 GB memory and 6.8 of 77 GB disk <span class="tag measured">Measured</span>. Infrastructure is small relative to price; the real costs are onboarding, support and sales, which the pilot will size.</p>
+  </div>
+</div>
+
+<h2><span class="n">07</span> Go-to-market</h2>
+<div class="grid3">
+  <div class="card"><div class="eyebrow">Phase 0 · Oct–Dec 2026</div><h3>Design partners</h3><p>One or two ID SMEs through our network and hackathon-ecosystem introductions. Free six-week pilot, 45-minute onboarding, weekly metric and safety review. No CRM integration required.</p></div>
+  <div class="card"><div class="eyebrow">Phase 1 · H1 2027</div><h3>Early adopters</h3><p>Quality-focused and CaseTrust-accredited studios, reached through pilot case studies, designer referrals and bilingual “how to brief your designer” guides for homeowners.</p></div>
+  <div class="card"><div class="eyebrow">Phase 2 · H2 2027 onward</div><h3>Scale</h3><p>JSON export into quotation and CRM tools, partnerships with inspiration platforms, more rooms, and a firm dashboard that tracks alignment across projects.</p></div>
+</div>
+<p><b>How a firm adopts it.</b> The designer sends the project link after lead qualification → the homeowner completes the guided brief at home → the designer reviews the summary before the first workshop → the pair resolves open decisions and approves → the brief is exported into the firm’s existing workflow. The homeowner never needs an account, and the firm keeps the relationship.</p>
+
+<h2><span class="n">08</span> Pilot plan and measurable outcomes</h2>
+<p><b>Set-up.</b> Six weeks; one or two SMEs; 10–20 consenting living-room projects; baseline from the firm’s recent comparable projects run the usual way. Synthetic or consented data only; no purchasing, contact or contractual output.</p>
+<table>
+  <tr><th style="width:21%">Metric <span class="tag hyp">Hypothesis</span></th><th>Definition</th><th class="num" style="width:12%">Target</th><th style="width:26%">How we measure</th></tr>
+  <tr><td>Brief Alignment Rate</td><td>Share of 20 rubric decisions where homeowner and designer independently pick the same interpretation after the session</td><td class="num">≥ 80%</td><td>Blind rubric at session end</td></tr>
+  <tr><td>Invitation-to-draft</td><td>Invited homeowners who reach a draft brief</td><td class="num">≥ 60%</td><td>Audit log</td></tr>
+  <tr><td>Designer review time</td><td>Median minutes to review a draft brief</td><td class="num">≤ 10 min</td><td>Timestamps plus designer log</td></tr>
+  <tr><td>Actionability</td><td>Designers rating the brief at least 4 of 5 as a starting point</td><td class="num">≥ 70%</td><td>One-question survey</td></tr>
+  <tr><td>Revisions</td><td>Concept revisions before sign-off, compared with baseline</td><td class="num">Fewer</td><td>Designer-reported per project</td></tr>
+  <tr><td>Willingness to pay</td><td>Designers who would pay S$49 per seat per month</td><td class="num">≥ 50%</td><td>Exit interview</td></tr>
+  <tr><td>Safety</td><td>P0 privacy or security incidents</td><td class="num">0</td><td>Incident log</td></tr>
+</table>
+<p><b>Decision rules.</b> Convert and expand if at least four targets are met with no P0 incident; iterate on the weakest step if two or three are met; stop or pivot if one or none is met, or if a P0 incident is not resolved.</p>
+
+<div class="keep">
+<h2><span class="n">09</span> Feasibility and scalability</h2>
+<p>The product already runs end to end on AWS with bounded AI usage, security controls and English/Chinese copy (details and evidence in the Technical Document). The path from pilot to scale changes infrastructure, not the product’s logic:</p>
+<table>
+  <tr><th style="width:17%">Concern</th><th>Today (pilot)</th><th>At scale</th></tr>
+  <tr><td>Data store</td><td>SQLite in WAL mode on one instance; backup before each release switch</td><td>Amazon RDS for PostgreSQL with per-firm tenancy and scheduled backups</td></tr>
+  <tr><td>Images</td><td>Private disk storage; images decoded, resized and metadata-stripped</td><td>Amazon S3 with signed URLs and lifecycle deletion</td></tr>
+  <tr><td>Compute</td><td>One Lightsail instance (US$24 per month) behind Caddy with HTTPS</td><td>Two or more instances or containers behind a load balancer</td></tr>
+  <tr><td>Model</td><td>Organiser Claude Sonnet 4.5 JSON API with per-project and daily caps</td><td>Amazon Bedrock under the firm’s account; a regional endpoint if data residency requires it (+10% over global <sup class="ref">[6]</sup>)</td></tr>
+  <tr><td>Identity</td><td>Browser-session access with single-use designer invitations</td><td>Firm accounts and single sign-on, recovery and admin roles</td></tr>
+  <tr><td>Vision</td><td>Adapter built but disabled: the gateway failed a known-image test</td><td>Enabled once a vision endpoint passes the same test</td></tr>
+  <tr><td>Compliance</td><td>Consent before upload, data minimisation, deletion by design</td><td>PDPA review, data-protection officer, data-processing agreements with firms</td></tr>
+</table>
+</div>
+
+<h2><span class="n">10</span> Risks and mitigations</h2>
+<table>
+  <tr><th style="width:27%">Risk</th><th>Mitigation</th></tr>
+  <tr><td>Designers see it as replacing their relationship work</td><td>It is the designer’s intake tool: the designer sends the link, owns the constraints and exports the brief into their own workflow.</td></tr>
+  <tr><td>Homeowners will not do pre-work</td><td>At most ten questions per round, pause and resume, “not sure” always allowed, a guided sample; completion is a pilot metric.</td></tr>
+  <tr><td>The AI misreads a preference</td><td>Proposals never auto-confirm, evidence is quoted, rejection is one click, and an explicit offline mode exists.</td></tr>
+  <tr><td>Liability for construction or safety claims</td><td>Out of scope by design; critical constraints require professional review before approval, and the product says so.</td></tr>
+  <tr><td>Privacy (PDPA)</td><td>Consent before upload, private storage, minimisation and deletion; no training on project data without separate consent.</td></tr>
+  <tr><td>Model cost or provider dependency</td><td>A provider adapter (Anthropic, OpenAI and Ollama formats), per-project and daily caps, cooldowns and an offline mode.</td></tr>
+  <tr><td>Large platforms add similar features</td><td>Focus on two-sided agreement data and workflow embedding; complement inspiration platforms rather than compete with them.</td></tr>
+</table>
+
+<div class="keep">
+<h2><span class="n">11</span> Social impact</h2>
+<div class="grid2">
+  <ul>
+    <li><b>Taste without jargon.</b> People without design vocabulary express preferences by reacting to real homes and answering plain questions, in English or Chinese, including mixed-language notes.</li>
+    <li><b>Transparency.</b> Every suggestion shows its evidence, and open decisions stay visible instead of being guessed.</li>
+  </ul>
+  <ul>
+    <li><b>Fewer misunderstandings.</b> A jointly approved, versioned record of requirements supports better conversations when expectations are questioned.</li>
+    <li><b>Inclusion.</b> Works in any browser with no app install; a manual path is always available; accessibility targets include WCAG 2.1 AA contrast and keyboard use.</li>
+  </ul>
+</div>
+</div>
+
+<h2><span class="n">12</span> Roadmap</h2>
+<table>
+  <tr><th style="width:18%">When</th><th>Milestones</th></tr>
+  <tr><td><b>Now</b> · Sep 2026</td><td>Living-room product live on AWS; two-sided approval; English and Chinese; bounded Claude Sonnet 4.5 note analysis; 77 tests and 19 live checks.</td></tr>
+  <tr><td><b>Next</b> · Q4 2026</td><td>Design-partner pilot; paired homeowner–designer trials; calibrate the belief model on pilot data; enable image understanding once a provider passes the known-image test; account recovery and HSTS.</td></tr>
+  <tr><td><b>Later</b> · 2027</td><td>Whole-home briefs with professional review for wet areas; firm dashboard; integrations with quotation and CRM tools; Malay and Tamil copy.</td></tr>
+</table>
+
+<h2><span class="n">13</span> Team and honest status</h2>
+<p><b>Four Wolf Kings (8QFDUS2I)</b> — Chen Xiaoming, Xing Yiyuan, Xu Tengyang and Xu Zhaobin — built AlignSpace for the NUS-ISS Show Me Your Agents hackathon (public category).</p>
+<table>
+  <tr><th style="width:36%">What we claim</th><th>Evidence</th></tr>
+  <tr><td>A working two-sided product on AWS</td><td><span class="tag measured">Measured</span> Live URL; deployment snapshot and 19/19 live checks on 26 September (Technical Document §9)</td></tr>
+  <tr><td>Guardrails that hold under adversarial checks</td><td><span class="tag measured">Measured</span> 19 two-session checks and 77 automated tests</td></tr>
+  <tr><td>Real model integration with bounded cost</td><td><span class="tag measured">Measured</span> Live call record with model, prompt version, tokens and latency (21 September)</td></tr>
+  <tr><td>Business outcomes</td><td><span class="tag hyp">Hypothesis</span> Not yet measured. No user study, time saving or revenue is claimed; the pilot above is designed to measure them.</td></tr>
+</table>
+
+<h2><span class="n">—</span> References</h2>
+<ol class="refs">
+  <li>Consumers Association of Singapore (CASE), media release, 9 February 2026: renovation contractors 787 complaints in 2025 (962 in 2024), fourth-highest industry; 268 CaseTrust-accredited renovation businesses as of January 2026, target 500 by 2027. <a href="https://www.case.org.sg/wp-content/uploads/2026/02/Media-Release%E2%80%94%E2%80%9476.2-per-cent-surge-in-beauty-complaints-in-2025-with-consumers-losing-over-2.1m.pdf">case.org.sg</a></li>
+  <li>Mothership, 8 January 2026, reporting HDB: about 19,600 flats completed in 2025; about 55,000 flats from 2025 to 2027. <a href="https://mothership.sg/2026/01/hdb-bto-2026/">mothership.sg/2026/01/hdb-bto-2026</a></li>
+  <li>ERA Singapore, 2 January 2026, HDB flash estimates: 26,042 resale applications in 2025 (28,986 in 2024). <a href="https://www.era.com.sg/press-release/4q-2025-hdb-flash-estimates-hdb-resale-transactions-moderate-to-end-2025">era.com.sg</a></li>
+  <li>Qanvast, 12 February 2026, expected 2026 renovation costs from 2025 medians across 341 BTO and 449 resale projects: 4-room BTO S$50,000–60,000; 4-room resale S$70,000–81,600. <a href="https://qanvast.com/sg/articles/what-are-the-expected-renovation-costs-for-hdb-flats-in-2026-3568">qanvast.com</a></li>
+  <li>AlignSpace live model-call record, 21 September 2026: 1,873 input and 426 output tokens, one attempt, 7.5 s. <a href="https://github.com/JaspinXu/AlignSpace/blob/main/docs/evidence/gateway-live-check.json">docs/evidence/gateway-live-check.json</a></li>
+  <li>Anthropic, Claude pricing: Claude Sonnet 4.5 US$3 per million input and US$15 per million output tokens; regional endpoints 10% above global. <a href="https://platform.claude.com/docs/en/about-claude/pricing">platform.claude.com</a></li>
+  <li>Amazon Lightsail pricing: Linux instance with 4 GB memory, 2 vCPUs, 80 GB SSD and 4 TB transfer, US$24 per month. <a href="https://aws.amazon.com/lightsail/pricing/">aws.amazon.com/lightsail/pricing</a></li>
+</ol>
+<p class="small muted">All web sources accessed 26 September 2026. Figures from sources are reported as published; scenario and cost-per-seat figures are our arithmetic on the assumptions stated beside them.</p>
+
+</body>
+</html>

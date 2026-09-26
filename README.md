@@ -25,7 +25,8 @@ References, notes and practical constraints become one versioned living-room bri
 <a href="#the-agent-loop"><b>Agent loop</b></a> ·
 <a href="#safety-and-evaluation"><b>Safety &amp; evaluation</b></a> ·
 <a href="#deploy"><b>Deploy</b></a> ·
-<a href="docs/writeup/AlignSpace-writeup.pdf"><b>Write-up (PDF)</b></a> ·
+<a href="docs/submission/AlignSpace-Business-Proposal.pdf"><b>Business proposal (PDF)</b></a> ·
+<a href="docs/submission/AlignSpace-Technical-Document.pdf"><b>Technical document (PDF)</b></a> ·
 <a href="README.zh-CN.md"><b>简体中文</b></a>
 </p>
 
@@ -227,12 +228,13 @@ app/
   access.py, store.py  Memberships, invitations, SQLite store and audit
   static/              Web app, styles, locale data
 schemas/               Design brief JSON schema
-scripts/               Deploy, E2E run, belief simulation, locale build
+scripts/               Deploy, deployment-evidence capture, E2E run, belief simulation, locale build
 deploy/                systemd unit and Caddyfile
 tests/                 77 unit, API and regression tests
 docs/                  Product, agent, safety, evaluation, deployment and submission docs
-  evidence/            E2E results, screenshots, example brief
-  writeup/             Write-up source and PDF
+  submission/          Business proposal and technical document (HTML sources, PDFs, renderer)
+  evidence/            E2E and live-deployment results, snapshots, screenshots, example brief
+  writeup/             Earlier combined write-up (v1.0), superseded by submission/
   assets/readme/       README figures
 ```
 
@@ -257,10 +259,10 @@ Documents under `docs/` include design proposals that are **not** what runs toda
 <details>
 <summary><b>Hackathon delivery</b></summary>
 
-- Shortlisting: **28 September 2026, 09:00 SGT**, posted in `#submission`: team code, project name, GitHub URL, video URL, PDF write-up, deployment evidence or URL.
+- Final submission: **28 September 2026, 09:00 SGT**, by email with the subject `SMYA Final Submission - 8QFDUS2I`: team code, problem statement, GitHub URL, [business proposal](docs/submission/AlignSpace-Business-Proposal.pdf) and [technical document](docs/submission/AlignSpace-Technical-Document.pdf) as PDFs, demo video URL, and deployment evidence (live URL plus the [26 September snapshot](docs/evidence/deployment-snapshot-2026-09-26.txt)).
 - Finale: **10 October 2026, 08:30 SGT**, face-to-face demo; finalist updates in `#final-submission`.
 - Assessed build on one organiser Lightsail medium instance, using the organiser's inference allocation.
-- Post template, organiser questions, video script and link check: [submission kit](docs/23-submission-kit.md).
+- Ready-to-send email, link check and video script: [submission kit](docs/23-submission-kit.md).
 
 </details>
 

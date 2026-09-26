@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AlignSpace — Technical Document</title>
+<meta name="author" content="Four Wolf Kings (8QFDUS2I)">
+<meta name="description" content="Technical document for AlignSpace: architecture, agents, reasoning loop, tools, human-in-the-loop, guardrails, evaluation and AWS deployment evidence.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section class="cover">
+  <div class="band">
+    <div class="eyebrow">NUS-ISS Show Me Your Agents · Public category · Design Inspiration</div>
+    <h1>AlignSpace</h1>
+    <div class="kind">Technical Document</div>
+    <p class="lede">A two-sided agent system with one explicit shared state: agents propose and ask, people confirm and decide, and a brief is released only when both roles approve the same content hash.</p>
+  </div>
+  <div class="hero"><img src="../assets/readme/architecture-light.png" alt="AlignSpace architecture" style="border:1px solid var(--line)"></div>
+  <div class="toc"><div class="eyebrow">Inside — mapped to the judging rubric</div>
+    <ol>
+      <li>Goal and scope</li><li>Architecture and reasoning loop</li><li>State and memory</li><li>Tool use and integration</li>
+      <li>Autonomy and human-in-the-loop</li><li>Safety, security and guardrails</li><li>Observability and evaluation</li>
+      <li>Platform, tooling and AWS deployment</li><li>Limitations and next steps</li><li>Appendices: rubric map, repository, API</li>
+    </ol>
+  </div>
+  <div class="facts">
+    <table class="kv">
+      <tr><td>Team</td><td>Four Wolf Kings · <b>8QFDUS2I</b> · Chen Xiaoming, Xing Yiyuan, Xu Tengyang, Xu Zhaobin</td></tr>
+      <tr><td>Live deployment</td><td><a href="https://54.255.93.19.sslip.io">https://54.255.93.19.sslip.io</a> — organiser AWS Lightsail medium instance, ap-southeast-1</td></tr>
+      <tr><td>Source code</td><td><a href="https://github.com/JaspinXu/AlignSpace">github.com/JaspinXu/AlignSpace</a> (MIT) · branch <code>main</code> · release <code>v1.1</code></td></tr>
+      <tr><td>Stack</td><td>Python 3.11, FastAPI, Pydantic, SQLite (WAL), vanilla JavaScript (English/中文), Caddy, systemd, Ubuntu 24.04</td></tr>
+      <tr><td>Model</td><td>Claude Sonnet 4.5 through the organiser’s JSON API (Amazon Bedrock); no fine-tuning</td></tr>
+      <tr><td>Verify in five minutes</td><td>Open the live URL → <i>Try a guided sample</i>; or run <code>python -m pytest -q</code> (77 tests) and <code>scripts/e2e_golden_path.py &lt;url&gt;</code> (19 checks)</td></tr>
+    </table>
+    <p class="note">Evidence labels: <span class="tag measured">Measured</span> observed in this repository or on the live deployment · <span class="tag hyp">Target</span> not yet measured. Companion: <b>Business Proposal</b> (problem, customers, value, pilot, economics). Date: 26 September 2026.</p>
+  </div>
+</section>
+
+<h2><span class="n">01</span> Goal and scope</h2>
+<p><b>Goal.</b> Replace the ambiguous “I like this” hand-off between a homeowner and an interior designer with one explicit, traceable, jointly approved living-room brief. The system optimises for <i>agreement</i>, not for generating images: an image does not say whether the person likes its oak, its light or its layout, and the same word (“warm”, “hotel-like”) means different things to each side.</p>
+<table>
+  <tr><th style="width:18%">Scope decision</th><th>Choice</th><th style="width:34%">Why</th></tr>
+  <tr><td>Users</td><td>Homeowner and designer, each in their own browser session with a role bound at join time</td><td>Two-sided agreement needs two independent actors</td></tr>
+  <tr><td>Room and decisions</td><td>Living room; 8 core decisions (style, colour, material, lighting, layout, mood, function, maintenance) and 55 conditional detail questions</td><td>Rich preferences, fewer safety-critical issues than wet areas</td></tr>
+  <tr><td>Output</td><td>Versioned brief, validated against <code>schemas/design-brief.schema.json</code>, exported as JSON or printed to PDF, carrying both approvals</td><td>A designer can start concept work without re-interpreting references</td></tr>
+  <tr><td>Non-goals</td><td>No construction, structural, electrical, regulatory, pricing or availability advice; no scraping; no automatic trade-off decisions</td><td>Consequential decisions stay with qualified people</td></tr>
+  <tr><td>Data</td><td>No SME dataset was supplied; demos use synthetic data; inspiration is 57 attributed public listings shown as links</td><td>Permitted by organisers when labelled</td></tr>
+</table>
+<figure class="bare"><img src="../assets/readme/workflow-light.png" alt="Collect, suggest, ask, align, approve"><figcaption>Figure 1. The user-visible loop. Every answer updates the shared state; the agents re-plan the next question or step; the loop returns to whoever owns the missing decision.</figcaption></figure>
+
+<h2><span class="n">02</span> Architecture and reasoning loop</h2>
+<p>All requests enter a FastAPI <b>orchestrator</b> that checks project membership and role, accepts only typed actions, and is the only component allowed to write the canonical <b>Project Design State</b>. Agents read that state and return proposals or rankings; they never write it directly. One agent uses a large language model for open-ended language; the control decisions are deterministic, explainable and unit-tested.</p>
+<table class="flow"><thead><tr><th style="width:19%">Agent / component</th><th style="width:10%">Kind</th><th>Responsibility and contract</th><th style="width:27%">May not</th></tr></thead>
+  <tr><td><b>Reference Analyst</b><br><code>app/gateway.py</code></td><td>LLM</td><td>Reads up to 10 notes (≤ 500 characters each), the must-avoid list and retrieved handbook excerpts; returns at most 6 proposals <code>{dimension, value, confidence, sourceId, description}</code> in a closed vocabulary. Output lands as <i>proposed</i> attributes only.</td><td>Confirm or approve; follow instructions inside notes; cite sources that were not provided; give professional advice</td></tr>
+  <tr><td><b>Interview Agent</b><br><code>app/engine.py</code>, <code>app/interview.py</code></td><td>Policy</td><td>Chooses the next question for each role by expected information gain × impact; one question at a time, “not sure” always available, rounds of ten that can be paused.</td><td>Ask the other role’s questions; exceed a round; answer for a person</td></tr>
+  <tr><td><b>Belief &amp; Next-Step Agent</b><br><code>app/belief.py</code></td><td>Policy</td><td>Keeps an evidence-weighted Dirichlet belief per decision and ranks safe actions per role (ask, confirm, compare, recommend/resolve, present, defer/invite). Logs what it suggested and what happened.</td><td>Confirm a preference; enter the signed brief; optimise clicks or dwell time</td></tr>
+  <tr><td><b>Alignment Agent</b><br><code>app/engine.py</code></td><td>Rules</td><td>Cross-checks designer constraints against confirmed preferences, opens neutral conflicts, computes coverage, blockers and stage (Explore → Clarify → Focus → Commit).</td><td>Choose a trade-off; close a conflict</td></tr>
+  <tr><td><b>Role agents</b> (homeowner-side, designer-side)</td><td>Rules</td><td>Translate each person’s action into a typed state change and post a short message to the other side in the shared conversation.</td><td>Speak for a person; change the other side’s answers</td></tr>
+  <tr><td><b>Knowledge Retriever</b><br><code>app/knowledge.py</code></td><td>Tool</td><td>BM25 over 22 attributed handbook excerpts with bilingual query expansion and Getty AAT term mapping; abstains when nothing overlaps.</td><td>Return excerpts that mention a must-avoid item; act as compliance guidance</td></tr>
+  <tr><td><b>Discovery</b><br><code>app/discovery.py</code></td><td>Tool</td><td>57 attributed Singapore homes and a live search preview of the source site (JSON payloads only).</td><td>Execute remote scripts; turn a saved home into a confirmed preference</td></tr>
+</table>
+
+<h3>The reasoning loop</h3>
+<ol>
+  <li><b>Observe.</b> An answer, note, saved home or constraint arrives as a typed action; the orchestrator applies it to the state under an optimistic version check.</li>
+  <li><b>Estimate.</b> For each decision, the belief combines the evidence so far (below). Must-avoid items and active constraints remove options before anything is scored.</li>
+  <li><b>Decide.</b> The Interview Agent picks the question with the highest expected uncertainty removed × impact for that role; the Next-Step Agent ranks safe actions.</li>
+  <li><b>Check.</b> The Alignment Agent recomputes coverage, conflicts, blockers and stage. The brief is approvable only with full coverage, no open conflict, no unreviewed critical constraint and no blocker.</li>
+  <li><b>Stop.</b> Both roles approve the same content hash. Otherwise the loop returns to the person who owns the missing decision.</li>
+</ol>
+<div class="grid2">
+  <div>
+    <div class="formula"><b>Evidence quality</b> &nbsp; q = σ(−2.0 + 3.0·explicitness + 1.0·reliability − 1.0·dispersion)<br><span class="muted">explicitness: model note 0.6 · image 0.6 · offline rule 0.4 · saved home 0.2; dispersion = other values proposed from the same source</span></div>
+    <div class="formula"><b>Weights</b> &nbsp; machine observation 2.0·q, the k-th repeat of a value counts 1/k, unconfirmed evidence halves every 30 days; a human answer or confirmation is an anchor of 8.0; a rejection halves that option.</div>
+    <div class="formula"><b>Belief</b> &nbsp; α<sub>o</sub> = 0.5 + population prior (λ = 1.0, style only, from attributed homes of the same property type) + Σ weights; p = α / Σα. “Leaning” needs p ≥ 0.45 and a margin ≥ 0.20.</div>
+    <div class="formula"><b>Next question</b> &nbsp; argmax (1 − 0.15)·H(p) × impact, where 0.15 is the assumed “not sure” rate; 0 once confirmed or blocked.</div>
+    <div class="formula"><b>Next step</b> &nbsp; reward = 1.0·ΔH + 0.8·execution + 0.6·confirmation + 1.2·acceptance − cost; cost: ask 0.15, confirm 0.05, show 0.25, recommend 0.10, present 0.05, defer 0. Hard gates filter first.</div>
+  </div>
+  <figure style="margin-top:4pt"><img src="../assets/readme/belief-panel.webp" alt="Suggested next step and clarity per decision"><figcaption>Figure 2. The side panel shows the suggested next step, why, the expected value and how clear each decision is. Advisory only and never part of the signed brief.</figcaption></figure>
+</div>
+<p class="small muted">Weights are hand-set, published and uncalibrated (<code>belief-0.1</code>): the policy is a constrained contextual bandit, not a trained reinforcement-learning agent. Every suggestion and its outcome is logged so the weights can be calibrated on pilot data (§07).</p>
+
+<h2><span class="n">03</span> State and memory</h2>
+<p>Each project is one JSON <b>Project Design State</b> (schema version 1.1.0) holding goals, must-avoid items, attributes (proposed / confirmed / rejected, each with evidence, actor and time), designer constraints (statement, rationale, severity, affected preference), conflicts, answers per role, references with provenance and consent, approvals, the agents’ conversation, the belief snapshot and a decision log.</p>
+<table>
+  <tr><th style="width:24%">Mechanism</th><th>How it works</th></tr>
+  <tr><td>Optimistic versioning</td><td>Every mutation increments <code>stateVersion</code>; a write carrying an older version is rejected with HTTP 409, so two people (or a slow model call) cannot overwrite each other.</td></tr>
+  <tr><td>Content hash and approvals</td><td>The brief carries a SHA-256 hash of its content. Each approval records the role, actor and hash; any later content edit changes the hash and clears both approvals.</td></tr>
+  <tr><td>Audit trail</td><td><code>audit_events</code> stores actor, action and version for every change; the Audit tab and <code>GET /api/projects/{id}/audit</code> expose it to project members.</td></tr>
+  <tr><td>Model-run ledger</td><td><code>analysis_runs</code> records mode, model, prompt version, retrieved chunk IDs, attempts, latency, tokens and outcome for every analysis, and enforces the caps.</td></tr>
+  <tr><td>Decision log</td><td>For each human action: which step was suggested, what the person did, whether it matched, and uncertainty before and after — the intervention data needed to evaluate and later learn the policy (last 200 entries per project).</td></tr>
+  <tr><td>Derived views</td><td>Belief and next steps are recomputed on every read, so a stored copy can never be stale; migrations upgrade older project states on load.</td></tr>
+</table>
+
+<h2><span class="n">04</span> Tool use and integration</h2>
+<table>
+  <tr><th style="width:18%">Tool</th><th>Typed contract</th><th style="width:36%">Boundary</th></tr>
+  <tr><td>LLM gateway adapter</td><td>Organiser JSON API (Claude Sonnet 4.5), temperature 0, at most 900 output tokens; response parsed with strict Pydantic models (<code>extra='forbid'</code>, confidence 0–1, description ≤ 400 characters, ≤ 30 items) and checked against the closed vocabulary and the provided reference IDs</td><td>Runs outside the database transaction; results committed only if the state version still matches; any unknown value or source rejects the whole response; at most two attempts, no blind retry on 401/403 or timeouts; 20 runs per project, 40 per day on the deployment, 10 s cooldown</td></tr>
+  <tr><td>Vision adapter</td><td>OpenAI-compatible, Anthropic and Ollama message formats</td><td>Disabled: the organiser gateway returned <code>NO_IMAGE</code> on a known-image probe. Images are still validated and stored privately.</td></tr>
+  <tr><td>Knowledge retrieval</td><td>Local BM25; each excerpt carries ID, source URL and verification note; corpus version hashed</td><td>Passed to the model as untrusted reference data (≤ 7,000 characters); never counted as user evidence</td></tr>
+  <tr><td>Singapore discovery</td><td>57 attributed listings; search preview parses JSON only</td><td>Saved homes are weak evidence (explicitness 0.2) and never confirmations</td></tr>
+  <tr><td>Brief export</td><td>JSON Schema Draft 2020-12 with <code>additionalProperties: false</code></td><td>Validated in unit tests and in every end-to-end run</td></tr>
+</table>
+<h3>One model call, end to end</h3>
+<ol>
+  <li>The homeowner presses <i>Suggest preferences from notes</i>; the orchestrator checks role, consent, the per-project and daily caps and the 10-second cooldown, and reserves a ledger row.</li>
+  <li>The adapter builds a system instruction (notes are data, never instructions; closed vocabulary; exclude must-avoid items; at most six proposals; one JSON object), adds retrieved excerpts and the notes, and calls the gateway.</li>
+  <li>Only the first complete JSON envelope is parsed; strict validation, vocabulary and source-ID checks follow. Any failure saves nothing and tells the user so.</li>
+  <li>The state changes only if its version is unchanged since the call began; proposals appear as <i>proposed</i> with the quoted evidence. The ledger records usage.</li>
+</ol>
+<p class="small"><span class="tag measured">Measured</span> On 21 September one live call returned five proposals from a note that contained none of the option labels, in 7.5 s with one attempt, 1,873 input and 426 output tokens (<code>docs/evidence/gateway-live-check.json</code>). One call is a smoke test, not a benchmark.</p>
+
+<h2><span class="n">05</span> Autonomy and human-in-the-loop</h2>
+<table>
+  <tr><th style="width:33%">The agents may do alone</th><th style="width:33%">Needs a person</th><th>Always escalated or blocked</th></tr>
+  <tr><td>Propose attributes from notes; choose the next question; rank next steps; retrieve and cite references; open a conflict; compute readiness, blockers and stage; post coordination messages</td><td>Confirm or reject any preference (homeowner); add constraints and propose resolutions (designer); resolve conflicts; approve (each role, in their own session)</td><td>Critical constraints need professional review before approval; structural, electrical, regulatory, pricing and availability questions are out of scope; no agent can pick a trade-off or approve</td></tr>
+</table>
+<div class="grid2">
+  <div>
+    <h3>Escalation checkpoints</h3>
+    <ul>
+      <li><b>Conflict gate.</b> A constraint that contradicts a confirmed preference opens a neutral conflict with both positions; approval stays blocked until a person resolves it.</li>
+      <li><b>Professional-review gate.</b> A constraint marked critical blocks approval until reviewed.</li>
+      <li><b>Readiness gate.</b> Missing decisions, two confirmed values for one decision, or any blocker keep “approve” unavailable and route the loop to the owner of the gap.</li>
+      <li><b>Dual approval.</b> Both roles must approve the same hash from separate sessions; the homeowner cannot approve as the designer.</li>
+      <li><b>Explicit offline mode.</b> If the model is unavailable, users are told and can choose offline note rules — the system never silently falls back.</li>
+    </ul>
+  </div>
+  <figure><img src="../evidence/screenshots/04-conflict.png" alt="Open conflict card"><figcaption>Figure 3. A designer constraint on light-oak joinery conflicts with the homeowner’s confirmed material, so a conflict opens and approval is blocked until a person chooses.</figcaption></figure>
+</div>
+
+<h2><span class="n">06</span> Safety, security and guardrails</h2>
+<table class="flow"><thead><tr><th style="width:20%">Threat</th><th>Control</th><th style="width:27%">Verified by</th></tr></thead>
+  <tr><td>Prompt injection in notes or retrieved text</td><td>All user and retrieved text is data; the instruction forbids following it; output can only create <i>proposed</i> attributes in a closed vocabulary; tools are not exposed to the model</td><td>Live check <code>injected_instruction_not_executed</code>; gateway schema tests</td></tr>
+  <tr><td>Cross-project access</td><td>Random session tokens stored only as SHA-256 digests; per-project membership checked on every request</td><td>Live check <code>other_session_cannot_read_project</code>; API tests</td></tr>
+  <tr><td>Role spoofing</td><td>Role bound when a single-use invitation is claimed; actions check the session’s role server-side</td><td>Live checks <code>role_spoof_rejected</code>, <code>homeowner_cannot_approve_as_designer</code></td></tr>
+  <tr><td>Invitation replay</td><td>Single-use, 24-hour expiry, stored as digests; a new invitation revokes older unused ones</td><td>Live check <code>invitation_replay_rejected</code></td></tr>
+  <tr><td>Lost updates and stale model results</td><td>Optimistic versioning (HTTP 409); model results committed only on an unchanged version</td><td>Live check <code>stale_edit_rejected</code>; regression tests</td></tr>
+  <tr><td>Approval integrity</td><td>Approvals bound to the content hash; any edit clears both</td><td>Live checks <code>same_content_hash</code>, <code>edit_invalidates_approvals</code></td></tr>
+  <tr><td>Malicious uploads</td><td>Consent required; JPG/PNG/WebP only with signature check; ≤ 10 MB and ≤ 20 megapixels; decoded, re-encoded and stripped of metadata; ≤ 10 per project; path traversal refused</td><td>Upload and decoding tests</td></tr>
+  <tr><td>Browser attacks</td><td>Cookies HttpOnly, SameSite=Strict, Secure; cross-origin writes rejected; CSP <code>script-src 'self'</code>, <code>frame-ancestors 'none'</code>; no-referrer; nosniff</td><td>Deployment snapshot headers (§08)</td></tr>
+  <tr><td>Secrets</td><td>API keys only in the server-side <code>.env</code> (mode 600), excluded from Git, the Docker context and release archives</td><td>History scan; deployment snapshot</td></tr>
+  <tr><td>Cost and abuse</td><td>Persistent per-project (20) and daily (40) caps, 10 s cooldown, two attempts at most</td><td>Cap tests; model-run ledger</td></tr>
+  <tr><td>Unsafe advice</td><td>The model instruction forbids professional and construction advice; critical constraints are marked <i>professional review required</i> and cannot be resolved or approved past; the product states its limits</td><td>Engine rule and tests; product copy</td></tr>
+</table>
+
+<h2><span class="n">07</span> Observability and evaluation</h2>
+<p><b>Tracing.</b> Every state change writes an audit event (actor, action, version). Every model call writes a ledger row (mode, model, prompt version <code>reference-observations-v3-grounded</code>, retrieved chunk IDs, knowledge-corpus hash, attempts, latency, tokens, outcome). Every human action writes a decision-log entry (suggested step, actual action, whether it matched, uncertainty before and after).</p>
+<figure class="bare"><img src="../assets/readme/evidence-light.png" alt="Evaluation summary"><figcaption>Figure 4. Evaluation summary as published in the repository README.</figcaption></figure>
+<table>
+  <tr><th style="width:27%">Evaluation</th><th>What it covers</th><th class="num" style="width:21%">Result</th></tr>
+  <tr><td>Automated tests (<code>pytest</code>, 8 files)</td><td>Approval hashes, stale edits, negation, preference replacement, constraint and must-avoid filtering, isolation, role spoofing, invitation replay, consent, image decoding, caps, model-schema boundaries, belief gates</td><td class="num pass">77 / 77 passed</td></tr>
+  <tr><td>Two-session browser run, live URL, 26 Sep (<code>scripts/e2e_golden_path.py</code>)</td><td>Golden path plus adversarial cases across separate homeowner and designer browser contexts: injection, must-avoid, unconfirmed suggestions, invitation role, conflict gate, dual approval, same hash, edit invalidation, replay, isolation, stale edit, role spoof, decision log</td><td class="num pass">19 / 19, 0 console errors, 20.7 s</td></tr>
+  <tr><td>Live model call, 21 Sep</td><td>Real note analysis on the public site through the organiser API</td><td class="num">5 proposals; 1 attempt; 7.5 s</td></tr>
+  <tr><td>Belief simulation (<code>scripts/simulate_belief.py</code>)</td><td>Recovering hidden preferences from noisy, bursty synthetic evidence, compared with naive vote counting (3 seeds)</td><td class="num">top-1 0.71–0.73 vs 0.68–0.70</td></tr>
+  <tr><td>Continuous integration (GitHub Actions)</td><td><code>ruff</code> lint, tests, belief simulation and schema check on every push</td><td class="num pass">green on the release commit</td></tr>
+</table>
+<p><b>Not yet evaluated.</b> No independent homeowner–designer study, no calibration of the belief on real projects, no load test beyond pilot scale, and image understanding is untested because it is disabled. The Business Proposal’s pilot defines the outcome metrics (alignment rate, review time, completion, revisions).</p>
+
+<h2><span class="n">08</span> Platform, tooling and AWS deployment</h2>
+<h3>Deployment design</h3>
+<ul>
+  <li><b>Target.</b> The one organiser-provided Lightsail medium instance (2 vCPU, 4 GB, 80 GB; Ubuntu 24.04; ap-southeast-1).</li>
+  <li><b>Release.</b> <code>scripts/deploy_lightsail.sh</code> ships <code>git archive HEAD</code> only — local databases, uploads and secrets never leave the developer’s machine — into <code>~/alignspace/releases/&lt;sha&gt;</code>, switches a <code>current</code> symlink, keeps <code>.env</code> and data in <code>shared/</code>, health-checks and rolls back on failure.</li>
+  <li><b>Runtime.</b> uvicorn bound to 127.0.0.1:8010 under a hardened systemd unit; Caddy on ports 80 and 443 with automatic Let’s Encrypt certificates (TLS-ALPN) for <code>54.255.93.19.sslip.io</code>; plain HTTP redirects to HTTPS.</li>
+  <li><b>Model access.</b> JSON calls to the organiser’s Amazon Bedrock Claude Sonnet 4.5 endpoint, within the published usage plan and our own caps.</li>
+  <li><b>Tooling.</b> GitHub Actions CI; Playwright for browser verification; Docker Compose for local use; AI coding assistants (including Kiro, as offered) during development — the assessed build does not depend on them.</li>
+</ul>
+<h3>Live snapshot <span class="tag measured">Measured</span></h3>
+<div class="terminal nowrap"><span class="d"># scripts/capture_deployment_evidence.sh — read-only, captured 2026-09-26 10:08 UTC</span>
+<span class="c">os       </span> Ubuntu 24.04.4 LTS · kernel 6.17.0-1019-aws
+<span class="c">instance </span> ap-southeast-1a · t3.medium class · 2 vCPU · memory 0.87 / 3.83 GB used · disk 6.8 / 77 GB used
+<span class="c">uptime   </span> 13 days (booted 2026-09-12 17:26 UTC)
+<span class="c">release  </span> ~/alignspace/releases/a1c8bd0 (current)
+<span class="c">services </span> alignspace  enabled · active since 2026-09-25 06:30 UTC · automatic restarts 0
+          caddy       enabled · active since 2026-09-21 08:42 UTC · automatic restarts 0
+<span class="c">unit     </span> User=ubuntu  ProtectSystem=strict  ProtectHome=read-only  NoNewPrivileges=yes
+          PrivateTmp=yes  UMask=0077  Restart=on-failure
+<span class="c">sockets  </span> 127.0.0.1:8010 (app, not public) · *:80 · *:443 (Caddy)
+<span class="c">tls      </span> CN=54.255.93.19.sslip.io · issuer Let's Encrypt YE1 · valid 2026-09-21 → 2026-12-20
+<span class="c">https    </span> GET /  → 200, certificate verified, 0.22 s
+          GET /health → {"status":"ok","service":"alignspace"} · http:// → 308 https://
+<span class="c">runtime  </span> {"analysisMode":"gateway","imageAnalysisEnabled":false,"projectRunLimit":20}
+<span class="c">limits   </span> ANALYSIS_MODE=gateway  ALLOW_IMAGES=false  SECURE_COOKIES=true  PROJECT_RUN_LIMIT=20  DAILY_RUN_LIMIT=40
+<span class="c">secrets  </span> .env mode 600, owner ubuntu — values never printed
+<span class="c">headers  </span> content-security-policy: default-src 'self'; img-src 'self' blob: … (truncated)
+          referrer-policy: no-referrer · x-content-type-options: nosniff
+<span class="c">ledger   </span> 13 projects · 70 audit events · 5 analysis runs (1 gateway, 4 offline)</div>
+<p class="small muted">Raw output: <code>docs/evidence/deployment-snapshot-2026-09-26.txt</code>. Same day, the two-session browser run against the public URL passed 19 of 19 checks with zero console errors (<code>docs/evidence/e2e-live-run-2026-09-26.json</code>). Hosting cost at list price is US$24 per month; one note analysis costs about US$0.012 at Claude Sonnet 4.5 list prices.</p>
+
+<h2><span class="n">09</span> Limitations and next steps</h2>
+<table>
+  <tr><th style="width:30%">Limitation</th><th>Next step</th></tr>
+  <tr><td>Belief weights and thresholds are hand-set and uncalibrated</td><td>Calibrate on a project- and time-separated split of pilot data; learn the next-step policy from the decision log</td></tr>
+  <tr><td>Image understanding disabled (gateway failed a known-image probe)</td><td>Enable the existing vision adapter once an endpoint passes the same probe</td></tr>
+  <tr><td>Possession-based sessions, no account recovery</td><td>Firm accounts, single sign-on and recovery</td></tr>
+  <tr><td>SQLite on one instance; manual backup at release switch</td><td>Scheduled backups now; PostgreSQL (Amazon RDS) and S3 for images at scale</td></tr>
+  <tr><td>No HSTS header yet</td><td>Add HSTS at the proxy after the pilot domain is fixed</td></tr>
+  <tr><td>No independent user study</td><td>Paired homeowner–designer trials in the pilot (Business Proposal §08)</td></tr>
+</table>
+
+<h2><span class="n">A</span> Rubric map</h2>
+<table class="compact">
+  <tr><th style="width:27%">Judging criterion</th><th>Where to look</th></tr>
+  <tr><td>Goal &amp; scope definition</td><td>§01 · Business Proposal · <code>docs/01-product-requirements.md</code>, <code>docs/10-business-case.md</code></td></tr>
+  <tr><td>Architecture &amp; reasoning loop</td><td>§02–03 · <code>app/engine.py</code>, <code>app/belief.py</code>, <code>app/store.py</code>, <code>docs/04</code>, <code>docs/22</code></td></tr>
+  <tr><td>Tool use &amp; integration</td><td>§04 · <code>app/gateway.py</code>, <code>app/knowledge.py</code>, <code>app/discovery.py</code>, <code>schemas/</code></td></tr>
+  <tr><td>Autonomy &amp; human-in-the-loop</td><td>§05 · approval and conflict tests · two-session run</td></tr>
+  <tr><td>Safety, security &amp; guardrails</td><td>§06 · <code>docs/07</code>, <code>app/access.py</code>, <code>tests/test_regressions.py</code>, <code>tests/test_api.py</code></td></tr>
+  <tr><td>Observability &amp; evaluation</td><td>§07 · <code>docs/16-verification-report.md</code>, <code>docs/evidence/</code>, Audit tab, decision log</td></tr>
+  <tr><td>Platform &amp; tooling usage</td><td>§08 · <code>docs/15-deployment-runbook.md</code>, <code>scripts/deploy_lightsail.sh</code>, <code>deploy/</code>, <code>.github/workflows/ci.yml</code></td></tr>
+</table>
+
+<h2><span class="n">B</span> Repository and how to run</h2>
+<div class="grid2">
+  <table class="compact">
+    <tr><th>Path</th><th>Contents</th></tr>
+    <tr><td><code>app/</code></td><td>11 Python modules, 2,678 lines: orchestrator (<code>main.py</code>), state engine, belief, gateway, knowledge, discovery, interview, access, store</td></tr>
+    <tr><td><code>app/static/</code></td><td>Vanilla JS/CSS/HTML front end with English and Chinese copy</td></tr>
+    <tr><td><code>tests/</code></td><td>8 files, 77 test cases</td></tr>
+    <tr><td><code>scripts/</code></td><td>Deployment, evidence capture, E2E, belief simulation, data refresh</td></tr>
+    <tr><td><code>schemas/</code>, <code>deploy/</code></td><td>Brief JSON Schema; systemd unit and Caddyfile</td></tr>
+    <tr><td><code>docs/</code></td><td>Requirements, design, safety, evaluation, runbook, verification report and evidence</td></tr>
+  </table>
+<div class="terminal"><span class="d"># local run (Python 3.11)</span>
+pip install -r requirements-dev.txt
+cp .env.example .env
+<span class="d"># no model key? set ALIGNSPACE_ANALYSIS_MODE=offline</span>
+python -m uvicorn app.main:app --port 8010
+python -m pytest -q     <span class="d"># 77 tests</span>
+
+<span class="d"># browser checks against any deployment</span>
+python scripts/e2e_golden_path.py https://&lt;host&gt;
+
+<span class="d"># deploy to Lightsail</span>
+scripts/deploy_lightsail.sh ubuntu@&lt;ip&gt; key.pem</div>
+</div>
+
+<h2><span class="n">C</span> API surface</h2>
+<table class="compact">
+  <tr><th style="width:23%">Area</th><th>Endpoints (all project routes require membership; writes require same-origin)</th></tr>
+  <tr><td>Health and runtime</td><td><code>GET /health</code> · <code>GET /api/runtime</code></td></tr>
+  <tr><td>Projects and access</td><td><code>GET|POST /api/projects</code> · <code>GET /api/projects/{id}</code> · <code>POST /api/projects/{id}/invitations</code> · <code>POST /api/invitations/claim</code> · <code>POST /api/demo/start</code></td></tr>
+  <tr><td>Evidence</td><td><code>POST /api/projects/{id}/reference-notes</code> · <code>POST /api/projects/{id}/references</code> · <code>GET /api/projects/{id}/references/{rid}/image</code> · <code>GET /api/inspiration/search</code> · <code>POST /api/inspiration/resolve</code></td></tr>
+  <tr><td>Agents</td><td><code>POST|GET /api/projects/{id}/analysis-runs</code> · <code>POST /api/projects/{id}/interview</code> · <code>POST /api/projects/{id}/questions/{qid}/answer</code> · <code>GET /api/decision-options</code></td></tr>
+  <tr><td>Human decisions</td><td><code>POST /api/projects/{id}/attributes/{aid}/review</code> · <code>POST /api/projects/{id}/constraints</code> · <code>POST /api/projects/{id}/conflicts/{cid}/resolve</code> · <code>POST /api/projects/{id}/approvals</code></td></tr>
+  <tr><td>Output and trace</td><td><code>GET /api/projects/{id}/brief</code> · <code>GET /api/projects/{id}/audit</code></td></tr>
+</table>
+
+</body>
+</html>
